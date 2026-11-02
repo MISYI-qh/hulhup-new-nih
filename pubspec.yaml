@@ -1,15 +1,46 @@
 name: hulhup
-description: Hulhup - tap, dengar suara acak.
+description: Hulhup - ketuk, dengarkan suara acak. Produk Misyi.
 publish_to: none
-version: 0.1.0+1
+version: 1.0.0+1
 environment:
   sdk: ">=3.3.0 <4.0.0"
 dependencies:
   flutter:
     sdk: flutter
-  audioplayers: ^6.0.0
-  record: ^6.0.0
+  audioplayers: ^6.1.0
+  record: ^7.1.2
   file_picker: ^10.0.0
-  path_provider: ^2.1.0
+  image_picker: ^1.1.2
+  path_provider: ^2.1.4
+  crypto: ^3.0.3
+  shared_preferences: ^2.3.2
+dev_dependencies:
+  flutter_launcher_icons: ^0.14.0
 flutter:
   uses-material-design: true
+  fonts:
+    - family: Outfit
+      fonts:
+        - asset: assets/fonts/Outfit-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Outfit-Bold.ttf
+          weight: 700
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/icon.png"
+  remove_alpha_ios: true
+  adaptive_icon_background: "#163F2B"
+  adaptive_icon_foreground: "assets/icon/foreground.png"
+  web:
+    generate: true
+    image_path: "assets/icon/icon.png"
+    background_color: "#FEFDF9"
+    theme_color: "#163F2B"
+  windows:
+    generate: true
+    image_path: "assets/icon/icon.png"
+    icon_size: 256
+  macos:
+    generate: true
+    image_path: "assets/icon/icon.png"

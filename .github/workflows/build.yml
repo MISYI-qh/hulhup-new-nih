@@ -1,5 +1,5 @@
 name: build
-on: [workflow_dispatch, push]
+on: workflow_dispatch
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -7,8 +7,17 @@ jobs:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with: { channel: stable }
-      - run: flutter create . --project-name hulhup --org app.hulhup --platforms=android,web,linux,windows,macos,ios
+      - name: Buat folder platform
+        run: flutter create . --project-name hulhup --org app.misyi --platforms=android,web,linux,windows,macos,ios
+      - name: Izin, nama, minSdk Android
+        run: |
+          M=android/app/src/main/AndroidManifest.xml
+          sed -i 's|<application|<uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\n    <application|' $M
+          sed -i 's|android:label="hulhup"|android:label="Hulhup"|' $M
+          sed -i 's|minSdk = flutter.minSdkVersion|minSdk = 24|; s|minSdkVersion flutter.minSdkVersion|minSdkVersion 24|' android/app/build.gradle* || true
+          sed -i 's|<title>hulhup</title>|<title>Hulhup</title>|' web/index.html || true
       - run: flutter pub get
+      - run: dart run flutter_launcher_icons
       - run: flutter build apk --release
       - run: flutter build web --release
       - uses: actions/upload-artifact@v4

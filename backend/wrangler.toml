@@ -1,0 +1,12 @@
+name = "hulhup-api"
+main = "index.js"
+compatibility_date = "2025-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "hulhup"
+database_id = "ISI_DENGAN_ID_D1"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "hulhup-files"
