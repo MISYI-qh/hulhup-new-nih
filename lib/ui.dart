@@ -386,42 +386,119 @@ class CoverBox extends StatelessWidget {
   }
 }
 
-/// Pemilih usia buatan sendiri (roda gulir), tanpa keyboard bawaan.
-class AgeField extends StatelessWidget {
+const _months = {
+  'id': ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'],
+  'en': ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+};
+
+/// Tanggal lahir buatan sendiri (tiga roda: tanggal, bulan, tahun). Umur dihitung otomatis.
+class BirthField extends StatelessWidget {
   final String label;
   final TextEditingController c;
-  const AgeField(this.label, this.c, {super.key});
+  const BirthField(this.label, this.c, {super.key});
   @override
   Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Padding(padding: const EdgeInsets.only(left: 6, bottom: 6), child: Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: sub(context)))),
-        Tap(onTap: () => pickAge(context, c), scale: .98, child: Container(
+        Tap(onTap: () => pickBirth(context, c), scale: .98, child: Container(
           height: 56, padding: const EdgeInsets.symmetric(horizontal: 18), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(28)),
-          child: ListenableBuilder(listenable: c, builder: (_, __) => Row(children: [
-            Expanded(child: AnimatedSwitcher(duration: const Duration(milliseconds: 220), transitionBuilder: (w, a) => FadeTransition(opacity: a, child: SlideTransition(position: Tween(begin: const Offset(0, .3), end: Offset.zero).animate(a), child: w)), child: Align(key: ValueKey(c.text), alignment: Alignment.centerLeft, child: Text(c.text, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500))))),
-            Icon(Icons.unfold_more_rounded, color: sub(context)),
-          ])),
+          child: ListenableBuilder(listenable: c, builder: (_, __) {
+            final d = DateTime.tryParse(c.text);
+            return Row(children: [
+              Expanded(child: AnimatedSwitcher(duration: const Duration(milliseconds: 220), transitionBuilder: (w, a) => FadeTransition(opacity: a, child: SlideTransition(position: Tween(begin: const Offset(0, .3), end: Offset.zero).animate(a), child: w)), child: Align(key: ValueKey(c.text), alignment: Alignment.centerLeft, child: Text(d == null ? '' : '${d.day} ${_months[Store.i.lang]![d.month - 1]} ${d.year}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500))))),
+              if (d != null) Padding(padding: const EdgeInsets.only(right: 8), child: Text('${Local.ageOf(c.text)} ${Store.i.t('years')}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: sub(context)))),
+              Icon(Icons.unfold_more_rounded, color: sub(context)),
+            ]);
+          }),
         )),
       ]);
 }
 
-Future<void> pickAge(BuildContext ctx, TextEditingController c) async {
-  var v = (int.tryParse(c.text) ?? 18).clamp(1, 120);
-  var ok = false;
-  final ctrl = FixedExtentScrollController(initialItem: v - 1);
-  await sheet(ctx, (sc) => Column(mainAxisSize: MainAxisSize.min, children: [
+Future<void> pickBirth(BuildContext ctx, TextEditingController c) async {
+  final init = DateTime.tryParse(c.text) ?? DateTime(DateTime.now().year - 18, 1, 1);
+  final r = await sheet<DateTime>(ctx, (_) => _BirthSheet(init));
+  if (r != null) c.text = '${r.year.toString().padLeft(4, '0')}-${r.month.toString().padLeft(2, '0')}-${r.day.toString().padLeft(2, '0')}';
+}
+
+class _BirthSheet extends StatefulWidget {
+  final DateTime init;
+  const _BirthSheet(this.init);
+  @override
+  State<_BirthSheet> createState() => _BirthState();
+}
+
+class _BirthState extends State<_BirthSheet> {
+  final now = DateTime.now();
+  late int d = widget.init.day, m = widget.init.month, y = widget.init.year;
+  late final cd = FixedExtentScrollController(initialItem: d - 1), cm = FixedExtentScrollController(initialItem: m - 1), cy = FixedExtentScrollController(initialItem: now.year - y);
+  int get days => DateUtils.getDaysInMonth(y, m);
+  @override
+  void dispose() { cd.dispose(); cm.dispose(); cy.dispose(); super.dispose(); }
+
+  void _fix() {
+    if (y == now.year && m > now.month) { m = now.month; cm.animateToItem(m - 1, duration: const Duration(milliseconds: 220), curve: Curves.easeOut); }
+    if (d > days) d = days;
+    if (y == now.year && m == now.month && d > now.day) d = now.day;
+    if (cd.hasClients && cd.selectedItem != d - 1) cd.animateToItem(d - 1, duration: const Duration(milliseconds: 220), curve: Curves.easeOut);
+    setState(() {});
+  }
+
+  Widget wheel(FixedExtentScrollController c, int n, int flex, String Function(int) t, ValueChanged<int> on) => Expanded(
+        flex: flex,
+        child: ListWheelScrollView.useDelegate(
+          controller: c, itemExtent: 52, diameterRatio: 2.2, perspective: .003, physics: const FixedExtentScrollPhysics(),
+          onSelectedItemChanged: (i) { HapticFeedback.selectionClick(); on(i); },
+          childDelegate: ListWheelChildBuilderDelegate(childCount: n, builder: (_, i) => Center(child: Text(t(i), style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: ink(context))))),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) => Column(mainAxisSize: MainAxisSize.min, children: [
         Text(Store.i.t('age'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
         const SizedBox(height: 8),
-        SizedBox(height: 210, child: Stack(children: [
-          Center(child: Container(height: 54, decoration: BoxDecoration(color: soft(sc), borderRadius: BorderRadius.circular(27)))),
-          ListWheelScrollView.useDelegate(
-            controller: ctrl, itemExtent: 54, diameterRatio: 2.2, perspective: .003, physics: const FixedExtentScrollPhysics(),
-            onSelectedItemChanged: (i) { v = i + 1; HapticFeedback.selectionClick(); },
-            childDelegate: ListWheelChildBuilderDelegate(childCount: 120, builder: (_, i) => Center(child: Text('${i + 1}', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: ink(sc))))),
-          ),
+        SizedBox(height: 208, child: Stack(children: [
+          Center(child: Container(height: 52, decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(26)))),
+          Row(children: [
+            wheel(cd, days, 2, (i) => '${i + 1}', (i) { d = i + 1; _fix(); }),
+            wheel(cm, 12, 4, (i) => _months[Store.i.lang]![i], (i) { m = i + 1; _fix(); }),
+            wheel(cy, 121, 3, (i) => '${now.year - i}', (i) { y = now.year - i; _fix(); }),
+          ]),
         ])),
         const SizedBox(height: 14),
-        PBtn(Store.i.t('done'), () { ok = true; Navigator.pop(sc); }),
-      ]));
-  if (ok) c.text = '$v';
-  ctrl.dispose();
+        PBtn(Store.i.t('done'), () => Navigator.pop(context, DateTime(y, m, d))),
+      ]);
+}
+
+const audiences = ['public', 'followers', 'following', 'both'];
+IconData audIcon(String v) => const {'public': Icons.public_rounded, 'followers': Icons.group_outlined, 'following': Icons.person_add_alt_1_outlined, 'both': Icons.people_alt_outlined}[v] ?? Icons.public_rounded;
+
+/// Pilihan audiens buatan sendiri (publik, pengikut, mengikuti, pengikut dan mengikuti).
+class Pick extends StatelessWidget {
+  final String label, value;
+  final ValueChanged<String> on;
+  const Pick(this.label, this.value, this.on, {super.key});
+  @override
+  Widget build(BuildContext context) {
+    final s = Store.i;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Padding(padding: const EdgeInsets.only(left: 6, bottom: 6), child: Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: sub(context)))),
+      Tap(
+        scale: .98,
+        onTap: () async {
+          final r = await sheet<String>(context, (sc) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Padding(padding: const EdgeInsets.only(left: 4, bottom: 12), child: Text(label, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18))),
+            for (final v in audiences) Tap(onTap: () => Navigator.pop(sc, v), scale: .98, child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200), margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+              decoration: BoxDecoration(color: v == value ? ink(sc).withValues(alpha: .14) : soft(sc), borderRadius: BorderRadius.circular(24)),
+              child: Row(children: [Icon(audIcon(v), size: 22, color: ink(sc)), const SizedBox(width: 14), Expanded(child: Text(s.t('a_$v'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16))), if (v == value) Icon(Icons.check_rounded, color: ink(sc))]),
+            )),
+          ]));
+          if (r != null) on(r);
+        },
+        child: Container(
+          height: 56, padding: const EdgeInsets.symmetric(horizontal: 18), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(28)),
+          child: Row(children: [Icon(audIcon(value), size: 22, color: ink(context)), const SizedBox(width: 12), Expanded(child: Text(s.t('a_$value'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500))), Icon(Icons.unfold_more_rounded, color: sub(context))]),
+        ),
+      ),
+    ]);
+  }
 }

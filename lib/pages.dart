@@ -44,7 +44,7 @@ class _AuthState extends State<AuthPage> {
     setState(() => busy = true);
     try {
       if (reg) {
-        await s.auth('/register', {'name': name.text, 'username': user.text, 'password': pw.text, 'age': age.text});
+        await s.auth('/register', {'name': name.text, 'username': user.text, 'password': pw.text, 'birth': age.text});
       } else {
         await s.auth('/login', {'username': user.text, 'password': pw.text});
       }
@@ -70,7 +70,7 @@ class _AuthState extends State<AuthPage> {
           Field(s.t('username'), user, max: 20),
           const SizedBox(height: 16),
           Field(s.t('password'), pw, secret: true),
-          if (reg) ...[const SizedBox(height: 16), AgeField(s.t('age'), age)],
+          if (reg) ...[const SizedBox(height: 16), BirthField(s.t('age'), age)],
         ])),
         const SizedBox(height: 28),
         PBtn(reg ? s.t('register') : s.t('login'), _go, loading: busy),
@@ -89,7 +89,7 @@ class AudioRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = Store.i;
-    final vis = {'all': Icons.public_rounded, 'followers': Icons.group_outlined, 'me': Icons.lock_outline_rounded}[a.vis]!;
+    final vis = audIcon(a.vis);
     return ListenableBuilder(listenable: s, builder: (_, __) {
       final on = s.playing == a.id;
       return Container(
@@ -102,7 +102,7 @@ class AudioRow extends StatelessWidget {
             Text(a.desc.trim().isEmpty ? s.t('untitled') : a.desc.trim(), maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: a.desc.trim().isEmpty ? sub(context) : null)),
             const SizedBox(height: 4),
             Row(children: [
-              Text(mmss(a.secs), style: TextStyle(color: sub(context), fontSize: 13, fontWeight: FontWeight.w600)),
+              ValueListenableBuilder<int>(valueListenable: s.pos, builder: (_, ms, __) => Text(on ? '${mmss(ms ~/ 1000)} / ${mmss(a.secs)}' : mmss(a.secs), style: TextStyle(color: on ? ink(context) : sub(context), fontSize: 13, fontWeight: FontWeight.w700))),
               if (mine) ...[const SizedBox(width: 10), Icon(vis, size: 15, color: sub(context))],
               if (showOwner) ...[const SizedBox(width: 10), Flexible(child: Text(a.ownerName, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: sub(context), fontSize: 13)))],
             ]),
@@ -190,11 +190,9 @@ class _ProfileState extends State<ProfilePage> {
   Widget _body(BuildContext context, Store s) {
     final u = user!, shown = tab == 1 ? likedList : list;
     return RefreshIndicator(color: ink(context), backgroundColor: card(context), onRefresh: _load, child: ListView(padding: const EdgeInsets.only(bottom: 40), children: [
-      In(0, Stack(clipBehavior: Clip.none, children: [
-        CoverBox(u.cover, 220),
-        Positioned(left: 24, bottom: -46, child: Container(padding: const EdgeInsets.all(5), decoration: BoxDecoration(color: bgOf(context), shape: BoxShape.circle, boxShadow: [BoxShadow(color: green.withValues(alpha: .18), blurRadius: 24, offset: const Offset(0, 8))]), child: Avatar(u.avatar, u.name, 92))),
-      ])),
-      const SizedBox(height: 56),
+      const SizedBox(height: 10),
+      In(0, Padding(padding: const EdgeInsets.symmetric(horizontal: 24), child: Align(alignment: Alignment.centerLeft, child: Container(padding: const EdgeInsets.all(5), decoration: BoxDecoration(color: bgOf(context), shape: BoxShape.circle, boxShadow: [BoxShadow(color: green.withValues(alpha: .16), blurRadius: 28, offset: const Offset(0, 10))]), child: Avatar(u.avatar, u.name, 96))))),
+      const SizedBox(height: 16),
       Padding(padding: const EdgeInsets.fromLTRB(24, 0, 24, 0), child: In(1, Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(u.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 24, letterSpacing: -.5)),
         const SizedBox(height: 2),
@@ -261,7 +259,7 @@ class EditProfilePage extends StatefulWidget {
 
 class _EditState extends State<EditProfilePage> {
   final u = Store.i.me!;
-  late final name = TextEditingController(text: u.name), user = TextEditingController(text: u.username), bio = TextEditingController(text: u.bio), age = TextEditingController(text: '${u.age}');
+  late final name = TextEditingController(text: u.name), user = TextEditingController(text: u.username), bio = TextEditingController(text: u.bio), age = TextEditingController(text: u.birth);
   bool busy = false;
   String? up;
 
@@ -281,7 +279,7 @@ class _EditState extends State<EditProfilePage> {
     final s = Store.i;
     setState(() => busy = true);
     try {
-      final j = await Api.req('PATCH', '/me', body: {'name': name.text, 'username': user.text, 'bio': bio.text, 'age': age.text});
+      final j = await Api.req('PATCH', '/me', body: {'name': name.text, 'username': user.text, 'bio': bio.text, 'birth': age.text});
       await s.refresh();
       toast(s.t('saved'));
       if (mounted) Navigator.pop(context, j['user']['username']);
@@ -295,16 +293,14 @@ class _EditState extends State<EditProfilePage> {
     return Scaffold(body: Column(children: [
       TopBar(back: true, title: s.t('edit_profile')),
       Expanded(child: ListView(padding: const EdgeInsets.only(bottom: 40), children: [
-        In(0, Stack(clipBehavior: Clip.none, children: [
-          Tap(onTap: () => _img('cover'), scale: .99, child: CoverBox(me.cover, 190, over: Align(alignment: const Alignment(0, -.25), child: Container(width: 54, height: 54, decoration: const BoxDecoration(color: Colors.black38, shape: BoxShape.circle), child: up == 'cover' ? const Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator(strokeWidth: 2.4, strokeCap: StrokeCap.round, color: cream)) : const Icon(Icons.photo_camera_outlined, color: cream, size: 26))))),
-          Positioned(left: 24, bottom: -42, child: Tap(onTap: () => _img('avatar'), child: Container(padding: const EdgeInsets.all(5), decoration: BoxDecoration(color: bgOf(context), shape: BoxShape.circle, boxShadow: [BoxShadow(color: green.withValues(alpha: .18), blurRadius: 24, offset: const Offset(0, 8))]), child: ClipOval(child: SizedBox(width: 84, height: 84, child: Stack(fit: StackFit.expand, children: [Avatar(me.avatar, me.name, 84), cam(up == 'avatar')])))))),
-        ])),
-        const SizedBox(height: 62),
+        const SizedBox(height: 8),
+        In(0, Center(child: Tap(onTap: () => _img('avatar'), child: Container(padding: const EdgeInsets.all(5), decoration: BoxDecoration(color: bgOf(context), shape: BoxShape.circle, boxShadow: [BoxShadow(color: green.withValues(alpha: .16), blurRadius: 28, offset: const Offset(0, 10))]), child: ClipOval(child: SizedBox(width: 104, height: 104, child: Stack(fit: StackFit.expand, children: [Avatar(me.avatar, me.name, 104), cam(up == 'avatar')]))))))),
+        const SizedBox(height: 28),
         Padding(padding: const EdgeInsets.symmetric(horizontal: 24), child: Column(children: [
           In(1, Field(s.t('name'), name, max: 40)), const SizedBox(height: 16),
           In(2, Field(s.t('username'), user, max: 20)), const SizedBox(height: 16),
           In(3, Field(s.t('bio'), bio, max: 300, lines: 4)), const SizedBox(height: 16),
-          In(4, AgeField(s.t('age'), age)), const SizedBox(height: 28),
+          In(4, BirthField(s.t('age'), age)), const SizedBox(height: 28),
           PBtn(s.t('save'), _save, loading: busy),
         ])),
       ])),
@@ -448,8 +444,8 @@ class _UploadState extends State<UploadPage> {
   Uint8List? bytes;
   String ext = 'm4a';
   int ms = 0;
-  bool recording = false, popup = true, busy = false, previewing = false;
-  String vis = 'all';
+  bool recording = false, popup = true, pprof = true, busy = false, previewing = false;
+  String vis = 'public', rand = 'public';
   Timer? timer;
 
   @override
@@ -507,7 +503,7 @@ class _UploadState extends State<UploadPage> {
     final s = Store.i;
     setState(() => busy = true);
     try {
-      await Api.multi('/audios', bytes!, 'a.$ext', {'desc': desc.text, 'secs': '${max(1, (ms / 1000).ceil())}', 'popup': popup ? '1' : '0', 'vis': vis});
+      await Api.multi('/audios', bytes!, 'a.$ext', {'desc': desc.text, 'secs': '${max(1, (ms / 1000).ceil())}', 'popup': popup ? '1' : '0', 'pprof': pprof ? '1' : '0', 'vis': vis, 'rand': rand});
       if (!mounted) return;
       Navigator.pop(context);
       toast(s.t('uploaded'));
@@ -535,9 +531,11 @@ class _UploadState extends State<UploadPage> {
         Field(s.t('desc'), desc, max: 500, lines: 4),
         const SizedBox(height: 18),
         Row(children: [Expanded(child: Text(s.t('popup'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16))), Toggle(popup, (v) => setState(() => popup = v))]),
-        const SizedBox(height: 20),
-        Padding(padding: const EdgeInsets.only(left: 6, bottom: 8), child: Text(s.t('who'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: sub(context)))),
-        Seg<String>([('all', s.t('v_all')), ('followers', s.t('v_fol')), ('me', s.t('v_me'))], vis, (v) => setState(() => vis = v)),
+        AnimatedSize(duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic, child: popup ? Padding(padding: const EdgeInsets.only(top: 16), child: Row(children: [Expanded(child: Text(s.t('pprof'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16))), Toggle(pprof, (v) => setState(() => pprof = v))])) : const SizedBox(width: double.infinity)),
+        const SizedBox(height: 22),
+        Pick(s.t('who_rand'), rand, (v) => setState(() => rand = v)),
+        const SizedBox(height: 16),
+        Pick(s.t('who'), vis, (v) => setState(() => vis = v)),
         const SizedBox(height: 28),
         PBtn(s.t('upload'), bytes == null || recording ? null : _send, loading: busy, icon: Icons.arrow_upward_rounded),
         const SizedBox(height: 12),

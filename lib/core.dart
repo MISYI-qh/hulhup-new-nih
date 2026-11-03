@@ -44,6 +44,46 @@ class Local {
     final s = sp.getString('db');
     db = s == null ? {'seq': 0, 'users': [], 'audios': [], 'likes': [], 'follows': [], 'notifs': [], 'taps': 0} : jsonDecode(s) as Map<String, dynamic>;
     session = sp.getString('session');
+    for (final a in _r('audios')) {
+      a['vis'] = const {'all': 'public', 'me': 'followers'}[a['vis']] ?? a['vis'];
+      a['rand'] ??= 'public';
+      a['pprof'] ??= true;
+    }
+    for (final u in _r('users')) {
+      if (u['birth'] == null) u['birth'] = _iso(DateTime(DateTime.now().year - ((u['age'] as int?) ?? 18), 1, 1));
+    }
+    await _save();
+  }
+
+  static String _iso(DateTime d) => '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  /// Umur dihitung dari tanggal lahir setiap kali dibutuhkan, jadi selalu mengikuti hari ini.
+  static int ageOf(String iso) {
+    final b = DateTime.tryParse(iso);
+    if (b == null) return 0;
+    final n = DateTime.now();
+    var a = n.year - b.year;
+    if (n.month < b.month || (n.month == b.month && n.day < b.day)) a--;
+    return a;
+  }
+
+  static bool _okBirth(String iso) {
+    final b = DateTime.tryParse(iso);
+    return b != null && !b.isAfter(DateTime.now()) && ageOf(iso) <= 120;
+  }
+
+  /// Apakah [viewer] termasuk audiens [mode] milik [owner]. pengikut = viewer mengikuti owner; mengikuti = owner mengikuti viewer.
+  static bool _aud(dynamic mode, Map owner, Map? viewer) {
+    if (mode == 'public') return true;
+    if (viewer == null) return false;
+    if (viewer['id'] == owner['id']) return true;
+    final fol = _r('follows').any((f) => f['from'] == viewer['id'] && f['to'] == owner['id']);
+    final ing = _r('follows').any((f) => f['from'] == owner['id'] && f['to'] == viewer['id']);
+    switch (mode) {
+      case 'followers': return fol;
+      case 'following': return ing;
+      default: return fol || ing;
+    }
   }
 
   static Future<void> _save() => sp.setString('db', jsonEncode(db));
@@ -72,7 +112,7 @@ class Local {
   static Map _uv(Map u, Map? me) {
     final id = u['id'] as int, mine = me != null && me['id'] == id;
     return {
-      'username': u['username'], 'name': u['name'], 'bio': u['bio'], 'age': mine ? u['age'] : 0,
+      'username': u['username'], 'name': u['name'], 'bio': u['bio'], 'age': mine ? ageOf(u['birth']) : 0, 'birth': mine ? u['birth'] : '',
       'avatar': _img(u, 'avatar'), 'cover': _img(u, 'cover'),
       'followers': _cnt('follows', (f) => f['to'] == id), 'following': _cnt('follows', (f) => f['from'] == id),
       'audios': _cnt('audios', (a) => a['owner'] == id),
@@ -83,7 +123,7 @@ class Local {
   static Map _av(Map a, Map? me) {
     final o = _byId(a['owner'])!, id = a['id'];
     return {
-      'id': id, 'desc': a['desc'], 'secs': a['secs'], 'popup': a['popup'], 'vis': a['vis'], 'url': 'mem:a$id',
+      'id': id, 'desc': a['desc'], 'secs': a['secs'], 'popup': a['popup'], 'vis': a['vis'], 'url': 'mem:a$id', 'pprof': a['pprof'] != false, 'rand': a['rand'],
       'likes': _cnt('likes', (l) => l['a'] == id), 'liked': me != null && _r('likes').any((l) => l['a'] == id && l['u'] == me['id']),
       'owner': o['username'], 'owner_name': o['name'], 'owner_avatar': _img(o, 'avatar'),
     };
@@ -104,14 +144,14 @@ class Local {
     final un = RegExp(r'^[a-z0-9_]{3,20}$');
 
     if (p == '/register' && m == 'POST') {
-      final name = '${b!['name'] ?? ''}'.trim(), u = '${b['username'] ?? ''}'.trim().toLowerCase(), pw = '${b['password'] ?? ''}', age = int.tryParse('${b['age']}'.trim());
+      final name = '${b!['name'] ?? ''}'.trim(), u = '${b['username'] ?? ''}'.trim().toLowerCase(), pw = '${b['password'] ?? ''}', birth = '${b['birth'] ?? ''}'.trim();
       if (name.isEmpty || name.length > 40) throw ApiErr('bad_name');
       if (!un.hasMatch(u)) throw ApiErr('bad_username');
       if (pw.length < 6 || pw.length > 100) throw ApiErr('bad_password');
-      if (age == null || age < 1 || age > 120) throw ApiErr('bad_age');
+      if (!_okBirth(birth)) throw ApiErr('bad_age');
       if (_byName(u) != null) throw ApiErr('username_taken');
       final salt = _salt();
-      final row = {'id': _next(), 'username': u, 'name': name, 'bio': '', 'age': age, 'salt': salt, 'pass': _hash(salt, pw), 'av': false, 'cv': false, 'created': _now()};
+      final row = {'id': _next(), 'username': u, 'name': name, 'bio': '', 'birth': birth, 'salt': salt, 'pass': _hash(salt, pw), 'av': false, 'cv': false, 'created': _now()};
       _r('users').add(row);
       await _save();
       await setSession(u);
@@ -128,7 +168,7 @@ class Local {
     if (p == '/random') {
       db['taps'] = (db['taps'] as int) + 1;
       await _save();
-      final all = _r('audios');
+      final all = _r('audios').where((a) => _aud(a['rand'] ?? 'public', _byId(a['owner'])!, me)).toList();
       return {'taps': db['taps'], 'audio': all.isEmpty ? null : _av(all[_rnd.nextInt(all.length)], me)};
     }
     if (p == '/search') {
@@ -145,13 +185,13 @@ class Local {
       final name = b!.containsKey('name') ? '${b['name']}'.trim() : u['name'] as String;
       final bio = b.containsKey('bio') ? '${b['bio']}'.trim() : u['bio'] as String;
       final nu = b.containsKey('username') ? '${b['username']}'.trim().toLowerCase() : u['username'] as String;
-      final age = b.containsKey('age') ? int.tryParse('${b['age']}'.trim()) : u['age'] as int;
+      final birth = b.containsKey('birth') ? '${b['birth']}'.trim() : u['birth'] as String;
       if (name.isEmpty || name.length > 40) throw ApiErr('bad_name');
       if (bio.length > 300) throw ApiErr('bad_bio');
       if (!un.hasMatch(nu)) throw ApiErr('bad_username');
-      if (age == null || age < 1 || age > 120) throw ApiErr('bad_age');
+      if (!_okBirth(birth)) throw ApiErr('bad_age');
       if (nu != u['username'] && _byName(nu) != null) throw ApiErr('username_taken');
-      u['name'] = name; u['bio'] = bio; u['username'] = nu; u['age'] = age;
+      u['name'] = name; u['bio'] = bio; u['username'] = nu; u['birth'] = birth;
       await _save();
       await setSession(nu);
       return {'user': _uv(u, u)};
@@ -231,7 +271,7 @@ class Local {
       if (x[2] == null && m == 'GET') {
         final mine = me != null && me['id'] == id;
         final isf = me != null && !mine && _r('follows').any((f) => f['from'] == me['id'] && f['to'] == id);
-        final rows = _r('audios').where((a) => a['owner'] == id && (mine || a['vis'] == 'all' || (a['vis'] == 'followers' && isf))).map((a) => _av(a, me)).toList();
+        final rows = _r('audios').where((a) => a['owner'] == id && (mine || _aud(a['vis'], u, me))).map((a) => _av(a, me)).toList();
         return {'user': _uv(u, me), 'audios': rows};
       }
       if (x[2] == '/follow' && m == 'POST') {
@@ -274,22 +314,23 @@ class Local {
     await _put('a$id', b);
     var d = (f['desc'] ?? '').trim();
     if (d.length > 500) d = d.substring(0, 500);
-    final vis = ['all', 'followers', 'me'].contains(f['vis']) ? f['vis'] : 'all';
-    _r('audios').insert(0, {'id': id, 'owner': me['id'], 'desc': d, 'secs': (int.tryParse(f['secs'] ?? '') ?? 30).clamp(1, 30), 'popup': f['popup'] != '0', 'vis': vis, 'created': _now()});
+    const ok = ['public', 'followers', 'following', 'both'];
+    final vis = ok.contains(f['vis']) ? f['vis'] : 'public', rnd = ok.contains(f['rand']) ? f['rand'] : 'public';
+    _r('audios').insert(0, {'id': id, 'owner': me['id'], 'desc': d, 'secs': (int.tryParse(f['secs'] ?? '') ?? 30).clamp(1, 30), 'popup': f['popup'] != '0', 'pprof': f['pprof'] != '0', 'vis': vis, 'rand': rnd, 'created': _now()});
     await _save();
     return {'ok': true};
   }
 }
 
 class U {
-  final String username, name, bio;
+  final String username, name, bio, birth;
   final String? avatar, cover;
   final int age, audios;
   int followers, following;
   bool isFollowing;
   final bool isMe;
   U.from(Map j)
-      : username = j['username'], name = j['name'], bio = j['bio'] ?? '', avatar = j['avatar'], cover = j['cover'],
+      : username = j['username'], name = j['name'], bio = j['bio'] ?? '', birth = j['birth'] ?? '', avatar = j['avatar'], cover = j['cover'],
         age = j['age'] ?? 0, audios = j['audios'] ?? 0, followers = j['followers'] ?? 0, following = j['following'] ?? 0,
         isFollowing = j['is_following'] == true, isMe = j['is_me'] == true;
 }
@@ -298,12 +339,12 @@ class A {
   final int id, secs;
   final String desc, url, vis, owner, ownerName;
   final String? ownerAvatar;
-  final bool popup;
+  final bool popup, pprof;
   int likes;
   bool liked;
   A.from(Map j)
       : id = j['id'], secs = j['secs'], desc = j['desc'] ?? '', url = j['url'], vis = j['vis'], owner = j['owner'],
-        ownerName = j['owner_name'], ownerAvatar = j['owner_avatar'], popup = j['popup'] == true, likes = j['likes'] ?? 0, liked = j['liked'] == true;
+        ownerName = j['owner_name'], ownerAvatar = j['owner_avatar'], popup = j['popup'] == true, pprof = j['pprof'] != false, likes = j['likes'] ?? 0, liked = j['liked'] == true;
 }
 
 String mmss(int s) => '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}';
@@ -325,6 +366,8 @@ class Store extends ChangeNotifier {
   String lang = 'id';
   ThemeMode mode = ThemeMode.system;
   int? playing;
+  int dur = 0;
+  final pos = ValueNotifier<int>(0);
   final _p = AudioPlayer();
   late SharedPreferences _sp;
 
@@ -336,7 +379,9 @@ class Store extends ChangeNotifier {
     lang = _sp.getString('lang') ?? 'id';
     mode = ThemeMode.values[(_sp.getInt('mode') ?? 0).clamp(0, 2)];
     await Local.init(_sp);
-    _p.onPlayerComplete.listen((_) { playing = null; notifyListeners(); });
+    _p.onPositionChanged.listen((d) => pos.value = d.inMilliseconds);
+    _p.onDurationChanged.listen((d) => dur = d.inMilliseconds);
+    _p.onPlayerComplete.listen((_) { playing = null; if (dur > 0) pos.value = dur; notifyListeners(); });
   }
 
   Future<void> refresh() async {
@@ -379,12 +424,21 @@ class Store extends ChangeNotifier {
   }
 
   Future<void> play(A a, {bool force = false}) async {
-    if (!force && playing == a.id) { await _p.stop(); playing = null; notifyListeners(); return; }
+    if (!force && playing == a.id) { await stop(); return; }
     playing = a.id;
+    pos.value = 0;
+    dur = 0;
     notifyListeners();
     await _p.stop();
     final b = Local.bytes(a.url);
     await _p.play(b != null ? BytesSource(b, mimeType: mimeOf(b)) : UrlSource(a.url));
+  }
+
+  Future<void> stop() async {
+    await _p.stop();
+    playing = null;
+    pos.value = 0;
+    notifyListeners();
   }
 
   Future<void> like(A a) async {
@@ -397,7 +451,7 @@ class Store extends ChangeNotifier {
 
 const S = <String, List<String>>{
   'login': ['Masuk', 'Sign in'], 'register': ['Daftar', 'Sign up'], 'name': ['Nama', 'Name'],
-  'username': ['Nama pengguna', 'Username'], 'password': ['Kata sandi', 'Password'], 'age': ['Usia', 'Age'],
+  'username': ['Nama pengguna', 'Username'], 'password': ['Kata sandi', 'Password'], 'age': ['Tanggal lahir', 'Date of birth'], 'years': ['tahun', 'years'], 'pprof': ['Tampilkan profil di popup', 'Show profile in popup'], 'who_rand': ['Siapa yang bisa mendengar secara acak', 'Who can hear it randomly'], 'a_public': ['Publik', 'Public'], 'a_followers': ['Pengikut', 'Followers'], 'a_following': ['Mengikuti', 'Following'], 'a_both': ['Pengikut dan mengikuti', 'Followers and following'],
   'guest': ['Akun tamu', 'Guest account'], 'guest_note': ['Masuk untuk mengunggah suara, menyukai, dan mengikuti.', 'Sign in to upload voices, like, and follow.'],
   'logout': ['Keluar', 'Sign out'], 'settings': ['Pengaturan', 'Settings'], 'account': ['Akun', 'Account'], 'general': ['Umum', 'General'],
   'edit_profile': ['Edit profil', 'Edit profile'], 'change_pw': ['Ubah kata sandi', 'Change password'],
@@ -428,16 +482,16 @@ const S = <String, List<String>>{
   'e_bad_username': ['Nama pengguna 3-20 karakter: huruf kecil, angka, garis bawah', 'Username 3-20 chars: lowercase, digits, underscore'],
   'e_bad_name': ['Nama wajib diisi (maks 40 karakter)', 'Name is required (max 40 chars)'],
   'e_bad_password': ['Kata sandi minimal 6 karakter', 'Password must be at least 6 characters'],
-  'e_bad_age': ['Usia tidak valid', 'Invalid age'], 'e_bad_bio': ['Bio maksimal 300 karakter', 'Bio max 300 characters'],
+  'e_bad_age': ['Tanggal lahir tidak valid', 'Invalid date of birth'], 'e_bad_bio': ['Bio maksimal 300 karakter', 'Bio max 300 characters'],
   'e_bad_file': ['File tidak valid', 'Invalid file'], 'e_too_big': ['File terlalu besar (maks 3 MB)', 'File too large (max 3 MB)'],
   'e_not_found': ['Tidak ditemukan', 'Not found'],
   'about_t': [
     'Hulhup adalah ruang suara yang sederhana. Ketuk satu tombol, dengarkan suara acak dari orang-orang di seluruh dunia, tanpa perlu masuk.\n\nMasuk hanya jika kamu ingin berbagi suaramu sendiri, menyukai audio, dan mengikuti akun lain.\n\nHulhup adalah produk dari Misyi.\n\nVersi 1.0.0',
     'Hulhup is a simple home for voices. Tap one button and hear a random voice from people around the world, no sign-in needed.\n\nSign in only if you want to share your own voice, like audio, and follow other accounts.\n\nHulhup is a product of Misyi.\n\nVersion 1.0.0'],
   'policy_t': [
-    'Dengan memakai Hulhup kamu setuju pada aturan berikut.\n\n1. Audio yang kamu unggah berdurasi maksimal 30 detik dan harus milikmu atau kamu punya izin memakainya.\n2. Dilarang mengunggah konten yang melecehkan, menebar kebencian, mengandung kekerasan atau seksual, melanggar hukum, atau meniru orang lain.\n3. Dilarang spam dan menyalahgunakan layanan.\n4. Setiap audio yang diunggah akan muncul secara publik dan acak untuk semua pengguna. Pengaturan siapa boleh melihat hanya berlaku di halaman profilmu.\n5. Audio tidak bisa diedit, hanya dihapus. Kamu bebas menghapus audio atau akunmu kapan saja.\n6. Kami dapat menghapus konten atau akun yang melanggar aturan ini.\n7. Hulhup disediakan apa adanya, aturan dapat diperbarui dan versi terbaru selalu ada di halaman ini.',
-    'By using Hulhup you agree to the following.\n\n1. Audio you upload is at most 30 seconds and must be yours, or you must have permission to use it.\n2. Do not upload content that harasses, spreads hate, contains violence or sexual material, breaks the law, or impersonates others.\n3. No spam or misuse of the service.\n4. Every uploaded audio appears publicly and randomly for all users. The who-can-see setting only applies on your profile page.\n5. Audio cannot be edited, only deleted. You may delete audio or your account at any time.\n6. We may remove content or accounts that break these rules.\n7. Hulhup is provided as is. These rules may be updated and the latest version is always on this page.'],
+    'Dengan memakai Hulhup kamu setuju pada aturan berikut.\n\n1. Audio yang kamu unggah berdurasi maksimal 30 detik dan harus milikmu atau kamu punya izin memakainya.\n2. Dilarang mengunggah konten yang melecehkan, menebar kebencian, mengandung kekerasan atau seksual, melanggar hukum, atau meniru orang lain.\n3. Dilarang spam dan menyalahgunakan layanan.\n4. Kamu memilih siapa yang bisa mendengar audiomu secara acak (publik, pengikut, mengikuti, atau pengikut dan mengikuti) dan siapa yang bisa melihatnya di profilmu. Audio yang dipilih publik dapat didengar siapa saja.\n5. Audio tidak bisa diedit, hanya dihapus. Kamu bebas menghapus audio atau akunmu kapan saja.\n6. Kami dapat menghapus konten atau akun yang melanggar aturan ini.\n7. Hulhup disediakan apa adanya, aturan dapat diperbarui dan versi terbaru selalu ada di halaman ini.',
+    'By using Hulhup you agree to the following.\n\n1. Audio you upload is at most 30 seconds and must be yours, or you must have permission to use it.\n2. Do not upload content that harasses, spreads hate, contains violence or sexual material, breaks the law, or impersonates others.\n3. No spam or misuse of the service.\n4. You choose who can hear your audio randomly (public, followers, following, or followers and following) and who can see it on your profile. Public audio can be heard by anyone.\n5. Audio cannot be edited, only deleted. You may delete audio or your account at any time.\n6. We may remove content or accounts that break these rules.\n7. Hulhup is provided as is. These rules may be updated and the latest version is always on this page.'],
   'privacy_t': [
-    'Data yang kami simpan: nama, nama pengguna, usia, bio, foto profil dan latar, audio yang kamu unggah, serta suka dan pengikut. Usiamu tidak ditampilkan ke pengguna lain.\n\nKata sandi disimpan dalam bentuk hash, tidak pernah dalam bentuk asli.\n\nMikrofon hanya dipakai saat kamu menekan tombol rekam. Galeri hanya dibuka saat kamu memilih foto.\n\nTanpa login, kamu hanya mendengar suara; kami tidak membuat profil tamu.\n\nKami tidak menjual datamu dan tidak menampilkan iklan. Data disimpan di infrastruktur Cloudflare.\n\nMenghapus audio atau akun akan menghapus file dan datanya secara permanen dari server.',
-    'Data we store: name, username, age, bio, profile photo and cover, audio you upload, plus likes and followers. Your age is never shown to other users.\n\nPasswords are stored as hashes, never in plain form.\n\nThe microphone is used only when you press record. The gallery opens only when you pick a photo.\n\nWithout signing in you only listen; we do not create guest profiles.\n\nWe do not sell your data and show no ads. Data is stored on Cloudflare infrastructure.\n\nDeleting audio or your account permanently removes the files and data from the server.'],
+    'Data yang kami simpan: nama, nama pengguna, tanggal lahir, bio, foto profil dan latar, audio yang kamu unggah, serta suka dan pengikut. Tanggal lahir dan usiamu tidak ditampilkan ke pengguna lain.\n\nKata sandi disimpan dalam bentuk hash, tidak pernah dalam bentuk asli.\n\nMikrofon hanya dipakai saat kamu menekan tombol rekam. Galeri hanya dibuka saat kamu memilih foto.\n\nTanpa login, kamu hanya mendengar suara; kami tidak membuat profil tamu.\n\nKami tidak menjual datamu dan tidak menampilkan iklan. Untuk saat ini data hanya disimpan di perangkatmu.\n\nMenghapus audio atau akun akan menghapus file dan datanya secara permanen dari perangkat.',
+    'Data we store: name, username, date of birth, bio, profile photo and cover, audio you upload, plus likes and followers. Your date of birth and age are never shown to other users.\n\nPasswords are stored as hashes, never in plain form.\n\nThe microphone is used only when you press record. The gallery opens only when you pick a photo.\n\nWithout signing in you only listen; we do not create guest profiles.\n\nWe do not sell your data and show no ads. For now data is stored only on your device.\n\nDeleting audio or your account permanently removes the files and data from the device.'],
 };

@@ -1,0 +1,41 @@
+version: 2.1
+
+jobs:
+  build:
+    docker:
+      - image: ghcr.io/cirruslabs/flutter:stable
+    resource_class: large
+    environment:
+      GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx3g"
+    steps:
+      - checkout
+      - run:
+          name: Buat folder platform
+          command: flutter create . --project-name hulhup --org app.misyi --platforms=android,web,linux,windows,macos,ios
+      - run:
+          name: Izin, nama, minSdk Android
+          command: |
+            M=android/app/src/main/AndroidManifest.xml
+            sed -i 's|<application|<uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\n    <application|' $M
+            sed -i 's|android:label="hulhup"|android:label="Hulhup"|' $M
+            sed -i 's|minSdk = flutter.minSdkVersion|minSdk = 24|; s|minSdkVersion flutter.minSdkVersion|minSdkVersion 24|' android/app/build.gradle* || true
+            sed -i 's|<title>hulhup</title>|<title>Hulhup</title>|' web/index.html || true
+      - run: flutter pub get
+      - run: dart run flutter_launcher_icons
+      - run:
+          name: Build APK
+          command: flutter build apk --release
+      - run:
+          name: Build web
+          command: flutter build web --release && cd build && zip -qr web.zip web
+      - store_artifacts:
+          path: build/app/outputs/flutter-apk/app-release.apk
+          destination: hulhup.apk
+      - store_artifacts:
+          path: build/web.zip
+          destination: hulhup-web.zip
+
+workflows:
+  build:
+    jobs:
+      - build

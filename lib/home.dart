@@ -20,7 +20,7 @@ class _HomeState extends State<HomePage> {
       if (!mounted) return;
       if (a == null) { toast(s.t('nobody')); return; }
       s.play(a, force: true).catchError((_) => toast(s.t('e_server'), bad: true));
-      if (a.popup) sheet(context, (_) => PopupBody(a));
+      if (a.popup) sheet(context, (_) => PopupBody(a)).then((_) { if (s.playing == a.id) s.stop(); });
     } catch (e) {
       toast(s.err(e), bad: true);
     }
@@ -146,37 +146,35 @@ class SideMenu extends StatelessWidget {
   }
 }
 
-class PopupBody extends StatefulWidget {
+class PopupBody extends StatelessWidget {
   final A a;
   const PopupBody(this.a, {super.key});
   @override
-  State<PopupBody> createState() => _PopupState();
-}
-
-class _PopupState extends State<PopupBody> with SingleTickerProviderStateMixin {
-  late final c = AnimationController(vsync: this, duration: Duration(seconds: widget.a.secs))..forward();
-  @override
-  void dispose() { c.dispose(); super.dispose(); }
-  @override
   Widget build(BuildContext context) {
-    final a = widget.a, s = Store.i;
+    final s = Store.i;
     return Column(mainAxisSize: MainAxisSize.min, children: [
-      Tap(onTap: () { Navigator.pop(context); go(context, ProfilePage(a.owner)); }, child: Row(children: [
+      if (a.pprof) Tap(onTap: () { Navigator.pop(context); go(context, ProfilePage(a.owner)); }, child: Row(children: [
         Avatar(a.ownerAvatar, a.ownerName, 46),
         const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(a.ownerName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)), Text(a.owner, style: TextStyle(color: sub(context), fontSize: 13))])),
         Icon(Icons.chevron_right_rounded, color: sub(context)),
       ])),
-      if (a.desc.trim().isNotEmpty) Padding(padding: const EdgeInsets.only(top: 12), child: Align(alignment: Alignment.centerLeft, child: Text(a.desc.trim(), maxLines: 4, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, height: 1.4)))),
-      const SizedBox(height: 14),
+      if (a.desc.trim().isNotEmpty) Padding(padding: EdgeInsets.only(top: a.pprof ? 12 : 0), child: Align(alignment: Alignment.centerLeft, child: Text(a.desc.trim(), maxLines: 4, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, height: 1.4)))),
+      SizedBox(height: a.pprof || a.desc.trim().isNotEmpty ? 14 : 4),
       Container(
         padding: const EdgeInsets.fromLTRB(8, 8, 6, 8), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(26)),
-        child: Row(children: [
-          Tap(onTap: () { c.forward(from: 0); s.play(a, force: true); }, child: Container(width: 44, height: 44, decoration: const BoxDecoration(color: green, shape: BoxShape.circle), child: const Icon(Icons.replay_rounded, color: cream, size: 22))),
-          Expanded(child: AnimatedBuilder(animation: c, builder: (_, __) => Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: c.value, minHeight: 6, backgroundColor: ink(context).withValues(alpha: .12), color: ink(context)))))),
-          Text(mmss(a.secs), style: TextStyle(color: sub(context), fontSize: 13, fontWeight: FontWeight.w600)),
-          ListenableBuilder(listenable: s, builder: (_, __) => LikeBtn(a.liked, a.likes, () => likeAudio(a))),
-        ]),
+        child: ListenableBuilder(listenable: s, builder: (_, __) {
+          final on = s.playing == a.id;
+          return Row(children: [
+            Tap(onTap: () => s.play(a).catchError((_) => toast(s.t('e_server'), bad: true)), child: AnimatedContainer(duration: const Duration(milliseconds: 250), width: 44, height: 44, decoration: BoxDecoration(color: on ? ink(context) : green, shape: BoxShape.circle), child: AnimatedSwitcher(duration: const Duration(milliseconds: 200), child: Icon(on ? Icons.pause_rounded : Icons.play_arrow_rounded, key: ValueKey(on), color: on ? bgOf(context) : cream, size: 26)))),
+            Expanded(child: ValueListenableBuilder<int>(valueListenable: s.pos, builder: (_, ms, __) {
+              final total = (s.dur > 0 ? s.dur : a.secs * 1000).clamp(1, 1 << 30);
+              return Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: (ms / total).clamp(0.0, 1.0), minHeight: 6, backgroundColor: ink(context).withValues(alpha: .12), color: ink(context))));
+            })),
+            ValueListenableBuilder<int>(valueListenable: s.pos, builder: (_, ms, __) => Text('${mmss(ms ~/ 1000)} / ${mmss(a.secs)}', style: TextStyle(color: on ? ink(context) : sub(context), fontSize: 13, fontWeight: FontWeight.w700))),
+            LikeBtn(a.liked, a.likes, () => likeAudio(a)),
+          ]);
+        }),
       ),
     ]);
   }

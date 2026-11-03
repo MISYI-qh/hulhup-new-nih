@@ -4,7 +4,7 @@ Aplikasi Flutter (Android, iOS, web, desktop). Saat ini SEMUA data (akun, audio,
 STATUS: kode sudah ditulis tetapi BELUM dikompilasi dan BELUM dites. Jalankan build lalu laporkan error yang muncul.
 
 Konsekuensi mode lokal:
-- Suara acak hanya berasal dari audio yang diunggah di perangkat itu sendiri.
+- Suara acak hanya berasal dari audio yang diunggah di perangkat itu sendiri (sesuai pilihan audiens: publik, pengikut, mengikuti, atau pengikut dan mengikuti).
 - Akun hanya ada di perangkat itu; hapus data aplikasi/browser = semua hilang.
 - Di web, penyimpanan browser terbatas (kira-kira 5 MB), jadi hanya muat beberapa audio dan foto.
 
