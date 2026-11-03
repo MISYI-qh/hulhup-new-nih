@@ -51,10 +51,15 @@ class Notifier {
     try { await _n.show(id, title, body, _d(sub)); } catch (_) {}
   }
 
-  static Future<void> schedule(int id, DateTime at, String title, String body, String sub) async {
+  /// Notifikasi berulang tiap hari pada jam tertentu (waktu setempat), terlepas dari apakah aplikasi sudah dibuka hari itu.
+  static Future<void> daily(int id, int hour, int minute, String title, String body, String sub) async {
     if (!_ok) return;
     try {
-      await _n.zonedSchedule(id, title, body, tz.TZDateTime.from(at, tz.UTC), _d(sub), androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle);
+      final n = DateTime.now();
+      var at = DateTime(n.year, n.month, n.day, hour, minute);
+      if (!at.isAfter(n)) at = DateTime(n.year, n.month, n.day + 1, hour, minute);
+      await _n.zonedSchedule(id, title, body, tz.TZDateTime.from(at, tz.UTC), _d(sub),
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle, matchDateTimeComponents: DateTimeComponents.time);
     } catch (_) {}
   }
 

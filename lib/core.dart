@@ -53,9 +53,22 @@ class Local {
     }
     for (final u in _r('users')) {
       u['pvis'] ??= 'public';
+      u['taps'] ??= 0;
+      if (u['log'] == null) {
+        // Riwayat hari masuk lama tidak tercatat; isi dari rangkaian terakhir.
+        final l = DateTime.tryParse(u['last'] ?? '');
+        final st = (u['streak'] ?? 0) as int;
+        u['log'] = l == null ? [] : [for (var i = st - 1; i >= 0; i--) _iso(DateTime(l.year, l.month, l.day - i))];
+      }
       if (u['birth'] == null) u['birth'] = _iso(DateTime(DateTime.now().year - ((u['age'] as int?) ?? 18), 1, 1));
     }
     await _save();
+  }
+
+  /// Jadwal pengingat 19.00 terakhir yang sudah lewat: (tanggal ISO, waktu dalam ms).
+  static (String, int) _slot() {
+    final n = DateTime.now(), d = n.hour >= 19 ? n : DateTime(n.year, n.month, n.day - 1);
+    return (_iso(d), DateTime(d.year, d.month, d.day, 19).millisecondsSinceEpoch);
   }
 
   static String _iso(DateTime d) => '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
@@ -93,7 +106,16 @@ class Local {
   static Future<void> _save() => sp.setString('db', jsonEncode(db));
   static Future<void> setSession(String? v) async { session = v; v == null ? await sp.remove('session') : await sp.setString('session', v); }
 
-  static Future<void> _put(String k, Uint8List b) async { _cache[k] = b; await sp.setString('m_$k', base64Encode(b)); }
+  static Future<void> _put(String k, Uint8List b) async {
+    try {
+      if (!await sp.setString('m_$k', base64Encode(b))) throw ApiErr('storage_full');
+      _cache[k] = b;
+    } on ApiErr {
+      rethrow;
+    } catch (_) {
+      throw ApiErr('storage_full');
+    }
+  }
   static Future<void> _del(String k) async { _cache.remove(k); await sp.remove('m_$k'); }
   static Uint8List? _blob(String k) {
     final c = _cache[k];
@@ -129,7 +151,7 @@ class Local {
     return {
       'username': u['username'], 'name': u['name'], 'bio': u['bio'], 'age': mine ? ageOf(u['birth']) : 0, 'birth': mine ? u['birth'] : '',
       'avatar': _img(u, 'avatar'), 'cover': _img(u, 'cover'),
-      'pvis': mine ? (u['pvis'] ?? 'public') : '', 'streak': mine ? _streakOf(u) : 0, 'days': mine ? (u['days'] ?? 0) : 0,
+      'taps': mine ? (u['taps'] ?? 0) : 0, 'pvis': mine ? (u['pvis'] ?? 'public') : '', 'streak': mine ? _streakOf(u) : 0, 'days': mine ? (u['days'] ?? 0) : 0,
       'followers': _cnt('follows', (f) => f['to'] == id), 'following': _cnt('follows', (f) => f['from'] == id),
       'audios': _cnt('audios', (a) => a['owner'] == id),
       'is_following': me != null && !mine && _r('follows').any((f) => f['from'] == me['id'] && f['to'] == id), 'is_me': mine,
@@ -139,7 +161,7 @@ class Local {
   static Map _av(Map a, Map? me) {
     final o = _byId(a['owner'])!, id = a['id'];
     return {
-      'id': id, 'desc': a['desc'], 'secs': a['secs'], 'popup': a['popup'], 'vis': a['vis'], 'url': 'mem:a$id', 'pprof': a['pprof'] != false, 'rand': a['rand'] ?? 'public',
+      'id': id, 'desc': a['desc'], 'secs': a['secs'], 'popup': true, 'vis': a['vis'], 'url': 'mem:a$id', 'pprof': a['pprof'] != false, 'rand': a['rand'] ?? 'public',
       'likes': _cnt('likes', (l) => l['a'] == id), 'liked': me != null && _r('likes').any((l) => l['a'] == id && l['u'] == me['id']),
       'owner': o['username'], 'owner_name': o['name'], 'owner_avatar': _img(o, 'avatar'),
     };
@@ -147,9 +169,15 @@ class Local {
 
   static List _mini(Iterable us) => us.map((u) => {'username': u['username'], 'name': u['name'], 'avatar': _img(u, 'avatar')}).toList();
 
+  /// Dipanggil saat notifikasi suka/ikuti baru dibuat (untuk menampilkan notifikasi HP): (username penerima, jenis, nama pelaku).
+  static void Function(String to, String type, String actor)? onNotify;
+
   static void _notify(int to, String type, int actor, int? audio) {
     if (to == actor) return;
+    if (_r('notifs').any((n) => n['to'] == to && n['type'] == type && n['actor'] == actor && n['audio'] == audio)) return;
     _r('notifs').add({'to': to, 'type': type, 'actor': actor, 'audio': audio, 'created': _now(), 'seen': false});
+    final a = _byId(actor), r = _byId(to);
+    if (a != null && r != null) onNotify?.call('${r['username']}', type, '${a['name']}');
   }
 
   static void _sys(int to, String type, int n) {
@@ -171,7 +199,7 @@ class Local {
       if (!_okBirth(birth)) throw ApiErr('bad_age');
       if (_byName(u) != null) throw ApiErr('username_taken');
       final salt = _salt();
-      final row = {'id': _next(), 'username': u, 'name': name, 'bio': '', 'birth': birth, 'salt': salt, 'pass': _hash(salt, pw), 'av': false, 'cv': false, 'created': _now()};
+      final row = {'id': _next(), 'username': u, 'name': name, 'bio': '', 'birth': birth, 'salt': salt, 'pass': _hash(salt, pw), 'av': false, 'cv': false, 'created': _now(), 'pvis': 'public', 'taps': 0, 'log': [], 'rem': _slot().$1};
       _r('users').add(row);
       await _save();
       await setSession(u);
@@ -184,9 +212,11 @@ class Local {
       return {'token': 'local', 'user': _uv(row, row)};
     }
     if (p == '/logout') { await setSession(null); return {'ok': true}; }
-    if (p == '/stats') return {'taps': db['taps']};
+    if (p == '/stats') return {'taps': me != null ? (me['taps'] ?? 0) : db['taps']};
     if (p == '/random') {
-      db['taps'] = (db['taps'] as int) + 1;
+      // Hitungan ketukan per akun; tamu punya hitungan sendiri.
+      final taps = me != null ? ((me['taps'] ?? 0) as int) + 1 : (db['taps'] as int) + 1;
+      if (me != null) { me['taps'] = taps; } else { db['taps'] = taps; }
       await _save();
       final all = _r('audios').where((a) => _aud(a['rand'] ?? 'public', _byId(a['owner'])!, me, self: false)).toList();
       // Acak sungguhan (Random.secure), hanya tidak mengulang audio yang sama dua kali berturut-turut bila ada pilihan lain.
@@ -194,7 +224,7 @@ class Local {
       if (pool.length > 1 && _lastRand != null) pool = pool.where((a) => a['id'] != _lastRand).toList();
       final pick = pool.isEmpty ? null : pool[_rnd.nextInt(pool.length)];
       _lastRand = pick?['id'];
-      return {'taps': db['taps'], 'audio': pick == null ? null : _av(pick, me)};
+      return {'taps': taps, 'audio': pick == null ? null : _av(pick, me)};
     }
     if (p == '/search') {
       final s = (q['q'] ?? '').trim().toLowerCase();
@@ -231,11 +261,38 @@ class Local {
         }
         u['days'] = ((u['days'] ?? 0) as int) + 1;
         u['last'] = today;
+        final lg = (u['log'] as List?) ?? (u['log'] = []);
+        if (!lg.contains(today)) lg.add(today);
+        if (lg.length > 800) lg.removeRange(0, lg.length - 800);
         if (missed > 0) _sys(u['id'], 'missed', missed);
         _sys(u['id'], 'streak', u['streak']);
         await _save();
       }
       return {'streak': _streakOf(u), 'days': u['days'] ?? 0, 'new': isNew};
+    }
+    if (p == '/me/log' && m == 'GET') {
+      final u = need();
+      final lg = List<String>.from((u['log'] as List?) ?? [])..sort();
+      return {'days': lg, 'streak': _streakOf(u), 'total': u['days'] ?? 0};
+    }
+    if (p == '/me/reminders' && m == 'POST') {
+      // Catat notifikasi "Kamu lelah?" jam 19.00 yang sudah lewat ke daftar notifikasi di aplikasi.
+      final u = need(), slot = _slot();
+      final fresh = u['rem'] != null && u['rem'] != slot.$1 && b?['on'] != false;
+      if (fresh) _r('notifs').add({'to': u['id'], 'type': 'tired', 'actor': null, 'audio': null, 'n': 0, 'created': slot.$2, 'seen': false});
+      u['rem'] = slot.$1;
+      await _save();
+      return {'ok': true, 'added': fresh};
+    }
+    x = RegExp(r'^/me/followers/([a-z0-9_]+)$').firstMatch(p);
+    if (x != null && m == 'DELETE') {
+      // Batalkan orang yang mengikuti kita (dia tidak diberi tahu).
+      final u = need(), f = _byName(x[1]!);
+      if (f == null) throw ApiErr('not_found');
+      _r('follows').removeWhere((r) => r['from'] == f['id'] && r['to'] == u['id']);
+      _r('notifs').removeWhere((n) => n['type'] == 'follow' && n['actor'] == f['id'] && n['to'] == u['id']);
+      await _save();
+      return {'followers': _cnt('follows', (r) => r['to'] == u['id'])};
     }
     if (p == '/me' && m == 'PATCH') {
       final u = need();
@@ -375,7 +432,7 @@ class Local {
     if (d.length > 200) d = d.substring(0, 200);
     const ok = ['public', 'followers', 'following', 'both'];
     final vis = ok.contains(f['vis']) ? f['vis'] : 'public', rnd = ok.contains(f['rand']) ? f['rand'] : 'public';
-    _r('audios').insert(0, {'id': id, 'owner': me['id'], 'desc': d, 'secs': (int.tryParse(f['secs'] ?? '') ?? 30).clamp(1, 30), 'popup': f['popup'] != '0', 'pprof': f['pprof'] != '0', 'vis': vis, 'rand': rnd, 'created': _now()});
+    _r('audios').insert(0, {'id': id, 'owner': me['id'], 'desc': d, 'secs': (int.tryParse(f['secs'] ?? '') ?? 30).clamp(1, 30), 'popup': true, 'pprof': f['pprof'] != '0', 'vis': vis, 'rand': rnd, 'created': _now()});
     await _save();
     return {'ok': true};
   }
@@ -384,13 +441,13 @@ class Local {
 class U {
   final String username, name, bio, birth, pvis;
   final String? avatar, cover;
-  final int age, audios, streak, days;
+  final int age, audios, streak, days, taps;
   int followers, following;
   bool isFollowing;
   final bool isMe;
   U.from(Map j)
       : username = j['username'], name = j['name'], bio = j['bio'] ?? '', birth = j['birth'] ?? '', avatar = j['avatar'], cover = j['cover'],
-        pvis = j['pvis'] ?? 'public', streak = j['streak'] ?? 0, days = j['days'] ?? 0,
+        pvis = j['pvis'] ?? 'public', streak = j['streak'] ?? 0, days = j['days'] ?? 0, taps = j['taps'] ?? 0,
         age = j['age'] ?? 0, audios = j['audios'] ?? 0, followers = j['followers'] ?? 0, following = j['following'] ?? 0,
         isFollowing = j['is_following'] == true, isMe = j['is_me'] == true;
 }
@@ -430,6 +487,7 @@ class Store extends ChangeNotifier {
   final offline = <A>[];
   final _rnd = Random.secure();
   int? _lastOff;
+  int _nid = 0;
   int? playing;
   int dur = 0;
   int _pushed = 0;
@@ -456,6 +514,7 @@ class Store extends ChangeNotifier {
     mode = ThemeMode.values[(_sp.getInt('mode') ?? 0).clamp(0, 2)];
     remind = _sp.getBool('remind') ?? true;
     await Local.init(_sp);
+    Local.onNotify = (to, type, actor) => Notifier.show(200 + (_nid++ % 50), 'Hulhup', '$actor ${t(type == 'like' ? 'n_like' : 'n_follow')} · @$to', t('notif'));
     try { for (final j in jsonDecode(_sp.getString('offline') ?? '[]') as List) { offline.add(A.from(j as Map)); } } catch (_) {}
     _p.onPositionChanged.listen((d) => pos.value = d.inMilliseconds);
     _p.onDurationChanged.listen((d) => dur = d.inMilliseconds);
@@ -485,11 +544,14 @@ class Store extends ChangeNotifier {
     int? fresh;
     try {
       await refresh();
-      if (me == null) { await Notifier.cancelReminders(); return null; }
-      final j = await Api.req('POST', '/me/checkin');
-      if (j['new'] == true) { fresh = j['streak'] as int?; await refresh(); }
-      if (unreadSocial > _pushed) await Notifier.show(1, 'Hulhup', t('push_unread').replaceAll('{n}', '$unreadSocial'), t('notif'));
-      _pushed = unreadSocial;
+      if (me != null) {
+        final j = await Api.req('POST', '/me/checkin');
+        if (j['new'] == true) fresh = j['streak'] as int?;
+        await Api.req('POST', '/me/reminders', body: {'on': remind});
+        await refresh();
+        if (unreadSocial > _pushed) await Notifier.show(1, 'Hulhup', t('push_unread').replaceAll('{n}', '$unreadSocial'), t('notif'));
+        _pushed = unreadSocial;
+      }
       if (remind) { await Notifier.allow(); await syncReminders(); } else { await Notifier.cancelReminders(); }
     } catch (_) {
     } finally {
@@ -498,15 +560,11 @@ class Store extends ChangeNotifier {
     return fresh;
   }
 
-  /// Jadwalkan pengingat jam 19.00 untuk 3 hari ke depan; dibatalkan & dijadwal ulang tiap kali aplikasi dibuka,
-  /// jadi hanya berbunyi kalau kamu memang belum membuka Hulhup hari itu.
+  /// Pengingat "Kamu lelah?" setiap hari jam 19.00, juga kalau aplikasi sudah dibuka hari itu. Dijadwal ulang tiap aplikasi dibuka.
   Future<void> syncReminders() async {
     await Notifier.cancelReminders();
-    if (me == null || !remind) return;
-    final n = DateTime.now();
-    for (var d = 1; d <= 3; d++) {
-      await Notifier.schedule(100 + d, DateTime(n.year, n.month, n.day + d, 19), t('r_title'), t('r_body'), t('notif'));
-    }
+    if (!remind) return;
+    await Notifier.daily(101, 19, 0, t('r_title'), t('r_body'), t('notif'));
   }
 
   Future<void> setRemind(bool v) async {
@@ -521,6 +579,7 @@ class Store extends ChangeNotifier {
   Future<void> auth(String path, Map body) async {
     final j = await Api.req('POST', path, body: body);
     me = U.from(j['user']);
+    taps = me!.taps;
     notifyListeners();
     start();
   }
@@ -528,12 +587,11 @@ class Store extends ChangeNotifier {
   Future<void> logout() async {
     try { await Api.req('POST', '/logout'); } catch (_) {}
     await _clear();
-    await Notifier.cancelReminders();
-    notifyListeners();
+    await refresh();
   }
 
-  Future<void> deleteAccount() async { await Api.req('DELETE', '/me'); await _clear(); await Notifier.cancelReminders(); notifyListeners(); }
-  void setLang(String l) { lang = l; _sp.setString('lang', l); notifyListeners(); if (me != null) syncReminders(); }
+  Future<void> deleteAccount() async { await Api.req('DELETE', '/me'); await _clear(); await refresh(); }
+  void setLang(String l) { lang = l; _sp.setString('lang', l); notifyListeners(); syncReminders(); }
   void setMode(ThemeMode m) { mode = m; _sp.setInt('mode', m.index); notifyListeners(); }
 
   Future<void> setPvis(String v) async {
@@ -664,7 +722,7 @@ const S = <String, List<String>>{
   'e_bad_file': ['File tidak valid', 'Invalid file'], 'e_too_big': ['File terlalu besar (maks 3 MB)', 'File too large (max 3 MB)'],
   'e_not_found': ['Tidak ditemukan', 'Not found'],
   'a_me': ['Hanya untuk saya', 'Only me'], 'pvis': ['Siapa yang bisa melihat audioku di profil', 'Who can see my audio on my profile'],
-  'remind': ['Pengingat harian', 'Daily reminder'], 'remind_sub': ['Notifikasi jam 19.00 kalau kamu belum masuk hari itu', 'A notification at 7 PM if you haven’t opened Hulhup that day'],
+  'remind': ['Pengingat harian', 'Daily reminder'], 'remind_sub': ['Notifikasi “Kamu lelah?” setiap hari jam 19.00', 'A “Feeling tired?” notification every day at 7 PM'],
   'streak_t': ['{n} hari berturut-turut', '{n}-day streak'], 'days_total': ['Total masuk {n} hari', '{n} days signed in in total'],
   'view_photo': ['Lihat foto', 'View photo'], 'change_photo': ['Ganti foto', 'Change photo'],
   'search_hint': ['Cari akun atau audio', 'Search accounts or audio'], 'sec_acc': ['Akun', 'Accounts'], 'sec_audio': ['Audio', 'Audio'],
@@ -676,6 +734,13 @@ const S = <String, List<String>>{
   'saved_off': ['Disimpan untuk offline', 'Saved for offline'], 'removed_off': ['Dihapus dari offline', 'Removed from offline'], 'off_fail': ['Tidak bisa menyimpan audio ini', 'Couldn’t save this audio'],
   'empty_offline': ['Belum ada audio offline. Simpan lewat popup acak atau daftar audio.', 'No offline audio yet. Save from the random popup or an audio list.'],
   'no_net': ['Tidak ada internet. Memutar audio offline.', 'No internet. Playing offline audio.'], 'no_net_empty': ['Tidak ada internet dan belum ada audio offline.', 'No internet and no offline audio yet.'],
+  'e_storage_full': ['Penyimpanan penuh. Hapus beberapa audio atau foto dulu.', 'Storage is full. Delete some audio or photos first.'],
+  'remove_follower': ['Hapus pengikut', 'Remove follower'], 'remove': ['Hapus', 'Remove'], 'follower_removed': ['Pengikut dihapus', 'Follower removed'],
+  'remove_follower_q': ['{name} tidak akan mengikutimu lagi. Dia tidak diberi tahu.', '{name} will no longer follow you. They won’t be notified.'],
+  'streak_cal': ['Hari masuk', 'Sign-in days'], 'cal_in': ['Masuk', 'Signed in'], 'cal_miss': ['Tidak masuk', 'Missed'], 'cal_today': ['Hari ini', 'Today'],
+  'cal_month': ['Bulan ini: {a} hari masuk, {b} hari tidak masuk', 'This month: {a} days signed in, {b} missed'],
+  'cal_missed_list': ['Hari yang tidak masuk', 'Days you missed'], 'cal_none': ['Tidak ada hari yang terlewat', 'No missed days'],
+  'cal_note': ['Riwayat sebelum fitur ini hanya tercatat dari rangkaian terakhir.', 'History before this feature is only known from your latest streak.'],
   'ago_now': ['baru saja', 'just now'], 'ago_m': ['mnt lalu', 'min ago'], 'ago_h': ['jam lalu', 'h ago'], 'ago_d': ['hari lalu', 'd ago'],
   'e_too_big_img': ['Foto terlalu besar (maks 10 MB)', 'Photo too large (max 10 MB)'],
   'about_t': [
@@ -685,6 +750,6 @@ const S = <String, List<String>>{
     'Dengan memakai Hulhup kamu setuju pada aturan berikut.\n\n1. Audio yang kamu unggah berdurasi maksimal 30 detik, dengan deskripsi maksimal 200 karakter, dan harus milikmu atau kamu punya izin memakainya. Foto profil maksimal 10 MB.\n2. Dilarang mengunggah konten yang melecehkan, menebar kebencian, mengandung kekerasan atau seksual, melanggar hukum, atau meniru orang lain.\n3. Dilarang spam dan menyalahgunakan layanan.\n4. Untuk setiap audio kamu memilih siapa yang bisa mendengarnya secara acak: publik, pengikut, mengikuti, atau pengikut dan mengikuti. Audio publik dapat didengar siapa saja.\n5. Di Pengaturan kamu memilih siapa yang bisa melihat audiomu di profil dan di hasil pencarian: publik, pengikut, mengikuti, pengikut dan mengikuti, atau hanya untuk saya. Pilihan hanya untuk saya hanya berlaku untuk tampilan profil dan tidak memengaruhi pilihan acak.\n6. Audio tidak bisa diedit, hanya dihapus. Kamu bebas menghapus audio atau akunmu kapan saja.\n7. Kami dapat menghapus konten atau akun yang melanggar aturan ini.\n8. Hulhup disediakan apa adanya, aturan dapat diperbarui dan versi terbaru selalu ada di halaman ini.',
     'By using Hulhup you agree to the following.\n\n1. Audio you upload is at most 30 seconds, with a description of at most 200 characters, and must be yours or you must have permission to use it. Profile photos are at most 10 MB.\n2. Do not upload content that harasses, spreads hate, contains violence or sexual material, breaks the law, or impersonates others.\n3. No spam or misuse of the service.\n4. For each audio you choose who can hear it randomly: public, followers, following, or followers and following. Public audio can be heard by anyone.\n5. In Settings you choose who can see your audio on your profile and in search results: public, followers, following, followers and following, or only me. Only me applies to the profile view only and does not affect the random setting.\n6. Audio cannot be edited, only deleted. You may delete audio or your account at any time.\n7. We may remove content or accounts that break these rules.\n8. Hulhup is provided as is. These rules may be updated and the latest version is always on this page.'],
   'privacy_t': [
-    'Data yang kami simpan: nama, nama pengguna, tanggal lahir, bio, foto profil, audio yang kamu unggah, suka, pengikut, serta jumlah hari kamu masuk. Tanggal lahir dan usiamu tidak ditampilkan ke pengguna lain.\n\nKata sandi disimpan dalam bentuk hash, tidak pernah dalam bentuk asli.\n\nNotifikasi: Hulhup meminta izin notifikasi untuk mengirim pengingat harian jam 19.00 jika kamu belum masuk hari itu, dan pemberitahuan suka dan pengikut baru. Pengingat dijadwalkan di perangkatmu sendiri. Kamu bisa mematikannya di Pengaturan atau di pengaturan sistem perangkat.\n\nMikrofon hanya dipakai saat kamu menekan tombol rekam. Galeri hanya dibuka saat kamu memilih foto.\n\nTanpa login, kamu hanya mendengar suara; kami tidak membuat profil tamu.\n\nAudio yang kamu jadikan offline disalin dan disimpan di perangkatmu supaya bisa diputar tanpa internet. Kamu bisa menghapusnya kapan saja dari menu Audio offline.\n\nKami tidak menjual datamu dan tidak menampilkan iklan. Untuk saat ini data hanya disimpan di perangkatmu.\n\nMenghapus audio atau akun akan menghapus file dan datanya secara permanen dari perangkat.',
-    'Data we store: name, username, date of birth, bio, profile photo, audio you upload, likes, followers, and the number of days you signed in. Your date of birth and age are never shown to other users.\n\nPasswords are stored as hashes, never in plain form.\n\nNotifications: Hulhup asks for notification permission to send a daily reminder at 7 PM if you haven’t opened it that day, and alerts for new likes and followers. Reminders are scheduled on your own device. You can turn them off in Settings or in your device settings.\n\nThe microphone is used only when you press record. The gallery opens only when you pick a photo.\n\nWithout signing in you only listen; we do not create guest profiles.\n\nAudio you make available offline is copied and stored on your device so it can play without internet. You can remove it anytime from the Offline audio menu.\n\nWe do not sell your data and show no ads. For now data is stored only on your device.\n\nDeleting audio or your account permanently removes the files and data from the device.'],
+    'Data yang kami simpan: nama, nama pengguna, tanggal lahir, bio, foto profil, audio yang kamu unggah, suka, pengikut, serta jumlah hari kamu masuk. Tanggal lahir dan usiamu tidak ditampilkan ke pengguna lain.\n\nKata sandi disimpan dalam bentuk hash, tidak pernah dalam bentuk asli.\n\nNotifikasi: Hulhup meminta izin notifikasi untuk mengirim pengingat harian setiap jam 19.00, dan pemberitahuan suka dan pengikut baru. Pengingat dijadwalkan di perangkatmu sendiri. Kamu bisa mematikannya di Pengaturan atau di pengaturan sistem perangkat.\n\nMikrofon hanya dipakai saat kamu menekan tombol rekam. Galeri hanya dibuka saat kamu memilih foto.\n\nTanpa login, kamu hanya mendengar suara; kami tidak membuat profil tamu.\n\nAudio yang kamu jadikan offline disalin dan disimpan di perangkatmu supaya bisa diputar tanpa internet. Kamu bisa menghapusnya kapan saja dari menu Audio offline.\n\nKami tidak menjual datamu dan tidak menampilkan iklan. Untuk saat ini data hanya disimpan di perangkatmu.\n\nMenghapus audio atau akun akan menghapus file dan datanya secara permanen dari perangkat.',
+    'Data we store: name, username, date of birth, bio, profile photo, audio you upload, likes, followers, and the number of days you signed in. Your date of birth and age are never shown to other users.\n\nPasswords are stored as hashes, never in plain form.\n\nNotifications: Hulhup asks for notification permission to send a daily reminder every day at 7 PM, and alerts for new likes and followers. Reminders are scheduled on your own device. You can turn them off in Settings or in your device settings.\n\nThe microphone is used only when you press record. The gallery opens only when you pick a photo.\n\nWithout signing in you only listen; we do not create guest profiles.\n\nAudio you make available offline is copied and stored on your device so it can play without internet. You can remove it anytime from the Offline audio menu.\n\nWe do not sell your data and show no ads. For now data is stored only on your device.\n\nDeleting audio or your account permanently removes the files and data from the device.'],
 };

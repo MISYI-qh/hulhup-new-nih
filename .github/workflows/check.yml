@@ -1,0 +1,14 @@
+name: check
+on: workflow_dispatch
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with: { channel: stable }
+      - run: flutter pub get
+      - name: Analisis kode
+        run: flutter analyze --no-pub
+      - name: Tes
+        run: flutter test --no-pub

@@ -11,19 +11,23 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomeState extends State<HomePage> {
-  bool menu = false;
+  bool menu = false, _busy = false;
 
   Future<void> _tap() async {
+    if (_busy) return;
+    _busy = true;
     final s = Store.i;
     try {
       final a = await s.random();
       if (!mounted) return;
       if (a == null) { toast(s.t(s.fromOffline ? 'no_net_empty' : 'nobody')); return; }
       if (s.fromOffline) toast(s.t('no_net'));
-      s.play(a, force: true, loop: a.popup).catchError((_) => toast(s.t('e_server'), bad: true));
-      if (a.popup) sheet(context, (_) => PopupBody(a)).then((_) { if (s.playing == a.id) s.stop(); });
+      s.play(a, force: true).catchError((_) => toast(s.t('e_server'), bad: true));
+      sheet(context, (_) => PopupBody(a)).then((_) { if (s.playing == a.id) s.stop(); });
     } catch (e) {
       toast(s.err(e), bad: true);
+    } finally {
+      _busy = false;
     }
   }
 

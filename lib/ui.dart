@@ -468,6 +468,8 @@ class _BirthState extends State<_BirthSheet> {
       ]);
 }
 
+List<String> monthNames(String lang) => _months[lang] ?? _months['id']!;
+
 const audiences = ['public', 'followers', 'following', 'both'];
 IconData audIcon(String v) => const {'public': Icons.public_rounded, 'followers': Icons.group_outlined, 'following': Icons.person_add_alt_1_outlined, 'both': Icons.people_alt_outlined, 'me': Icons.lock_outline_rounded}[v] ?? Icons.public_rounded;
 

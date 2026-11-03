@@ -210,7 +210,7 @@ class _ProfileState extends State<ProfilePage> {
         if (u.bio.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 12), child: Text(u.bio, style: const TextStyle(fontSize: 15, height: 1.45))),
         const SizedBox(height: 16),
         Row(children: [_stat(u.followers, s.t('followers'), 'followers'), const SizedBox(width: 22), _stat(u.following, s.t('following'), 'following')]),
-        if (mine && (u.streak > 0 || u.days > 0)) Padding(padding: const EdgeInsets.only(top: 14), child: StreakChip(u.streak, u.days)),
+        if (mine && (u.streak > 0 || u.days > 0)) Padding(padding: const EdgeInsets.only(top: 14), child: StreakChip(u.streak, u.days, open: true)),
         const SizedBox(height: 18),
         if (mine) Row(children: [Expanded(child: PBtn(s.t('edit_profile'), _edit, ghost: true, icon: Icons.edit_outlined)), const SizedBox(width: 10), Expanded(child: PBtn(s.t('upload'), () async { await go(context, const UploadPage()); _load(); }, icon: Icons.add_rounded))])
         else if (s.me != null) PBtn(u.isFollowing ? s.t('unfollow') : s.t('follow'), _follow, loading: busy, ghost: u.isFollowing, icon: u.isFollowing ? Icons.check_rounded : Icons.person_add_alt_1_rounded),
@@ -243,19 +243,38 @@ class _FollowsState extends State<FollowsPage> {
   @override
   Widget build(BuildContext context) => Scaffold(body: Column(children: [
         TopBar(back: true, title: Store.i.t(widget.kind)),
-        Expanded(child: users == null && error == null ? const Loader() : error != null ? Empty(Icons.cloud_off_rounded, error!) : users!.isEmpty ? Empty(Icons.group_outlined, Store.i.t('empty_list')) : UserList(users!)),
+        Expanded(child: users == null && error == null ? const Loader() : error != null ? Empty(Icons.cloud_off_rounded, error!) : users!.isEmpty ? Empty(Icons.group_outlined, Store.i.t('empty_list')) : ListView.builder(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 40), itemCount: users!.length,
+          itemBuilder: (_, i) {
+            final u = users![i] as Map, own = widget.kind == 'followers' && widget.u == Store.i.me?.username;
+            return UserTile(u, i, trailing: own ? Tap(onTap: () => _remove(u), child: Container(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9), decoration: BoxDecoration(color: bgOf(context), borderRadius: BorderRadius.circular(18)), child: Text(Store.i.t('remove'), style: const TextStyle(color: heart, fontWeight: FontWeight.w700, fontSize: 13)))) : null);
+          },
+        )),
       ]));
+
+  Future<void> _remove(Map u) async {
+    final s = Store.i;
+    if (!await confirm(context, s.t('remove_follower'), s.t('remove_follower_q').replaceAll('{name}', '${u['name']}'), s.t('remove'), danger: true)) return;
+    try {
+      await Api.req('DELETE', '/me/followers/${u['username']}');
+      users!.remove(u);
+      toast(s.t('follower_removed'));
+      await s.refresh();
+    } catch (e) { toast(s.err(e), bad: true); }
+    if (mounted) setState(() {});
+  }
 }
 
 class UserTile extends StatelessWidget {
   final Map u;
   final int i;
-  const UserTile(this.u, this.i, {super.key});
+  final Widget? trailing;
+  const UserTile(this.u, this.i, {super.key, this.trailing});
   @override
   Widget build(BuildContext context) => In(i, Tap(onTap: () => go(context, ProfilePage(u['username'])), child: Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(26)), child: Row(children: [
         Avatar(u['avatar'], u['name'], 46), const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(u['name'], maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)), Text(u['username'], style: TextStyle(color: sub(context), fontSize: 13))])),
-        Icon(Icons.chevron_right_rounded, color: sub(context)),
+        trailing ?? Icon(Icons.chevron_right_rounded, color: sub(context)),
       ]))));
 }
 
@@ -268,11 +287,12 @@ class UserList extends StatelessWidget {
 
 class StreakChip extends StatelessWidget {
   final int streak, days;
-  const StreakChip(this.streak, this.days, {super.key});
+  final bool open;
+  const StreakChip(this.streak, this.days, {super.key, this.open = false});
   @override
   Widget build(BuildContext context) {
     final s = Store.i;
-    return Container(
+    final box = Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(24)),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         Icon(Icons.local_fire_department_rounded, size: 28, color: streak > 0 ? const Color(0xFFE8833A) : sub(context)),
@@ -281,8 +301,105 @@ class StreakChip extends StatelessWidget {
           Text(s.t('streak_t').replaceAll('{n}', '$streak'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
           Text(s.t('days_total').replaceAll('{n}', '$days'), style: TextStyle(color: sub(context), fontSize: 12.5)),
         ]),
+        if (open) ...[const SizedBox(width: 10), Icon(Icons.calendar_month_rounded, size: 20, color: sub(context))],
       ]),
     );
+    return open ? Tap(onTap: () => go(context, const StreakPage()), scale: .97, child: box) : box;
+  }
+}
+
+/// Kalender hari masuk: hari masuk, hari yang tidak masuk, dan hari ini.
+class StreakPage extends StatefulWidget {
+  const StreakPage({super.key});
+  @override
+  State<StreakPage> createState() => _StreakState();
+}
+
+class _StreakState extends State<StreakPage> {
+  Set<String> days = {};
+  int streak = 0, total = 0;
+  bool loading = true;
+  String? error;
+  DateTime month = DateTime(DateTime.now().year, DateTime.now().month);
+
+  @override
+  void initState() { super.initState(); _load(); }
+
+  Future<void> _load() async {
+    try {
+      final j = await Api.req('GET', '/me/log');
+      days = {for (final d in j['days'] as List) '$d'};
+      streak = j['streak'] ?? 0;
+      total = j['total'] ?? 0;
+    } catch (e) { error = Store.i.err(e); }
+    if (mounted) setState(() => loading = false);
+  }
+
+  static String _iso(DateTime d) => '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  @override
+  Widget build(BuildContext context) {
+    final s = Store.i;
+    return Scaffold(body: Column(children: [
+      TopBar(back: true, title: s.t('streak_cal')),
+      Expanded(child: loading ? const Loader() : error != null ? Empty(Icons.cloud_off_rounded, error!) : _body(context, s)),
+    ]));
+  }
+
+  Widget _body(BuildContext context, Store s) {
+    final now = DateTime.now(), today = DateTime(now.year, now.month, now.day);
+    final sorted = days.toList()..sort();
+    final first = sorted.isEmpty ? null : DateTime.tryParse(sorted.first);
+    final wd = s.lang == 'id' ? ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'] : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final n = DateUtils.getDaysInMonth(month.year, month.month), lead = DateTime(month.year, month.month, 1).weekday - 1;
+    final canPrev = first != null && DateTime(month.year, month.month).isAfter(DateTime(first.year, first.month));
+    final canNext = DateTime(month.year, month.month).isBefore(DateTime(today.year, today.month));
+    final missed = <DateTime>[];
+    var inCount = 0;
+    final cells = <Widget>[for (var i = 0; i < lead; i++) const SizedBox()];
+    for (var d = 1; d <= n; d++) {
+      final dt = DateTime(month.year, month.month, d), inn = days.contains(_iso(dt));
+      final isToday = dt == today, past = first != null && !dt.isBefore(first) && dt.isBefore(today), miss = past && !inn;
+      if (inn) inCount++;
+      if (miss) missed.add(dt);
+      final Color? bg = inn ? green : (miss ? heart.withValues(alpha: .16) : null);
+      final Color fg = inn ? cream : (miss ? heart : (dt.isAfter(today) || first == null || dt.isBefore(first) ? sub(context).withValues(alpha: .5) : ink(context)));
+      cells.add(Container(
+        margin: const EdgeInsets.all(3),
+        decoration: BoxDecoration(color: bg, shape: BoxShape.circle, border: isToday ? Border.all(color: ink(context), width: 2) : null),
+        alignment: Alignment.center,
+        child: Text('$d', style: TextStyle(fontWeight: inn || isToday ? FontWeight.w800 : FontWeight.w500, fontSize: 14, color: fg)),
+      ));
+    }
+    Widget legend(Color c, String t, {bool ring = false}) => Row(mainAxisSize: MainAxisSize.min, children: [
+          Container(width: 14, height: 14, decoration: BoxDecoration(color: ring ? null : c, shape: BoxShape.circle, border: ring ? Border.all(color: c, width: 2) : null)),
+          const SizedBox(width: 6), Text(t, style: TextStyle(color: sub(context), fontSize: 12.5)),
+        ]);
+    final mn = monthNames(s.lang)[month.month - 1];
+    return ListView(padding: const EdgeInsets.fromLTRB(20, 4, 20, 40), children: [
+      In(0, Align(alignment: Alignment.centerLeft, child: StreakChip(streak, total))),
+      const SizedBox(height: 18),
+      In(1, Row(children: [
+        IconBtn(Icons.chevron_left_rounded, () => setState(() => month = DateTime(month.year, month.month - 1)), color: canPrev ? null : sub(context).withValues(alpha: .3)),
+        Expanded(child: Center(child: Text('$mn ${month.year}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)))),
+        IconBtn(Icons.chevron_right_rounded, () => setState(() => month = DateTime(month.year, month.month + 1)), color: canNext ? null : sub(context).withValues(alpha: .3)),
+      ])),
+      const SizedBox(height: 8),
+      Row(children: [for (final w in wd) Expanded(child: Center(child: Text(w, style: TextStyle(color: sub(context), fontSize: 12.5, fontWeight: FontWeight.w600))))]),
+      const SizedBox(height: 6),
+      GridView.count(crossAxisCount: 7, shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), children: cells),
+      const SizedBox(height: 10),
+      Wrap(spacing: 18, runSpacing: 8, children: [legend(green, s.t('cal_in')), legend(heart, s.t('cal_miss')), legend(ink(context), s.t('cal_today'), ring: true)]),
+      const SizedBox(height: 18),
+      Text(s.t('cal_month').replaceAll('{a}', '$inCount').replaceAll('{b}', '${missed.length}'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+      const SizedBox(height: 14),
+      Text(s.t('cal_missed_list'), style: TextStyle(color: sub(context), fontWeight: FontWeight.w700, fontSize: 13)),
+      const SizedBox(height: 8),
+      if (missed.isEmpty) Text(s.t('cal_none'), style: TextStyle(color: sub(context), fontSize: 14))
+      else Wrap(spacing: 8, runSpacing: 8, children: [for (final d in missed) Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), decoration: BoxDecoration(color: heart.withValues(alpha: .12), borderRadius: BorderRadius.circular(16)), child: Text('${wd[d.weekday - 1]}, ${d.day} ${monthNames(s.lang)[d.month - 1]}', style: const TextStyle(color: heart, fontWeight: FontWeight.w600, fontSize: 13)))]),
+      const SizedBox(height: 18),
+      Text(s.t('cal_note'), style: TextStyle(color: sub(context), fontSize: 12.5, height: 1.4)),
+    ]);
   }
 }
 
@@ -412,17 +529,17 @@ class SettingsPage extends StatelessWidget {
           row(Icons.key_rounded, s.t('change_pw'), () => sheet(context, (_) => const PwSheet())),
           const SizedBox(height: 6),
           Pick(s.t('pvis'), s.me!.pvis, (v) async { try { await s.setPvis(v); toast(s.t('saved')); } catch (e) { toast(s.err(e), bad: true); } }, opts: const ['public', 'followers', 'following', 'both', 'me']),
-          if (!kIsWeb) ...[
-            label(s.t('notif')),
-            Container(
-              padding: const EdgeInsets.fromLTRB(18, 14, 16, 14), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(24)),
-              child: Row(children: [
-                Icon(Icons.notifications_active_outlined, size: 22, color: ink(context)), const SizedBox(width: 14),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(s.t('remind'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)), const SizedBox(height: 2), Text(s.t('remind_sub'), style: TextStyle(color: sub(context), fontSize: 12.5, height: 1.3))])),
-                const SizedBox(width: 10), Toggle(s.remind, s.setRemind),
-              ]),
-            ),
-          ],
+        ],
+        if (!kIsWeb) ...[
+          label(s.t('notif')),
+          Container(
+            padding: const EdgeInsets.fromLTRB(18, 14, 16, 14), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(24)),
+            child: Row(children: [
+              Icon(Icons.notifications_active_outlined, size: 22, color: ink(context)), const SizedBox(width: 14),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(s.t('remind'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)), const SizedBox(height: 2), Text(s.t('remind_sub'), style: TextStyle(color: sub(context), fontSize: 12.5, height: 1.3))])),
+              const SizedBox(width: 10), Toggle(s.remind, s.setRemind),
+            ]),
+          ),
         ],
         label(s.t('language')),
         Seg<String>([('id', 'Indonesia'), ('en', 'English')], s.lang, s.setLang),
@@ -528,15 +645,15 @@ class _NotifState extends State<NotifPage> {
 
   Widget _item(Map n, int i) {
     final s = Store.i;
-    final sys = n['type'] == 'streak' || n['type'] == 'missed', like = n['type'] == 'like';
+    final k = '${n['type']}', sys = k == 'streak' || k == 'missed' || k == 'tired', like = k == 'like';
     final bg = n['seen'] == true ? soft(context) : ink(context).withValues(alpha: .12);
     final when = Text(s.ago(n['created'] as int), style: TextStyle(color: sub(context), fontSize: 12));
     if (sys) {
-      final txt = s.t(n['type'] == 'streak' ? 'n_streak' : 'n_missed').replaceAll('{n}', '${n['n']}');
+      final txt = k == 'tired' ? s.t('r_body') : s.t(k == 'streak' ? 'n_streak' : 'n_missed').replaceAll('{n}', '${n['n']}');
       return In(i, Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(26)), child: Row(children: [
         Container(width: 46, height: 46, decoration: const BoxDecoration(color: green, shape: BoxShape.circle), child: const Center(child: Logo(30, cream))),
         const SizedBox(width: 14),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [const Text('Hulhup', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)), const Spacer(), when]), const SizedBox(height: 2), Text(txt, style: const TextStyle(fontSize: 15, height: 1.4))])),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Text(k == 'tired' ? s.t('r_title') : 'Hulhup', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)), const Spacer(), when]), const SizedBox(height: 2), Text(txt, style: const TextStyle(fontSize: 15, height: 1.4))])),
       ])));
     }
     return In(i, Tap(onTap: () => go(context, ProfilePage(n['username'])), child: Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(26)), child: Row(children: [
@@ -555,7 +672,7 @@ class _NotifState extends State<NotifPage> {
     return Scaffold(body: Column(children: [
       TopBar(back: true, title: s.t('notif')),
       Expanded(child: items == null && error == null ? const Loader() : error != null ? Empty(Icons.cloud_off_rounded, error!) : ListView(padding: const EdgeInsets.fromLTRB(20, 4, 20, 40), children: [
-        if (me != null && (me.streak > 0 || me.days > 0)) Padding(padding: const EdgeInsets.only(bottom: 14), child: Align(alignment: Alignment.centerLeft, child: StreakChip(me.streak, me.days))),
+        if (me != null && (me.streak > 0 || me.days > 0)) Padding(padding: const EdgeInsets.only(bottom: 14), child: Align(alignment: Alignment.centerLeft, child: StreakChip(me.streak, me.days, open: true))),
         if (items!.isEmpty) Empty(Icons.notifications_none_rounded, s.t('empty_notif')),
         for (var i = 0; i < items!.length; i++) _item(items![i] as Map, i),
       ])),
@@ -577,7 +694,7 @@ class _UploadState extends State<UploadPage> {
   Uint8List? bytes;
   String ext = 'm4a';
   int ms = 0;
-  bool recording = false, popup = true, pprof = true, busy = false, previewing = false;
+  bool recording = false, pprof = true, busy = false, previewing = false;
   String rand = 'public';
   Timer? timer;
 
@@ -618,9 +735,16 @@ class _UploadState extends State<UploadPage> {
     final b = f.bytes ?? await XFile(f.path!).readAsBytes();
     final tp = AudioPlayer();
     int? secs;
-    try { await tp.setSource(BytesSource(b)); secs = (await tp.getDuration())?.inSeconds; } catch (_) {}
+    try {
+      await tp.setSource(BytesSource(b, mimeType: mimeOf(b)));
+      for (var i = 0; i < 10 && secs == null; i++) {
+        final d = await tp.getDuration();
+        if (d != null) { secs = (d.inMilliseconds / 1000).round(); } else { await Future.delayed(const Duration(milliseconds: 150)); }
+      }
+    } catch (_) {}
     await tp.dispose();
-    if (secs == null || secs > 30) { toast(s.t('too_long'), bad: true); return; }
+    if (secs == null) { toast(s.t('e_bad_file'), bad: true); return; }
+    if (secs > 30) { toast(s.t('too_long'), bad: true); return; }
     await pv.stop();
     setState(() { bytes = b; ext = (f.extension ?? 'm4a').toLowerCase(); ms = max(1, secs!) * 1000; previewing = false; });
   }
@@ -636,7 +760,7 @@ class _UploadState extends State<UploadPage> {
     final s = Store.i;
     setState(() => busy = true);
     try {
-      await Api.multi('/audios', bytes!, 'a.$ext', {'desc': desc.text, 'secs': '${max(1, (ms / 1000).ceil())}', 'popup': popup ? '1' : '0', 'pprof': pprof ? '1' : '0', 'rand': rand});
+      await Api.multi('/audios', bytes!, 'a.$ext', {'desc': desc.text, 'secs': '${max(1, (ms / 1000).ceil())}', 'pprof': pprof ? '1' : '0', 'rand': rand});
       if (!mounted) return;
       Navigator.pop(context);
       toast(s.t('uploaded'));
@@ -663,8 +787,7 @@ class _UploadState extends State<UploadPage> {
         const SizedBox(height: 24),
         Field(s.t('desc'), desc, max: 200, lines: 4),
         const SizedBox(height: 18),
-        Row(children: [Expanded(child: Text(s.t('popup'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16))), Toggle(popup, (v) => setState(() => popup = v))]),
-        AnimatedSize(duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic, child: popup ? Padding(padding: const EdgeInsets.only(top: 16), child: Row(children: [Expanded(child: Text(s.t('pprof'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16))), Toggle(pprof, (v) => setState(() => pprof = v))])) : const SizedBox(width: double.infinity)),
+        Row(children: [Expanded(child: Text(s.t('pprof'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16))), Toggle(pprof, (v) => setState(() => pprof = v))]),
         const SizedBox(height: 22),
         Pick(s.t('who_rand'), rand, (v) => setState(() => rand = v)),
         const SizedBox(height: 28),

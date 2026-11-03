@@ -19,6 +19,8 @@ dependencies:
   connectivity_plus: ^6.1.0
 dev_dependencies:
   flutter_launcher_icons: ^0.14.0
+  flutter_test:
+    sdk: flutter
 flutter:
   uses-material-design: true
   fonts:
