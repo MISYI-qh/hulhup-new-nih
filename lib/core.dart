@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -100,6 +101,9 @@ class Local {
     final s = sp.getString('m_$k');
     return s == null ? null : _cache[k] = base64Decode(s);
   }
+  static Future<void> putBlob(String k, Uint8List b) => _put(k, b);
+  static Future<void> delBlob(String k) => _del(k);
+  static int? _lastRand;
   static Uint8List? bytes(String url) => url.startsWith('mem:') ? _blob(url.substring(4)) : null;
 
   static List _r(String k) => db[k] as List;
@@ -185,7 +189,12 @@ class Local {
       db['taps'] = (db['taps'] as int) + 1;
       await _save();
       final all = _r('audios').where((a) => _aud(a['rand'] ?? 'public', _byId(a['owner'])!, me, self: false)).toList();
-      return {'taps': db['taps'], 'audio': all.isEmpty ? null : _av(all[_rnd.nextInt(all.length)], me)};
+      // Acak sungguhan (Random.secure), hanya tidak mengulang audio yang sama dua kali berturut-turut bila ada pilihan lain.
+      var pool = all;
+      if (pool.length > 1 && _lastRand != null) pool = pool.where((a) => a['id'] != _lastRand).toList();
+      final pick = pool.isEmpty ? null : pool[_rnd.nextInt(pool.length)];
+      _lastRand = pick?['id'];
+      return {'taps': db['taps'], 'audio': pick == null ? null : _av(pick, me)};
     }
     if (p == '/search') {
       final s = (q['q'] ?? '').trim().toLowerCase();
@@ -396,6 +405,7 @@ class A {
   A.from(Map j)
       : id = j['id'], secs = j['secs'], desc = j['desc'] ?? '', url = j['url'], vis = j['vis'] ?? 'public', rand = j['rand'] ?? 'public', owner = j['owner'],
         ownerName = j['owner_name'], ownerAvatar = j['owner_avatar'], popup = j['popup'] == true, pprof = j['pprof'] != false, likes = j['likes'] ?? 0, liked = j['liked'] == true;
+  Map<String, dynamic> toJson() => {'id': id, 'secs': secs, 'desc': desc, 'url': url, 'vis': vis, 'rand': rand, 'owner': owner, 'owner_name': ownerName, 'owner_avatar': ownerAvatar, 'popup': popup, 'pprof': pprof, 'likes': likes, 'liked': liked};
 }
 
 String mmss(int s) => '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}';
@@ -416,7 +426,10 @@ class Store extends ChangeNotifier {
   int taps = 0, unread = 0, unreadSocial = 0;
   String lang = 'id';
   ThemeMode mode = ThemeMode.system;
-  bool remind = true;
+  bool remind = true, fromOffline = false;
+  final offline = <A>[];
+  final _rnd = Random.secure();
+  int? _lastOff;
   int? playing;
   int dur = 0;
   int _pushed = 0;
@@ -443,6 +456,7 @@ class Store extends ChangeNotifier {
     mode = ThemeMode.values[(_sp.getInt('mode') ?? 0).clamp(0, 2)];
     remind = _sp.getBool('remind') ?? true;
     await Local.init(_sp);
+    try { for (final j in jsonDecode(_sp.getString('offline') ?? '[]') as List) { offline.add(A.from(j as Map)); } } catch (_) {}
     _p.onPositionChanged.listen((d) => pos.value = d.inMilliseconds);
     _p.onDurationChanged.listen((d) => dur = d.inMilliseconds);
     _p.onPlayerComplete.listen((_) { playing = null; _scope = null; if (dur > 0) pos.value = dur; notifyListeners(); });
@@ -489,10 +503,9 @@ class Store extends ChangeNotifier {
   Future<void> syncReminders() async {
     await Notifier.cancelReminders();
     if (me == null || !remind) return;
-    final n = DateTime.now(), st = me!.streak;
+    final n = DateTime.now();
     for (var d = 1; d <= 3; d++) {
-      final body = d == 1 ? (st > 0 ? t('r1s').replaceAll('{n}', '$st') : t('r1')) : t('r$d');
-      await Notifier.schedule(100 + d, DateTime(n.year, n.month, n.day + d, 19), 'Hulhup', body, t('notif'));
+      await Notifier.schedule(100 + d, DateTime(n.year, n.month, n.day + d, 19), t('r_title'), t('r_body'), t('notif'));
     }
   }
 
@@ -529,11 +542,53 @@ class Store extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<bool> _online() async {
+    try { return (await Connectivity().checkConnectivity()).any((e) => e != ConnectivityResult.none); } catch (_) { return true; }
+  }
+
+  A? _pickOffline() {
+    if (offline.isEmpty) return null;
+    var c = offline;
+    if (c.length > 1 && _lastOff != null) c = c.where((a) => a.id != _lastOff).toList();
+    final a = c[_rnd.nextInt(c.length)];
+    _lastOff = a.id;
+    return a;
+  }
+
+  /// Tanpa internet, acak diambil dari audio yang sudah dijadikan offline.
   Future<A?> random() async {
-    final j = await Api.req('GET', '/random');
-    taps = j['taps'] ?? taps;
+    fromOffline = false;
+    if (!await _online()) { fromOffline = true; return _pickOffline(); }
+    try {
+      final j = await Api.req('GET', '/random');
+      taps = j['taps'] ?? taps;
+      notifyListeners();
+      return j['audio'] == null ? null : A.from(j['audio']);
+    } on ApiErr {
+      rethrow;
+    } catch (_) {
+      fromOffline = true;
+      return _pickOffline();
+    }
+  }
+
+  bool isOffline(int id) => offline.any((o) => o.id == id);
+
+  Future<void> toggleOffline(A a) async {
+    final i = offline.indexWhere((o) => o.id == a.id);
+    if (i >= 0) {
+      await Local.delBlob('off${a.id}');
+      offline.removeAt(i);
+    } else {
+      final b = Local.bytes(a.url);
+      if (b == null) throw ApiErr('server');
+      await Local.putBlob('off${a.id}', b);
+      final j = a.toJson();
+      j['url'] = 'mem:off${a.id}';
+      offline.insert(0, A.from(j));
+    }
+    await _sp.setString('offline', jsonEncode(offline.map((o) => o.toJson()).toList()));
     notifyListeners();
-    return j['audio'] == null ? null : A.from(j['audio']);
   }
 
   /// [loop]: audio berulang terus sampai dijeda atau popup/halaman ditutup.
@@ -616,10 +671,11 @@ const S = <String, List<String>>{
   'n_streak': ['Kamu sudah masuk {n} hari berturut-turut', 'You’ve signed in {n} days in a row'],
   'n_missed': ['Kamu tidak masuk {n} hari. Rangkaianmu dimulai lagi dari awal.', 'You missed {n} day(s). Your streak starts over.'],
   'push_unread': ['{n} notifikasi baru', '{n} new notifications'],
-  'r1s': ['Kamu belum masuk hari ini. Rangkaian {n} harimu akan putus kalau tidak masuk sekarang.', 'You haven’t opened Hulhup today. Your {n}-day streak ends if you skip today.'],
-  'r1': ['Kamu belum masuk hari ini. Ketuk dan dengarkan suara acak.', 'You haven’t opened Hulhup today. Tap and hear a random voice.'],
-  'r2': ['Sudah 2 hari kamu tidak masuk. Ada suara baru menunggumu.', 'It’s been 2 days. New voices are waiting for you.'],
-  'r3': ['Sudah 3 hari tidak masuk. Kami kangen, ayo kembali ke Hulhup.', 'It’s been 3 days. We miss you, come back to Hulhup.'],
+  'r_title': ['Kamu lelah?', 'Feeling tired?'], 'r_body': ['Coba lah untuk mendengarkan beberapa suara', 'Try listening to a few voices'],
+  'mk_offline': ['Jadikan offline', 'Make available offline'], 'is_offline': ['Tersimpan offline', 'Saved offline'], 'offline_t': ['Audio offline', 'Offline audio'],
+  'saved_off': ['Disimpan untuk offline', 'Saved for offline'], 'removed_off': ['Dihapus dari offline', 'Removed from offline'], 'off_fail': ['Tidak bisa menyimpan audio ini', 'Couldn’t save this audio'],
+  'empty_offline': ['Belum ada audio offline. Simpan lewat popup acak atau daftar audio.', 'No offline audio yet. Save from the random popup or an audio list.'],
+  'no_net': ['Tidak ada internet. Memutar audio offline.', 'No internet. Playing offline audio.'], 'no_net_empty': ['Tidak ada internet dan belum ada audio offline.', 'No internet and no offline audio yet.'],
   'ago_now': ['baru saja', 'just now'], 'ago_m': ['mnt lalu', 'min ago'], 'ago_h': ['jam lalu', 'h ago'], 'ago_d': ['hari lalu', 'd ago'],
   'e_too_big_img': ['Foto terlalu besar (maks 10 MB)', 'Photo too large (max 10 MB)'],
   'about_t': [
@@ -629,6 +685,6 @@ const S = <String, List<String>>{
     'Dengan memakai Hulhup kamu setuju pada aturan berikut.\n\n1. Audio yang kamu unggah berdurasi maksimal 30 detik, dengan deskripsi maksimal 200 karakter, dan harus milikmu atau kamu punya izin memakainya. Foto profil maksimal 10 MB.\n2. Dilarang mengunggah konten yang melecehkan, menebar kebencian, mengandung kekerasan atau seksual, melanggar hukum, atau meniru orang lain.\n3. Dilarang spam dan menyalahgunakan layanan.\n4. Untuk setiap audio kamu memilih siapa yang bisa mendengarnya secara acak: publik, pengikut, mengikuti, atau pengikut dan mengikuti. Audio publik dapat didengar siapa saja.\n5. Di Pengaturan kamu memilih siapa yang bisa melihat audiomu di profil dan di hasil pencarian: publik, pengikut, mengikuti, pengikut dan mengikuti, atau hanya untuk saya. Pilihan hanya untuk saya hanya berlaku untuk tampilan profil dan tidak memengaruhi pilihan acak.\n6. Audio tidak bisa diedit, hanya dihapus. Kamu bebas menghapus audio atau akunmu kapan saja.\n7. Kami dapat menghapus konten atau akun yang melanggar aturan ini.\n8. Hulhup disediakan apa adanya, aturan dapat diperbarui dan versi terbaru selalu ada di halaman ini.',
     'By using Hulhup you agree to the following.\n\n1. Audio you upload is at most 30 seconds, with a description of at most 200 characters, and must be yours or you must have permission to use it. Profile photos are at most 10 MB.\n2. Do not upload content that harasses, spreads hate, contains violence or sexual material, breaks the law, or impersonates others.\n3. No spam or misuse of the service.\n4. For each audio you choose who can hear it randomly: public, followers, following, or followers and following. Public audio can be heard by anyone.\n5. In Settings you choose who can see your audio on your profile and in search results: public, followers, following, followers and following, or only me. Only me applies to the profile view only and does not affect the random setting.\n6. Audio cannot be edited, only deleted. You may delete audio or your account at any time.\n7. We may remove content or accounts that break these rules.\n8. Hulhup is provided as is. These rules may be updated and the latest version is always on this page.'],
   'privacy_t': [
-    'Data yang kami simpan: nama, nama pengguna, tanggal lahir, bio, foto profil, audio yang kamu unggah, suka, pengikut, serta jumlah hari kamu masuk. Tanggal lahir dan usiamu tidak ditampilkan ke pengguna lain.\n\nKata sandi disimpan dalam bentuk hash, tidak pernah dalam bentuk asli.\n\nNotifikasi: Hulhup meminta izin notifikasi untuk mengirim pengingat harian jam 19.00 jika kamu belum masuk hari itu, dan pemberitahuan suka dan pengikut baru. Pengingat dijadwalkan di perangkatmu sendiri. Kamu bisa mematikannya di Pengaturan atau di pengaturan sistem perangkat.\n\nMikrofon hanya dipakai saat kamu menekan tombol rekam. Galeri hanya dibuka saat kamu memilih foto.\n\nTanpa login, kamu hanya mendengar suara; kami tidak membuat profil tamu.\n\nKami tidak menjual datamu dan tidak menampilkan iklan. Untuk saat ini data hanya disimpan di perangkatmu.\n\nMenghapus audio atau akun akan menghapus file dan datanya secara permanen dari perangkat.',
-    'Data we store: name, username, date of birth, bio, profile photo, audio you upload, likes, followers, and the number of days you signed in. Your date of birth and age are never shown to other users.\n\nPasswords are stored as hashes, never in plain form.\n\nNotifications: Hulhup asks for notification permission to send a daily reminder at 7 PM if you haven’t opened it that day, and alerts for new likes and followers. Reminders are scheduled on your own device. You can turn them off in Settings or in your device settings.\n\nThe microphone is used only when you press record. The gallery opens only when you pick a photo.\n\nWithout signing in you only listen; we do not create guest profiles.\n\nWe do not sell your data and show no ads. For now data is stored only on your device.\n\nDeleting audio or your account permanently removes the files and data from the device.'],
+    'Data yang kami simpan: nama, nama pengguna, tanggal lahir, bio, foto profil, audio yang kamu unggah, suka, pengikut, serta jumlah hari kamu masuk. Tanggal lahir dan usiamu tidak ditampilkan ke pengguna lain.\n\nKata sandi disimpan dalam bentuk hash, tidak pernah dalam bentuk asli.\n\nNotifikasi: Hulhup meminta izin notifikasi untuk mengirim pengingat harian jam 19.00 jika kamu belum masuk hari itu, dan pemberitahuan suka dan pengikut baru. Pengingat dijadwalkan di perangkatmu sendiri. Kamu bisa mematikannya di Pengaturan atau di pengaturan sistem perangkat.\n\nMikrofon hanya dipakai saat kamu menekan tombol rekam. Galeri hanya dibuka saat kamu memilih foto.\n\nTanpa login, kamu hanya mendengar suara; kami tidak membuat profil tamu.\n\nAudio yang kamu jadikan offline disalin dan disimpan di perangkatmu supaya bisa diputar tanpa internet. Kamu bisa menghapusnya kapan saja dari menu Audio offline.\n\nKami tidak menjual datamu dan tidak menampilkan iklan. Untuk saat ini data hanya disimpan di perangkatmu.\n\nMenghapus audio atau akun akan menghapus file dan datanya secara permanen dari perangkat.',
+    'Data we store: name, username, date of birth, bio, profile photo, audio you upload, likes, followers, and the number of days you signed in. Your date of birth and age are never shown to other users.\n\nPasswords are stored as hashes, never in plain form.\n\nNotifications: Hulhup asks for notification permission to send a daily reminder at 7 PM if you haven’t opened it that day, and alerts for new likes and followers. Reminders are scheduled on your own device. You can turn them off in Settings or in your device settings.\n\nThe microphone is used only when you press record. The gallery opens only when you pick a photo.\n\nWithout signing in you only listen; we do not create guest profiles.\n\nAudio you make available offline is copied and stored on your device so it can play without internet. You can remove it anytime from the Offline audio menu.\n\nWe do not sell your data and show no ads. For now data is stored only on your device.\n\nDeleting audio or your account permanently removes the files and data from the device.'],
 };

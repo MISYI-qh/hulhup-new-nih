@@ -18,7 +18,8 @@ class _HomeState extends State<HomePage> {
     try {
       final a = await s.random();
       if (!mounted) return;
-      if (a == null) { toast(s.t('nobody')); return; }
+      if (a == null) { toast(s.t(s.fromOffline ? 'no_net_empty' : 'nobody')); return; }
+      if (s.fromOffline) toast(s.t('no_net'));
       s.play(a, force: true, loop: a.popup).catchError((_) => toast(s.t('e_server'), bad: true));
       if (a.popup) sheet(context, (_) => PopupBody(a)).then((_) { if (s.playing == a.id) s.stop(); });
     } catch (e) {
@@ -131,6 +132,7 @@ class SideMenu extends StatelessWidget {
             const Brand(),
             const SizedBox(height: 28),
             item(Icons.tune_rounded, 'settings', () => const SettingsPage()),
+            item(Icons.download_done_rounded, 'offline_t', () => const OfflinePage()),
             item(Icons.info_outline_rounded, 'about', () => TextPage(s.t('about'), s.t('about_t'))),
             item(Icons.rule_rounded, 'policy', () => TextPage(s.t('policy'), s.t('policy_t'))),
             item(Icons.lock_outline_rounded, 'privacy', () => TextPage(s.t('privacy'), s.t('privacy_t'))),
@@ -176,6 +178,11 @@ class PopupBody extends StatelessWidget {
           ]);
         }),
       ),
+      const SizedBox(height: 10),
+      ListenableBuilder(listenable: s, builder: (_, __) {
+        final off = s.isOffline(a.id);
+        return PBtn(off ? s.t('is_offline') : s.t('mk_offline'), () => toggleOffline(a), ghost: true, icon: off ? Icons.offline_pin_rounded : Icons.download_for_offline_outlined);
+      }),
     ]);
   }
 }

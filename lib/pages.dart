@@ -17,6 +17,11 @@ Future<void> likeAudio(A a) async {
   try { await s.like(a); } catch (e) { toast(s.err(e), bad: true); }
 }
 
+Future<void> toggleOffline(A a) async {
+  final s = Store.i, was = s.isOffline(a.id);
+  try { await s.toggleOffline(a); toast(s.t(was ? 'removed_off' : 'saved_off')); } catch (_) { toast(s.t('off_fail'), bad: true); }
+}
+
 // ---------- teks ----------
 class TextPage extends StatelessWidget {
   final String title, body;
@@ -106,6 +111,8 @@ class AudioRow extends StatelessWidget {
               ValueListenableBuilder<int>(valueListenable: s.pos, builder: (_, ms, __) => Text(on ? '${mmss(ms ~/ 1000)} / ${mmss(a.secs)}' : mmss(a.secs), style: TextStyle(color: on ? ink(context) : sub(context), fontSize: 13, fontWeight: FontWeight.w700))),
               if (mine) ...[const SizedBox(width: 10), Icon(vis, size: 15, color: sub(context))],
               if (showOwner) ...[const SizedBox(width: 10), Flexible(child: Text(a.ownerName, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: sub(context), fontSize: 13)))],
+              const SizedBox(width: 6),
+              Tap(onTap: () => toggleOffline(a), child: Padding(padding: const EdgeInsets.all(4), child: Icon(s.isOffline(a.id) ? Icons.offline_pin_rounded : Icons.download_for_offline_outlined, size: 20, color: s.isOffline(a.id) ? ink(context) : sub(context)))),
             ]),
           ])),
           LikeBtn(a.liked, a.likes, () => likeAudio(a)),
@@ -292,6 +299,27 @@ class ImageViewer extends StatelessWidget {
           Positioned(left: 0, right: 0, bottom: 0, child: SafeArea(child: Padding(padding: const EdgeInsets.all(20), child: Center(child: Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)))))),
         ]),
       );
+}
+
+class OfflinePage extends StatefulWidget {
+  const OfflinePage({super.key});
+  @override
+  State<OfflinePage> createState() => _OfflineState();
+}
+
+class _OfflineState extends State<OfflinePage> {
+  @override
+  void dispose() { Store.i.leave(this); super.dispose(); }
+  @override
+  Widget build(BuildContext context) {
+    final s = Store.i;
+    return Scaffold(body: Column(children: [
+      TopBar(back: true, title: s.t('offline_t')),
+      Expanded(child: ListenableBuilder(listenable: s, builder: (_, __) => s.offline.isEmpty
+          ? Empty(Icons.download_for_offline_outlined, s.t('empty_offline'))
+          : ListView(padding: const EdgeInsets.fromLTRB(20, 4, 20, 40), children: [for (var i = 0; i < s.offline.length; i++) In(i, AudioRow(s.offline[i], key: ValueKey('o${s.offline[i].id}'), showOwner: true, scope: this))]))),
+    ]));
+  }
 }
 
 // ---------- edit profil ----------
