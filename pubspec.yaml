@@ -1,7 +1,7 @@
 name: hulhup
 description: Hulhup - ketuk, dengarkan suara acak. Produk Misyi.
 publish_to: none
-version: 1.0.0+1
+version: 1.1.0+2
 environment:
   sdk: ">=3.3.0 <4.0.0"
 dependencies:
@@ -14,6 +14,8 @@ dependencies:
   path_provider: ^2.1.4
   crypto: ^3.0.3
   shared_preferences: ^2.3.2
+  flutter_local_notifications: ^19.0.0
+  timezone: ^0.10.0
 dev_dependencies:
   flutter_launcher_icons: ^0.14.0
 flutter:

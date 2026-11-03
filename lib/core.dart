@@ -5,6 +5,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'notify.dart';
 
 class ApiErr implements Exception {
   final String code;
@@ -50,6 +51,7 @@ class Local {
       a['pprof'] ??= true;
     }
     for (final u in _r('users')) {
+      u['pvis'] ??= 'public';
       if (u['birth'] == null) u['birth'] = _iso(DateTime(DateTime.now().year - ((u['age'] as int?) ?? 18), 1, 1));
     }
     await _save();
@@ -73,10 +75,11 @@ class Local {
   }
 
   /// Apakah [viewer] termasuk audiens [mode] milik [owner]. pengikut = viewer mengikuti owner; mengikuti = owner mengikuti viewer.
-  static bool _aud(dynamic mode, Map owner, Map? viewer) {
+  static bool _aud(dynamic mode, Map owner, Map? viewer, {bool self = true}) {
     if (mode == 'public') return true;
     if (viewer == null) return false;
-    if (viewer['id'] == owner['id']) return true;
+    if (viewer['id'] == owner['id']) return self;
+    if (mode == 'me') return false;
     final fol = _r('follows').any((f) => f['from'] == viewer['id'] && f['to'] == owner['id']);
     final ing = _r('follows').any((f) => f['from'] == owner['id'] && f['to'] == viewer['id']);
     switch (mode) {
@@ -109,11 +112,20 @@ class Local {
   static int _cnt(String k, bool Function(dynamic) f) => _r(k).where(f).length;
   static String? _img(Map u, String kind) => u[kind == 'avatar' ? 'av' : 'cv'] == true ? 'mem:u${u['id']}_$kind' : null;
 
+  /// Rangkaian hari masuk yang masih berlaku (hari ini atau kemarin), selain itu 0.
+  static int _streakOf(Map u) {
+    final l = u['last'] as String?;
+    if (l == null) return 0;
+    final d = DateTime.now();
+    return (l == _iso(d) || l == _iso(DateTime(d.year, d.month, d.day - 1))) ? ((u['streak'] ?? 0) as int) : 0;
+  }
+
   static Map _uv(Map u, Map? me) {
     final id = u['id'] as int, mine = me != null && me['id'] == id;
     return {
       'username': u['username'], 'name': u['name'], 'bio': u['bio'], 'age': mine ? ageOf(u['birth']) : 0, 'birth': mine ? u['birth'] : '',
       'avatar': _img(u, 'avatar'), 'cover': _img(u, 'cover'),
+      'pvis': mine ? (u['pvis'] ?? 'public') : '', 'streak': mine ? _streakOf(u) : 0, 'days': mine ? (u['days'] ?? 0) : 0,
       'followers': _cnt('follows', (f) => f['to'] == id), 'following': _cnt('follows', (f) => f['from'] == id),
       'audios': _cnt('audios', (a) => a['owner'] == id),
       'is_following': me != null && !mine && _r('follows').any((f) => f['from'] == me['id'] && f['to'] == id), 'is_me': mine,
@@ -123,7 +135,7 @@ class Local {
   static Map _av(Map a, Map? me) {
     final o = _byId(a['owner'])!, id = a['id'];
     return {
-      'id': id, 'desc': a['desc'], 'secs': a['secs'], 'popup': a['popup'], 'vis': a['vis'], 'url': 'mem:a$id', 'pprof': a['pprof'] != false, 'rand': a['rand'],
+      'id': id, 'desc': a['desc'], 'secs': a['secs'], 'popup': a['popup'], 'vis': a['vis'], 'url': 'mem:a$id', 'pprof': a['pprof'] != false, 'rand': a['rand'] ?? 'public',
       'likes': _cnt('likes', (l) => l['a'] == id), 'liked': me != null && _r('likes').any((l) => l['a'] == id && l['u'] == me['id']),
       'owner': o['username'], 'owner_name': o['name'], 'owner_avatar': _img(o, 'avatar'),
     };
@@ -134,6 +146,10 @@ class Local {
   static void _notify(int to, String type, int actor, int? audio) {
     if (to == actor) return;
     _r('notifs').add({'to': to, 'type': type, 'actor': actor, 'audio': audio, 'created': _now(), 'seen': false});
+  }
+
+  static void _sys(int to, String type, int n) {
+    _r('notifs').add({'to': to, 'type': type, 'actor': null, 'audio': null, 'n': n, 'created': _now(), 'seen': false});
   }
 
   static Future<dynamic> handle(String m, String path, Map? b) async {
@@ -168,17 +184,49 @@ class Local {
     if (p == '/random') {
       db['taps'] = (db['taps'] as int) + 1;
       await _save();
-      final all = _r('audios').where((a) => _aud(a['rand'] ?? 'public', _byId(a['owner'])!, me)).toList();
+      final all = _r('audios').where((a) => _aud(a['rand'] ?? 'public', _byId(a['owner'])!, me, self: false)).toList();
       return {'taps': db['taps'], 'audio': all.isEmpty ? null : _av(all[_rnd.nextInt(all.length)], me)};
     }
     if (p == '/search') {
       final s = (q['q'] ?? '').trim().toLowerCase();
-      if (s.isEmpty) return {'users': []};
-      return {'users': _mini(_r('users').where((u) => u['username'].startsWith(s) || u['name'].toLowerCase().contains(s)).take(30))};
+      if (s.isEmpty) return {'users': [], 'audios': []};
+      final au = _r('audios').where((a) {
+        final o = _byId(a['owner']);
+        return o != null && '${a['desc']}'.toLowerCase().contains(s) && _aud(o['pvis'] ?? 'public', o, me);
+      }).take(30).map((a) => _av(a, me)).toList();
+      return {'users': _mini(_r('users').where((u) => u['username'].startsWith(s) || u['name'].toLowerCase().contains(s)).take(30)), 'audios': au};
     }
     if (p == '/me' && m == 'GET') {
       final u = need();
-      return {'user': _uv(u, u), 'unread': _cnt('notifs', (n) => n['to'] == u['id'] && n['seen'] == false)};
+      return {'user': _uv(u, u), 'unread': _cnt('notifs', (n) => n['to'] == u['id'] && n['seen'] == false), 'unread_social': _cnt('notifs', (n) => n['to'] == u['id'] && n['seen'] == false && (n['type'] == 'like' || n['type'] == 'follow'))};
+    }
+    if (p == '/me/settings' && m == 'PATCH') {
+      final u = need();
+      final v = b!['pvis'];
+      if (!const ['public', 'followers', 'following', 'both', 'me'].contains(v)) throw ApiErr('bad_file');
+      u['pvis'] = v;
+      await _save();
+      return {'user': _uv(u, u)};
+    }
+    if (p == '/me/checkin' && m == 'POST') {
+      final u = need(), now = DateTime.now(), today = _iso(now), last = u['last'] as String?;
+      var isNew = false;
+      if (last != today) {
+        isNew = true;
+        var missed = 0;
+        if (last != null && last == _iso(DateTime(now.year, now.month, now.day - 1))) {
+          u['streak'] = ((u['streak'] ?? 0) as int) + 1;
+        } else {
+          if (last != null) missed = max(0, DateTime.parse(today).difference(DateTime.parse(last)).inDays - 1);
+          u['streak'] = 1;
+        }
+        u['days'] = ((u['days'] ?? 0) as int) + 1;
+        u['last'] = today;
+        if (missed > 0) _sys(u['id'], 'missed', missed);
+        _sys(u['id'], 'streak', u['streak']);
+        await _save();
+      }
+      return {'streak': _streakOf(u), 'days': u['days'] ?? 0, 'new': isNew};
     }
     if (p == '/me' && m == 'PATCH') {
       final u = need();
@@ -229,6 +277,7 @@ class Local {
       final u = need();
       final rows = _r('notifs').where((n) => n['to'] == u['id']).toList().reversed.take(60).toList();
       final items = rows.map((n) {
+        if (n['actor'] == null) return {'type': n['type'], 'created': n['created'], 'seen': n['seen'], 'n': n['n'], 'username': '', 'name': 'Hulhup', 'avatar': null, 'desc': ''};
         final a = _byId(n['actor']);
         if (a == null) return null;
         String d = '';
@@ -271,7 +320,7 @@ class Local {
       if (x[2] == null && m == 'GET') {
         final mine = me != null && me['id'] == id;
         final isf = me != null && !mine && _r('follows').any((f) => f['from'] == me['id'] && f['to'] == id);
-        final rows = _r('audios').where((a) => a['owner'] == id && (mine || _aud(a['vis'], u, me))).map((a) => _av(a, me)).toList();
+        final rows = _r('audios').where((a) => a['owner'] == id && (mine || _aud(u['pvis'] ?? 'public', u, me))).map((a) => _av(a, me)).toList();
         return {'user': _uv(u, me), 'audios': rows};
       }
       if (x[2] == '/follow' && m == 'POST') {
@@ -298,7 +347,8 @@ class Local {
     final x = RegExp(r'^/me/(avatar|cover)$').firstMatch(p);
     if (x == null) throw ApiErr('not_found');
     if (!RegExp(r'^image/(jpe?g|png|webp)$').hasMatch(type)) throw ApiErr('bad_file');
-    if (b.isEmpty || b.length > 3 * 1024 * 1024) throw ApiErr('too_big');
+    if (b.isEmpty) throw ApiErr('bad_file');
+    if (b.length > 10 * 1024 * 1024) throw ApiErr('too_big_img');
     await _put('u${me['id']}_${x[1]}', b);
     me[x[1] == 'avatar' ? 'av' : 'cv'] = true;
     await _save();
@@ -313,7 +363,7 @@ class Local {
     final id = _next();
     await _put('a$id', b);
     var d = (f['desc'] ?? '').trim();
-    if (d.length > 500) d = d.substring(0, 500);
+    if (d.length > 200) d = d.substring(0, 200);
     const ok = ['public', 'followers', 'following', 'both'];
     final vis = ok.contains(f['vis']) ? f['vis'] : 'public', rnd = ok.contains(f['rand']) ? f['rand'] : 'public';
     _r('audios').insert(0, {'id': id, 'owner': me['id'], 'desc': d, 'secs': (int.tryParse(f['secs'] ?? '') ?? 30).clamp(1, 30), 'popup': f['popup'] != '0', 'pprof': f['pprof'] != '0', 'vis': vis, 'rand': rnd, 'created': _now()});
@@ -323,27 +373,28 @@ class Local {
 }
 
 class U {
-  final String username, name, bio, birth;
+  final String username, name, bio, birth, pvis;
   final String? avatar, cover;
-  final int age, audios;
+  final int age, audios, streak, days;
   int followers, following;
   bool isFollowing;
   final bool isMe;
   U.from(Map j)
       : username = j['username'], name = j['name'], bio = j['bio'] ?? '', birth = j['birth'] ?? '', avatar = j['avatar'], cover = j['cover'],
+        pvis = j['pvis'] ?? 'public', streak = j['streak'] ?? 0, days = j['days'] ?? 0,
         age = j['age'] ?? 0, audios = j['audios'] ?? 0, followers = j['followers'] ?? 0, following = j['following'] ?? 0,
         isFollowing = j['is_following'] == true, isMe = j['is_me'] == true;
 }
 
 class A {
   final int id, secs;
-  final String desc, url, vis, owner, ownerName;
+  final String desc, url, vis, rand, owner, ownerName;
   final String? ownerAvatar;
   final bool popup, pprof;
   int likes;
   bool liked;
   A.from(Map j)
-      : id = j['id'], secs = j['secs'], desc = j['desc'] ?? '', url = j['url'], vis = j['vis'], owner = j['owner'],
+      : id = j['id'], secs = j['secs'], desc = j['desc'] ?? '', url = j['url'], vis = j['vis'] ?? 'public', rand = j['rand'] ?? 'public', owner = j['owner'],
         ownerName = j['owner_name'], ownerAvatar = j['owner_avatar'], popup = j['popup'] == true, pprof = j['pprof'] != false, likes = j['likes'] ?? 0, liked = j['liked'] == true;
 }
 
@@ -362,11 +413,15 @@ class Store extends ChangeNotifier {
   static final i = Store._();
   Store._();
   U? me;
-  int taps = 0, unread = 0;
+  int taps = 0, unread = 0, unreadSocial = 0;
   String lang = 'id';
   ThemeMode mode = ThemeMode.system;
+  bool remind = true;
   int? playing;
   int dur = 0;
+  int _pushed = 0;
+  Object? _scope;
+  bool _starting = false;
   final pos = ValueNotifier<int>(0);
   final _p = AudioPlayer();
   late SharedPreferences _sp;
@@ -374,14 +429,23 @@ class Store extends ChangeNotifier {
   String t(String k) => (S[k] ?? [k, k])[lang == 'id' ? 0 : 1];
   String err(Object e) => e is ApiErr ? (S.containsKey('e_${e.code}') ? t('e_${e.code}') : t('e_server')) : t('e_network');
 
+  String ago(int ms) {
+    final m = (DateTime.now().millisecondsSinceEpoch - ms) ~/ 60000;
+    if (m < 1) return t('ago_now');
+    if (m < 60) return '$m ${t('ago_m')}';
+    final h = m ~/ 60;
+    return h < 24 ? '$h ${t('ago_h')}' : '${h ~/ 24} ${t('ago_d')}';
+  }
+
   Future<void> init() async {
     _sp = await SharedPreferences.getInstance();
     lang = _sp.getString('lang') ?? 'id';
     mode = ThemeMode.values[(_sp.getInt('mode') ?? 0).clamp(0, 2)];
+    remind = _sp.getBool('remind') ?? true;
     await Local.init(_sp);
     _p.onPositionChanged.listen((d) => pos.value = d.inMilliseconds);
     _p.onDurationChanged.listen((d) => dur = d.inMilliseconds);
-    _p.onPlayerComplete.listen((_) { playing = null; if (dur > 0) pos.value = dur; notifyListeners(); });
+    _p.onPlayerComplete.listen((_) { playing = null; _scope = null; if (dur > 0) pos.value = dur; notifyListeners(); });
   }
 
   Future<void> refresh() async {
@@ -390,6 +454,7 @@ class Store extends ChangeNotifier {
         final j = await Api.req('GET', '/me');
         me = U.from(j['user']);
         unread = j['unread'] ?? 0;
+        unreadSocial = j['unread_social'] ?? 0;
       }
       taps = (await Api.req('GET', '/stats'))['taps'] ?? taps;
     } on ApiErr catch (e) {
@@ -398,23 +463,71 @@ class Store extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _clear() async { await Local.setSession(null); me = null; unread = 0; }
+  /// Dipanggil saat aplikasi dibuka / kembali ke depan: catat hari masuk, notifikasi, pengingat.
+  /// Mengembalikan jumlah hari berturut-turut bila ini masuk pertama hari ini.
+  Future<int?> start() async {
+    if (_starting) return null;
+    _starting = true;
+    int? fresh;
+    try {
+      await refresh();
+      if (me == null) { await Notifier.cancelReminders(); return null; }
+      final j = await Api.req('POST', '/me/checkin');
+      if (j['new'] == true) { fresh = j['streak'] as int?; await refresh(); }
+      if (unreadSocial > _pushed) await Notifier.show(1, 'Hulhup', t('push_unread').replaceAll('{n}', '$unreadSocial'), t('notif'));
+      _pushed = unreadSocial;
+      if (remind) { await Notifier.allow(); await syncReminders(); } else { await Notifier.cancelReminders(); }
+    } catch (_) {
+    } finally {
+      _starting = false;
+    }
+    return fresh;
+  }
+
+  /// Jadwalkan pengingat jam 19.00 untuk 3 hari ke depan; dibatalkan & dijadwal ulang tiap kali aplikasi dibuka,
+  /// jadi hanya berbunyi kalau kamu memang belum membuka Hulhup hari itu.
+  Future<void> syncReminders() async {
+    await Notifier.cancelReminders();
+    if (me == null || !remind) return;
+    final n = DateTime.now(), st = me!.streak;
+    for (var d = 1; d <= 3; d++) {
+      final body = d == 1 ? (st > 0 ? t('r1s').replaceAll('{n}', '$st') : t('r1')) : t('r$d');
+      await Notifier.schedule(100 + d, DateTime(n.year, n.month, n.day + d, 19), 'Hulhup', body, t('notif'));
+    }
+  }
+
+  Future<void> setRemind(bool v) async {
+    remind = v;
+    await _sp.setBool('remind', v);
+    notifyListeners();
+    if (v) { await Notifier.allow(); await syncReminders(); } else { await Notifier.cancelReminders(); }
+  }
+
+  Future<void> _clear() async { await Local.setSession(null); me = null; unread = 0; unreadSocial = 0; _pushed = 0; }
 
   Future<void> auth(String path, Map body) async {
     final j = await Api.req('POST', path, body: body);
     me = U.from(j['user']);
     notifyListeners();
+    start();
   }
 
   Future<void> logout() async {
     try { await Api.req('POST', '/logout'); } catch (_) {}
     await _clear();
+    await Notifier.cancelReminders();
     notifyListeners();
   }
 
-  Future<void> deleteAccount() async { await Api.req('DELETE', '/me'); await _clear(); notifyListeners(); }
-  void setLang(String l) { lang = l; _sp.setString('lang', l); notifyListeners(); }
+  Future<void> deleteAccount() async { await Api.req('DELETE', '/me'); await _clear(); await Notifier.cancelReminders(); notifyListeners(); }
+  void setLang(String l) { lang = l; _sp.setString('lang', l); notifyListeners(); if (me != null) syncReminders(); }
   void setMode(ThemeMode m) { mode = m; _sp.setInt('mode', m.index); notifyListeners(); }
+
+  Future<void> setPvis(String v) async {
+    final j = await Api.req('PATCH', '/me/settings', body: {'pvis': v});
+    me = U.from(j['user']);
+    notifyListeners();
+  }
 
   Future<A?> random() async {
     final j = await Api.req('GET', '/random');
@@ -423,13 +536,17 @@ class Store extends ChangeNotifier {
     return j['audio'] == null ? null : A.from(j['audio']);
   }
 
-  Future<void> play(A a, {bool force = false}) async {
+  /// [loop]: audio berulang terus sampai dijeda atau popup/halaman ditutup.
+  /// [scope]: halaman yang memutar; saat halaman itu ditutup, panggil [leave] agar suara berhenti.
+  Future<void> play(A a, {bool force = false, bool loop = true, Object? scope}) async {
     if (!force && playing == a.id) { await stop(); return; }
     playing = a.id;
+    _scope = scope;
     pos.value = 0;
     dur = 0;
     notifyListeners();
     await _p.stop();
+    await _p.setReleaseMode(loop ? ReleaseMode.loop : ReleaseMode.release);
     final b = Local.bytes(a.url);
     await _p.play(b != null ? BytesSource(b, mimeType: mimeOf(b)) : UrlSource(a.url));
   }
@@ -437,8 +554,14 @@ class Store extends ChangeNotifier {
   Future<void> stop() async {
     await _p.stop();
     playing = null;
+    _scope = null;
     pos.value = 0;
     notifyListeners();
+  }
+
+  /// Dipanggil dari dispose() halaman: hentikan suara bila diputar dari halaman itu.
+  void leave(Object scope) {
+    if (_scope == scope && playing != null) Future.microtask(stop);
   }
 
   Future<void> like(A a) async {
@@ -466,7 +589,7 @@ const S = <String, List<String>>{
   'desc': ['Deskripsi', 'Description'], 'bio': ['Bio', 'Bio'], 'popup': ['Tampilkan popup saat diketuk', 'Show popup on tap'],
   'who': ['Siapa boleh melihat di profil', 'Who can see it on profile'], 'v_all': ['Semua', 'Everyone'], 'v_fol': ['Pengikut', 'Followers'], 'v_me': ['Aku', 'Me'],
   'noedit': ['Audio tidak bisa diedit, hanya dihapus.', 'Audio cannot be edited, only deleted.'],
-  'search': ['Cari akun', 'Search accounts'], 'notif': ['Notifikasi', 'Notifications'],
+  'search': ['Cari', 'Search'], 'notif': ['Notifikasi', 'Notifications'],
   'n_follow': ['mulai mengikutimu', 'started following you'], 'n_like': ['menyukai audiomu', 'liked your audio'],
   'empty_audio': ['Belum ada audio', 'No audio yet'], 'empty_liked': ['Belum ada yang disukai', 'Nothing liked yet'],
   'empty_notif': ['Belum ada notifikasi', 'No notifications yet'], 'empty_search': ['Tidak ada hasil', 'No results'], 'empty_list': ['Belum ada akun', 'No accounts yet'],
@@ -485,13 +608,27 @@ const S = <String, List<String>>{
   'e_bad_age': ['Tanggal lahir tidak valid', 'Invalid date of birth'], 'e_bad_bio': ['Bio maksimal 300 karakter', 'Bio max 300 characters'],
   'e_bad_file': ['File tidak valid', 'Invalid file'], 'e_too_big': ['File terlalu besar (maks 3 MB)', 'File too large (max 3 MB)'],
   'e_not_found': ['Tidak ditemukan', 'Not found'],
+  'a_me': ['Hanya untuk saya', 'Only me'], 'pvis': ['Siapa yang bisa melihat audioku di profil', 'Who can see my audio on my profile'],
+  'remind': ['Pengingat harian', 'Daily reminder'], 'remind_sub': ['Notifikasi jam 19.00 kalau kamu belum masuk hari itu', 'A notification at 7 PM if you haven’t opened Hulhup that day'],
+  'streak_t': ['{n} hari berturut-turut', '{n}-day streak'], 'days_total': ['Total masuk {n} hari', '{n} days signed in in total'],
+  'view_photo': ['Lihat foto', 'View photo'], 'change_photo': ['Ganti foto', 'Change photo'],
+  'search_hint': ['Cari akun atau audio', 'Search accounts or audio'], 'sec_acc': ['Akun', 'Accounts'], 'sec_audio': ['Audio', 'Audio'],
+  'n_streak': ['Kamu sudah masuk {n} hari berturut-turut', 'You’ve signed in {n} days in a row'],
+  'n_missed': ['Kamu tidak masuk {n} hari. Rangkaianmu dimulai lagi dari awal.', 'You missed {n} day(s). Your streak starts over.'],
+  'push_unread': ['{n} notifikasi baru', '{n} new notifications'],
+  'r1s': ['Kamu belum masuk hari ini. Rangkaian {n} harimu akan putus kalau tidak masuk sekarang.', 'You haven’t opened Hulhup today. Your {n}-day streak ends if you skip today.'],
+  'r1': ['Kamu belum masuk hari ini. Ketuk dan dengarkan suara acak.', 'You haven’t opened Hulhup today. Tap and hear a random voice.'],
+  'r2': ['Sudah 2 hari kamu tidak masuk. Ada suara baru menunggumu.', 'It’s been 2 days. New voices are waiting for you.'],
+  'r3': ['Sudah 3 hari tidak masuk. Kami kangen, ayo kembali ke Hulhup.', 'It’s been 3 days. We miss you, come back to Hulhup.'],
+  'ago_now': ['baru saja', 'just now'], 'ago_m': ['mnt lalu', 'min ago'], 'ago_h': ['jam lalu', 'h ago'], 'ago_d': ['hari lalu', 'd ago'],
+  'e_too_big_img': ['Foto terlalu besar (maks 10 MB)', 'Photo too large (max 10 MB)'],
   'about_t': [
-    'Hulhup adalah ruang suara yang sederhana. Ketuk satu tombol, dengarkan suara acak dari orang-orang di seluruh dunia, tanpa perlu masuk.\n\nMasuk hanya jika kamu ingin berbagi suaramu sendiri, menyukai audio, dan mengikuti akun lain.\n\nHulhup adalah produk dari Misyi.\n\nVersi 1.0.0',
-    'Hulhup is a simple home for voices. Tap one button and hear a random voice from people around the world, no sign-in needed.\n\nSign in only if you want to share your own voice, like audio, and follow other accounts.\n\nHulhup is a product of Misyi.\n\nVersion 1.0.0'],
+    'Hulhup adalah ruang suara yang sederhana. Ketuk satu tombol, dengarkan suara acak dari orang-orang di seluruh dunia, tanpa perlu masuk.\n\nMasuk hanya jika kamu ingin berbagi suaramu sendiri, menyukai audio, mengikuti akun lain, dan mencari audio lewat deskripsinya.\n\nKamu mengatur sendiri siapa yang bisa mendengar audiomu secara acak, dan lewat Pengaturan siapa yang bisa melihatnya di profilmu, termasuk pilihan hanya untuk saya.\n\nHulhup mengingatkanmu lewat notifikasi dan menghitung berapa hari berturut-turut kamu masuk.\n\nHulhup adalah produk dari Misyi.\n\nVersi 1.1.0',
+    'Hulhup is a simple home for voices. Tap one button and hear a random voice from people around the world, no sign-in needed.\n\nSign in only if you want to share your own voice, like audio, follow other accounts, and search audio by its description.\n\nYou choose who can hear your audio randomly, and in Settings who can see it on your profile, including an only-me option.\n\nHulhup reminds you with notifications and counts how many days in a row you sign in.\n\nHulhup is a product of Misyi.\n\nVersion 1.1.0'],
   'policy_t': [
-    'Dengan memakai Hulhup kamu setuju pada aturan berikut.\n\n1. Audio yang kamu unggah berdurasi maksimal 30 detik dan harus milikmu atau kamu punya izin memakainya.\n2. Dilarang mengunggah konten yang melecehkan, menebar kebencian, mengandung kekerasan atau seksual, melanggar hukum, atau meniru orang lain.\n3. Dilarang spam dan menyalahgunakan layanan.\n4. Kamu memilih siapa yang bisa mendengar audiomu secara acak (publik, pengikut, mengikuti, atau pengikut dan mengikuti) dan siapa yang bisa melihatnya di profilmu. Audio yang dipilih publik dapat didengar siapa saja.\n5. Audio tidak bisa diedit, hanya dihapus. Kamu bebas menghapus audio atau akunmu kapan saja.\n6. Kami dapat menghapus konten atau akun yang melanggar aturan ini.\n7. Hulhup disediakan apa adanya, aturan dapat diperbarui dan versi terbaru selalu ada di halaman ini.',
-    'By using Hulhup you agree to the following.\n\n1. Audio you upload is at most 30 seconds and must be yours, or you must have permission to use it.\n2. Do not upload content that harasses, spreads hate, contains violence or sexual material, breaks the law, or impersonates others.\n3. No spam or misuse of the service.\n4. You choose who can hear your audio randomly (public, followers, following, or followers and following) and who can see it on your profile. Public audio can be heard by anyone.\n5. Audio cannot be edited, only deleted. You may delete audio or your account at any time.\n6. We may remove content or accounts that break these rules.\n7. Hulhup is provided as is. These rules may be updated and the latest version is always on this page.'],
+    'Dengan memakai Hulhup kamu setuju pada aturan berikut.\n\n1. Audio yang kamu unggah berdurasi maksimal 30 detik, dengan deskripsi maksimal 200 karakter, dan harus milikmu atau kamu punya izin memakainya. Foto profil maksimal 10 MB.\n2. Dilarang mengunggah konten yang melecehkan, menebar kebencian, mengandung kekerasan atau seksual, melanggar hukum, atau meniru orang lain.\n3. Dilarang spam dan menyalahgunakan layanan.\n4. Untuk setiap audio kamu memilih siapa yang bisa mendengarnya secara acak: publik, pengikut, mengikuti, atau pengikut dan mengikuti. Audio publik dapat didengar siapa saja.\n5. Di Pengaturan kamu memilih siapa yang bisa melihat audiomu di profil dan di hasil pencarian: publik, pengikut, mengikuti, pengikut dan mengikuti, atau hanya untuk saya. Pilihan hanya untuk saya hanya berlaku untuk tampilan profil dan tidak memengaruhi pilihan acak.\n6. Audio tidak bisa diedit, hanya dihapus. Kamu bebas menghapus audio atau akunmu kapan saja.\n7. Kami dapat menghapus konten atau akun yang melanggar aturan ini.\n8. Hulhup disediakan apa adanya, aturan dapat diperbarui dan versi terbaru selalu ada di halaman ini.',
+    'By using Hulhup you agree to the following.\n\n1. Audio you upload is at most 30 seconds, with a description of at most 200 characters, and must be yours or you must have permission to use it. Profile photos are at most 10 MB.\n2. Do not upload content that harasses, spreads hate, contains violence or sexual material, breaks the law, or impersonates others.\n3. No spam or misuse of the service.\n4. For each audio you choose who can hear it randomly: public, followers, following, or followers and following. Public audio can be heard by anyone.\n5. In Settings you choose who can see your audio on your profile and in search results: public, followers, following, followers and following, or only me. Only me applies to the profile view only and does not affect the random setting.\n6. Audio cannot be edited, only deleted. You may delete audio or your account at any time.\n7. We may remove content or accounts that break these rules.\n8. Hulhup is provided as is. These rules may be updated and the latest version is always on this page.'],
   'privacy_t': [
-    'Data yang kami simpan: nama, nama pengguna, tanggal lahir, bio, foto profil dan latar, audio yang kamu unggah, serta suka dan pengikut. Tanggal lahir dan usiamu tidak ditampilkan ke pengguna lain.\n\nKata sandi disimpan dalam bentuk hash, tidak pernah dalam bentuk asli.\n\nMikrofon hanya dipakai saat kamu menekan tombol rekam. Galeri hanya dibuka saat kamu memilih foto.\n\nTanpa login, kamu hanya mendengar suara; kami tidak membuat profil tamu.\n\nKami tidak menjual datamu dan tidak menampilkan iklan. Untuk saat ini data hanya disimpan di perangkatmu.\n\nMenghapus audio atau akun akan menghapus file dan datanya secara permanen dari perangkat.',
-    'Data we store: name, username, date of birth, bio, profile photo and cover, audio you upload, plus likes and followers. Your date of birth and age are never shown to other users.\n\nPasswords are stored as hashes, never in plain form.\n\nThe microphone is used only when you press record. The gallery opens only when you pick a photo.\n\nWithout signing in you only listen; we do not create guest profiles.\n\nWe do not sell your data and show no ads. For now data is stored only on your device.\n\nDeleting audio or your account permanently removes the files and data from the device.'],
+    'Data yang kami simpan: nama, nama pengguna, tanggal lahir, bio, foto profil, audio yang kamu unggah, suka, pengikut, serta jumlah hari kamu masuk. Tanggal lahir dan usiamu tidak ditampilkan ke pengguna lain.\n\nKata sandi disimpan dalam bentuk hash, tidak pernah dalam bentuk asli.\n\nNotifikasi: Hulhup meminta izin notifikasi untuk mengirim pengingat harian jam 19.00 jika kamu belum masuk hari itu, dan pemberitahuan suka dan pengikut baru. Pengingat dijadwalkan di perangkatmu sendiri. Kamu bisa mematikannya di Pengaturan atau di pengaturan sistem perangkat.\n\nMikrofon hanya dipakai saat kamu menekan tombol rekam. Galeri hanya dibuka saat kamu memilih foto.\n\nTanpa login, kamu hanya mendengar suara; kami tidak membuat profil tamu.\n\nKami tidak menjual datamu dan tidak menampilkan iklan. Untuk saat ini data hanya disimpan di perangkatmu.\n\nMenghapus audio atau akun akan menghapus file dan datanya secara permanen dari perangkat.',
+    'Data we store: name, username, date of birth, bio, profile photo, audio you upload, likes, followers, and the number of days you signed in. Your date of birth and age are never shown to other users.\n\nPasswords are stored as hashes, never in plain form.\n\nNotifications: Hulhup asks for notification permission to send a daily reminder at 7 PM if you haven’t opened it that day, and alerts for new likes and followers. Reminders are scheduled on your own device. You can turn them off in Settings or in your device settings.\n\nThe microphone is used only when you press record. The gallery opens only when you pick a photo.\n\nWithout signing in you only listen; we do not create guest profiles.\n\nWe do not sell your data and show no ads. For now data is stored only on your device.\n\nDeleting audio or your account permanently removes the files and data from the device.'],
 };

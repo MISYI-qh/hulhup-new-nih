@@ -85,21 +85,22 @@ class AudioRow extends StatelessWidget {
   final bool mine;
   final VoidCallback? onDelete;
   final bool showOwner;
-  const AudioRow(this.a, {super.key, this.mine = false, this.onDelete, this.showOwner = false});
+  final Object? scope;
+  const AudioRow(this.a, {super.key, this.mine = false, this.onDelete, this.showOwner = false, this.scope});
   @override
   Widget build(BuildContext context) {
     final s = Store.i;
-    final vis = audIcon(a.vis);
+    final vis = audIcon(a.rand);
     return ListenableBuilder(listenable: s, builder: (_, __) {
       final on = s.playing == a.id;
       return Container(
         margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.fromLTRB(12, 12, 6, 12),
         decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(26)),
         child: Row(children: [
-          Tap(onTap: () => s.play(a).catchError((_) => toast(s.t('e_server'), bad: true)), child: AnimatedContainer(duration: const Duration(milliseconds: 250), width: 46, height: 46, decoration: BoxDecoration(color: on ? ink(context) : green, shape: BoxShape.circle), child: AnimatedSwitcher(duration: const Duration(milliseconds: 200), child: Icon(on ? Icons.pause_rounded : Icons.play_arrow_rounded, key: ValueKey(on), color: on ? bgOf(context) : cream, size: 26)))),
+          Tap(onTap: () => s.play(a, scope: scope).catchError((_) => toast(s.t('e_server'), bad: true)), child: AnimatedContainer(duration: const Duration(milliseconds: 250), width: 46, height: 46, decoration: BoxDecoration(color: on ? ink(context) : green, shape: BoxShape.circle), child: AnimatedSwitcher(duration: const Duration(milliseconds: 200), child: Icon(on ? Icons.pause_rounded : Icons.play_arrow_rounded, key: ValueKey(on), color: on ? bgOf(context) : cream, size: 26)))),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(a.desc.trim().isEmpty ? s.t('untitled') : a.desc.trim(), maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: a.desc.trim().isEmpty ? sub(context) : null)),
+            Text(a.desc.trim().isEmpty ? s.t('untitled') : a.desc.trim(), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: a.desc.trim().isEmpty ? sub(context) : null)),
             const SizedBox(height: 4),
             Row(children: [
               ValueListenableBuilder<int>(valueListenable: s.pos, builder: (_, ms, __) => Text(on ? '${mmss(ms ~/ 1000)} / ${mmss(a.secs)}' : mmss(a.secs), style: TextStyle(color: on ? ink(context) : sub(context), fontSize: 13, fontWeight: FontWeight.w700))),
@@ -132,6 +133,8 @@ class _ProfileState extends State<ProfilePage> {
 
   @override
   void initState() { super.initState(); if (widget.u != null) _load(); }
+  @override
+  void dispose() { Store.i.leave(this); super.dispose(); }
 
   Future<void> _load() async {
     try {
@@ -191,7 +194,7 @@ class _ProfileState extends State<ProfilePage> {
     final u = user!, shown = tab == 1 ? likedList : list;
     return RefreshIndicator(color: ink(context), backgroundColor: card(context), onRefresh: _load, child: ListView(padding: const EdgeInsets.only(bottom: 40), children: [
       const SizedBox(height: 10),
-      In(0, Padding(padding: const EdgeInsets.symmetric(horizontal: 24), child: Align(alignment: Alignment.centerLeft, child: Container(padding: const EdgeInsets.all(5), decoration: BoxDecoration(color: bgOf(context), shape: BoxShape.circle, boxShadow: [BoxShadow(color: green.withValues(alpha: .16), blurRadius: 28, offset: const Offset(0, 10))]), child: Avatar(u.avatar, u.name, 96))))),
+      In(0, Padding(padding: const EdgeInsets.symmetric(horizontal: 24), child: Align(alignment: Alignment.centerLeft, child: Container(padding: const EdgeInsets.all(5), decoration: BoxDecoration(color: bgOf(context), shape: BoxShape.circle, boxShadow: [BoxShadow(color: green.withValues(alpha: .16), blurRadius: 28, offset: const Offset(0, 10))]), child: Tap(onTap: u.avatar == null ? null : () => go(context, ImageViewer(u.avatar!, u.name)), scale: .96, child: Avatar(u.avatar, u.name, 96)))))),
       const SizedBox(height: 16),
       Padding(padding: const EdgeInsets.fromLTRB(24, 0, 24, 0), child: In(1, Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(u.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 24, letterSpacing: -.5)),
@@ -200,6 +203,7 @@ class _ProfileState extends State<ProfilePage> {
         if (u.bio.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 12), child: Text(u.bio, style: const TextStyle(fontSize: 15, height: 1.45))),
         const SizedBox(height: 16),
         Row(children: [_stat(u.followers, s.t('followers'), 'followers'), const SizedBox(width: 22), _stat(u.following, s.t('following'), 'following')]),
+        if (mine && (u.streak > 0 || u.days > 0)) Padding(padding: const EdgeInsets.only(top: 14), child: StreakChip(u.streak, u.days)),
         const SizedBox(height: 18),
         if (mine) Row(children: [Expanded(child: PBtn(s.t('edit_profile'), _edit, ghost: true, icon: Icons.edit_outlined)), const SizedBox(width: 10), Expanded(child: PBtn(s.t('upload'), () async { await go(context, const UploadPage()); _load(); }, icon: Icons.add_rounded))])
         else if (s.me != null) PBtn(u.isFollowing ? s.t('unfollow') : s.t('follow'), _follow, loading: busy, ghost: u.isFollowing, icon: u.isFollowing ? Icons.check_rounded : Icons.person_add_alt_1_rounded),
@@ -208,7 +212,7 @@ class _ProfileState extends State<ProfilePage> {
       if (mine) Padding(padding: const EdgeInsets.symmetric(horizontal: 24), child: Seg<int>([(0, s.t('audio')), (1, s.t('liked'))], tab, (v) => setState(() => tab = v))),
       const SizedBox(height: 14),
       if (shown.isEmpty) Empty(tab == 1 ? Icons.favorite_border_rounded : Icons.graphic_eq_rounded, tab == 1 ? s.t('empty_liked') : s.t('empty_audio'))
-      else Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Column(children: [for (var i = 0; i < shown.length; i++) In(i, AudioRow(shown[i], key: ValueKey('${tab}_${shown[i].id}'), mine: mine && tab == 0, showOwner: tab == 1, onDelete: mine && tab == 0 ? () => _del(shown[i]) : null))])),
+      else Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Column(children: [for (var i = 0; i < shown.length; i++) In(i, AudioRow(shown[i], key: ValueKey('${tab}_${shown[i].id}'), scope: this, mine: mine && tab == 0, showOwner: tab == 1, onDelete: mine && tab == 0 ? () => _del(shown[i]) : null))])),
     ]));
   }
 }
@@ -236,18 +240,58 @@ class _FollowsState extends State<FollowsPage> {
       ]));
 }
 
+class UserTile extends StatelessWidget {
+  final Map u;
+  final int i;
+  const UserTile(this.u, this.i, {super.key});
+  @override
+  Widget build(BuildContext context) => In(i, Tap(onTap: () => go(context, ProfilePage(u['username'])), child: Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(26)), child: Row(children: [
+        Avatar(u['avatar'], u['name'], 46), const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(u['name'], maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)), Text(u['username'], style: TextStyle(color: sub(context), fontSize: 13))])),
+        Icon(Icons.chevron_right_rounded, color: sub(context)),
+      ]))));
+}
+
 class UserList extends StatelessWidget {
   final List users;
   const UserList(this.users, {super.key});
   @override
-  Widget build(BuildContext context) => ListView.builder(padding: const EdgeInsets.fromLTRB(20, 4, 20, 40), itemCount: users.length, itemBuilder: (_, i) {
-        final u = users[i];
-        return In(i, Tap(onTap: () => go(context, ProfilePage(u['username'])), child: Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(26)), child: Row(children: [
-          Avatar(u['avatar'], u['name'], 46), const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(u['name'], maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)), Text(u['username'], style: TextStyle(color: sub(context), fontSize: 13))])),
-          Icon(Icons.chevron_right_rounded, color: sub(context)),
-        ]))));
-      });
+  Widget build(BuildContext context) => ListView.builder(padding: const EdgeInsets.fromLTRB(20, 4, 20, 40), itemCount: users.length, itemBuilder: (_, i) => UserTile(users[i], i));
+}
+
+class StreakChip extends StatelessWidget {
+  final int streak, days;
+  const StreakChip(this.streak, this.days, {super.key});
+  @override
+  Widget build(BuildContext context) {
+    final s = Store.i;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(24)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(Icons.local_fire_department_rounded, size: 28, color: streak > 0 ? const Color(0xFFE8833A) : sub(context)),
+        const SizedBox(width: 10),
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(s.t('streak_t').replaceAll('{n}', '$streak'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+          Text(s.t('days_total').replaceAll('{n}', '$days'), style: TextStyle(color: sub(context), fontSize: 12.5)),
+        ]),
+      ]),
+    );
+  }
+}
+
+/// Pratinjau foto layar penuh: cubit untuk memperbesar, ketuk untuk menutup.
+class ImageViewer extends StatelessWidget {
+  final String url, name;
+  const ImageViewer(this.url, this.name, {super.key});
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        backgroundColor: Colors.black,
+        body: Stack(children: [
+          Positioned.fill(child: GestureDetector(onTap: () => Navigator.maybePop(context), child: InteractiveViewer(minScale: 1, maxScale: 5, child: Center(child: img(url, fit: BoxFit.contain))))),
+          SafeArea(child: Align(alignment: Alignment.topRight, child: Padding(padding: const EdgeInsets.all(8), child: IconBtn(Icons.close_rounded, () => Navigator.maybePop(context), color: Colors.white)))),
+          Positioned(left: 0, right: 0, bottom: 0, child: SafeArea(child: Padding(padding: const EdgeInsets.all(20), child: Center(child: Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)))))),
+        ]),
+      );
 }
 
 // ---------- edit profil ----------
@@ -275,6 +319,21 @@ class _EditState extends State<EditProfilePage> {
     if (mounted) setState(() => up = null);
   }
 
+  Widget _opt(BuildContext sc, IconData i, String t, String v) => Tap(
+        onTap: () => Navigator.pop(sc, v), scale: .98,
+        child: Container(margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16), decoration: BoxDecoration(color: soft(sc), borderRadius: BorderRadius.circular(24)), child: Row(children: [Icon(i, size: 22, color: ink(sc)), const SizedBox(width: 14), Text(t, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16))])),
+      );
+
+  Future<void> _avatarMenu() async {
+    final s = Store.i, me = s.me!;
+    final r = await sheet<String>(context, (sc) => Column(mainAxisSize: MainAxisSize.min, children: [
+      if (me.avatar != null) _opt(sc, Icons.visibility_outlined, s.t('view_photo'), 'view'),
+      _opt(sc, Icons.photo_library_outlined, s.t('change_photo'), 'change'),
+    ]));
+    if (!mounted) return;
+    if (r == 'view') { go(context, ImageViewer(me.avatar!, me.name)); } else if (r == 'change') { _img('avatar'); }
+  }
+
   Future<void> _save() async {
     final s = Store.i;
     setState(() => busy = true);
@@ -294,7 +353,7 @@ class _EditState extends State<EditProfilePage> {
       TopBar(back: true, title: s.t('edit_profile')),
       Expanded(child: ListView(padding: const EdgeInsets.only(bottom: 40), children: [
         const SizedBox(height: 8),
-        In(0, Center(child: Tap(onTap: () => _img('avatar'), child: Container(padding: const EdgeInsets.all(5), decoration: BoxDecoration(color: bgOf(context), shape: BoxShape.circle, boxShadow: [BoxShadow(color: green.withValues(alpha: .16), blurRadius: 28, offset: const Offset(0, 10))]), child: ClipOval(child: SizedBox(width: 104, height: 104, child: Stack(fit: StackFit.expand, children: [Avatar(me.avatar, me.name, 104), cam(up == 'avatar')]))))))),
+        In(0, Center(child: Tap(onTap: _avatarMenu, child: Container(padding: const EdgeInsets.all(5), decoration: BoxDecoration(color: bgOf(context), shape: BoxShape.circle, boxShadow: [BoxShadow(color: green.withValues(alpha: .16), blurRadius: 28, offset: const Offset(0, 10))]), child: ClipOval(child: SizedBox(width: 104, height: 104, child: Stack(fit: StackFit.expand, children: [Avatar(me.avatar, me.name, 104), cam(up == 'avatar')]))))))),
         const SizedBox(height: 28),
         Padding(padding: const EdgeInsets.symmetric(horizontal: 24), child: Column(children: [
           In(1, Field(s.t('name'), name, max: 40)), const SizedBox(height: 16),
@@ -323,6 +382,19 @@ class SettingsPage extends StatelessWidget {
           label(s.t('account')),
           row(Icons.edit_outlined, s.t('edit_profile'), () => go(context, const EditProfilePage())),
           row(Icons.key_rounded, s.t('change_pw'), () => sheet(context, (_) => const PwSheet())),
+          const SizedBox(height: 6),
+          Pick(s.t('pvis'), s.me!.pvis, (v) async { try { await s.setPvis(v); toast(s.t('saved')); } catch (e) { toast(s.err(e), bad: true); } }, opts: const ['public', 'followers', 'following', 'both', 'me']),
+          if (!kIsWeb) ...[
+            label(s.t('notif')),
+            Container(
+              padding: const EdgeInsets.fromLTRB(18, 14, 16, 14), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(24)),
+              child: Row(children: [
+                Icon(Icons.notifications_active_outlined, size: 22, color: ink(context)), const SizedBox(width: 14),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(s.t('remind'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)), const SizedBox(height: 2), Text(s.t('remind_sub'), style: TextStyle(color: sub(context), fontSize: 12.5, height: 1.3))])),
+                const SizedBox(width: 10), Toggle(s.remind, s.setRemind),
+              ]),
+            ),
+          ],
         ],
         label(s.t('language')),
         Seg<String>([('id', 'Indonesia'), ('en', 'English')], s.lang, s.setLang),
@@ -373,28 +445,40 @@ class SearchPage extends StatefulWidget {
 
 class _SearchState extends State<SearchPage> {
   final c = TextEditingController();
-  List? res;
+  Map? res;
   bool busy = false;
   Timer? t;
   @override
-  void dispose() { t?.cancel(); super.dispose(); }
+  void dispose() { t?.cancel(); c.dispose(); Store.i.leave(this); super.dispose(); }
   void _q(String v) {
     t?.cancel();
     if (v.trim().isEmpty) { setState(() => res = null); return; }
     t = Timer(const Duration(milliseconds: 350), () async {
       setState(() => busy = true);
-      try { res = (await Api.req('GET', '/search?q=${Uri.encodeQueryComponent(v.trim())}'))['users']; } catch (e) { toast(Store.i.err(e), bad: true); }
+      try { res = await Api.req('GET', '/search?q=${Uri.encodeQueryComponent(v.trim())}') as Map; } catch (e) { toast(Store.i.err(e), bad: true); }
       if (mounted) setState(() => busy = false);
     });
   }
+
+  Widget _sec(String t) => Padding(padding: const EdgeInsets.fromLTRB(6, 8, 0, 10), child: Text(t, style: TextStyle(color: sub(context), fontWeight: FontWeight.w700, fontSize: 13)));
+
+  Widget _results() {
+    final s = Store.i, us = res!['users'] as List, au = (res!['audios'] as List).map((e) => A.from(e)).toList();
+    if (us.isEmpty && au.isEmpty) return Empty(Icons.search_off_rounded, s.t('empty_search'));
+    return ListView(padding: const EdgeInsets.fromLTRB(20, 0, 20, 40), children: [
+      if (us.isNotEmpty) ...[_sec(s.t('sec_acc')), for (var i = 0; i < us.length; i++) UserTile(us[i], i)],
+      if (au.isNotEmpty) ...[_sec(s.t('sec_audio')), for (var i = 0; i < au.length; i++) In(i, AudioRow(au[i], key: ValueKey('s${au[i].id}'), showOwner: true, scope: this))],
+    ]);
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(body: Column(children: [
         TopBar(back: true, title: Store.i.t('search')),
         Padding(padding: const EdgeInsets.fromLTRB(20, 0, 20, 14), child: Container(
           height: 54, padding: const EdgeInsets.only(left: 18, right: 6), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(27)),
-          child: Row(children: [Icon(Icons.search_rounded, color: sub(context)), const SizedBox(width: 10), Expanded(child: TextField(controller: c, autofocus: true, onChanged: _q, cursorColor: ink(context), style: const TextStyle(fontSize: 16), decoration: const InputDecoration(border: InputBorder.none, isDense: true))), if (busy) const Padding(padding: EdgeInsets.only(right: 12), child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.2)))]),
+          child: Row(children: [Icon(Icons.search_rounded, color: sub(context)), const SizedBox(width: 10), Expanded(child: TextField(controller: c, autofocus: true, onChanged: _q, cursorColor: ink(context), style: const TextStyle(fontSize: 16), decoration: InputDecoration(border: InputBorder.none, isDense: true, hintText: Store.i.t('search_hint'), hintStyle: TextStyle(color: sub(context))))), if (busy) const Padding(padding: EdgeInsets.only(right: 12), child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.2)))]),
         )),
-        Expanded(child: res == null ? const SizedBox() : res!.isEmpty ? Empty(Icons.search_off_rounded, Store.i.t('empty_search')) : UserList(res!)),
+        Expanded(child: res == null ? const SizedBox() : _results()),
       ]));
 }
 
@@ -413,19 +497,40 @@ class _NotifState extends State<NotifPage> {
     try { items = (await Api.req('GET', '/notifications'))['items']; } catch (e) { error = Store.i.err(e); }
     if (mounted) setState(() {});
   }
+
+  Widget _item(Map n, int i) {
+    final s = Store.i;
+    final sys = n['type'] == 'streak' || n['type'] == 'missed', like = n['type'] == 'like';
+    final bg = n['seen'] == true ? soft(context) : ink(context).withValues(alpha: .12);
+    final when = Text(s.ago(n['created'] as int), style: TextStyle(color: sub(context), fontSize: 12));
+    if (sys) {
+      final txt = s.t(n['type'] == 'streak' ? 'n_streak' : 'n_missed').replaceAll('{n}', '${n['n']}');
+      return In(i, Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(26)), child: Row(children: [
+        Container(width: 46, height: 46, decoration: const BoxDecoration(color: green, shape: BoxShape.circle), child: const Center(child: Logo(30, cream))),
+        const SizedBox(width: 14),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [const Text('Hulhup', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)), const Spacer(), when]), const SizedBox(height: 2), Text(txt, style: const TextStyle(fontSize: 15, height: 1.4))])),
+      ])));
+    }
+    return In(i, Tap(onTap: () => go(context, ProfilePage(n['username'])), child: Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(26)), child: Row(children: [
+      Stack(clipBehavior: Clip.none, children: [Avatar(n['avatar'], n['name'], 46), Positioned(right: -4, bottom: -4, child: Container(width: 22, height: 22, decoration: BoxDecoration(color: like ? heart : green, shape: BoxShape.circle, border: Border.all(color: bgOf(context), width: 2)), child: Icon(like ? Icons.favorite_rounded : Icons.person_add_alt_1_rounded, size: 11, color: cream)))]),
+      const SizedBox(width: 14),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text.rich(TextSpan(children: [TextSpan(text: n['name'], style: const TextStyle(fontWeight: FontWeight.w800)), TextSpan(text: '  ${like ? s.t('n_like') : s.t('n_follow')}')]), style: const TextStyle(fontSize: 15, height: 1.4)),
+        const SizedBox(height: 2), when,
+      ])),
+    ]))));
+  }
+
   @override
   Widget build(BuildContext context) {
-    final s = Store.i;
+    final s = Store.i, me = s.me;
     return Scaffold(body: Column(children: [
       TopBar(back: true, title: s.t('notif')),
-      Expanded(child: items == null && error == null ? const Loader() : error != null ? Empty(Icons.cloud_off_rounded, error!) : items!.isEmpty ? Empty(Icons.notifications_none_rounded, s.t('empty_notif')) : ListView.builder(padding: const EdgeInsets.fromLTRB(20, 4, 20, 40), itemCount: items!.length, itemBuilder: (_, i) {
-        final n = items![i], like = n['type'] == 'like';
-        return In(i, Tap(onTap: () => go(context, ProfilePage(n['username'])), child: Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: n['seen'] == true ? soft(context) : ink(context).withValues(alpha: .12), borderRadius: BorderRadius.circular(26)), child: Row(children: [
-          Stack(clipBehavior: Clip.none, children: [Avatar(n['avatar'], n['name'], 46), Positioned(right: -4, bottom: -4, child: Container(width: 22, height: 22, decoration: BoxDecoration(color: like ? heart : green, shape: BoxShape.circle, border: Border.all(color: bgOf(context), width: 2)), child: Icon(like ? Icons.favorite_rounded : Icons.person_add_alt_1_rounded, size: 11, color: cream)))]),
-          const SizedBox(width: 14),
-          Expanded(child: Text.rich(TextSpan(children: [TextSpan(text: n['name'], style: const TextStyle(fontWeight: FontWeight.w800)), TextSpan(text: '  ${like ? s.t('n_like') : s.t('n_follow')}')]), style: const TextStyle(fontSize: 15, height: 1.4))),
-        ]))));
-      })),
+      Expanded(child: items == null && error == null ? const Loader() : error != null ? Empty(Icons.cloud_off_rounded, error!) : ListView(padding: const EdgeInsets.fromLTRB(20, 4, 20, 40), children: [
+        if (me != null && (me.streak > 0 || me.days > 0)) Padding(padding: const EdgeInsets.only(bottom: 14), child: Align(alignment: Alignment.centerLeft, child: StreakChip(me.streak, me.days))),
+        if (items!.isEmpty) Empty(Icons.notifications_none_rounded, s.t('empty_notif')),
+        for (var i = 0; i < items!.length; i++) _item(items![i] as Map, i),
+      ])),
     ]));
   }
 }
@@ -445,7 +550,7 @@ class _UploadState extends State<UploadPage> {
   String ext = 'm4a';
   int ms = 0;
   bool recording = false, popup = true, pprof = true, busy = false, previewing = false;
-  String vis = 'public', rand = 'public';
+  String rand = 'public';
   Timer? timer;
 
   @override
@@ -503,7 +608,7 @@ class _UploadState extends State<UploadPage> {
     final s = Store.i;
     setState(() => busy = true);
     try {
-      await Api.multi('/audios', bytes!, 'a.$ext', {'desc': desc.text, 'secs': '${max(1, (ms / 1000).ceil())}', 'popup': popup ? '1' : '0', 'pprof': pprof ? '1' : '0', 'vis': vis, 'rand': rand});
+      await Api.multi('/audios', bytes!, 'a.$ext', {'desc': desc.text, 'secs': '${max(1, (ms / 1000).ceil())}', 'popup': popup ? '1' : '0', 'pprof': pprof ? '1' : '0', 'rand': rand});
       if (!mounted) return;
       Navigator.pop(context);
       toast(s.t('uploaded'));
@@ -528,14 +633,12 @@ class _UploadState extends State<UploadPage> {
           if (bytes != null && !recording) ...[const SizedBox(width: 10), Expanded(child: PBtn(s.t('preview'), _preview, ghost: true, icon: previewing ? Icons.pause_rounded : Icons.play_arrow_rounded))],
         ]),
         const SizedBox(height: 24),
-        Field(s.t('desc'), desc, max: 500, lines: 4),
+        Field(s.t('desc'), desc, max: 200, lines: 4),
         const SizedBox(height: 18),
         Row(children: [Expanded(child: Text(s.t('popup'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16))), Toggle(popup, (v) => setState(() => popup = v))]),
         AnimatedSize(duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic, child: popup ? Padding(padding: const EdgeInsets.only(top: 16), child: Row(children: [Expanded(child: Text(s.t('pprof'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16))), Toggle(pprof, (v) => setState(() => pprof = v))])) : const SizedBox(width: double.infinity)),
         const SizedBox(height: 22),
         Pick(s.t('who_rand'), rand, (v) => setState(() => rand = v)),
-        const SizedBox(height: 16),
-        Pick(s.t('who'), vis, (v) => setState(() => vis = v)),
         const SizedBox(height: 28),
         PBtn(s.t('upload'), bytes == null || recording ? null : _send, loading: busy, icon: Icons.arrow_upward_rounded),
         const SizedBox(height: 12),

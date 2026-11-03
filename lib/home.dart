@@ -19,7 +19,7 @@ class _HomeState extends State<HomePage> {
       final a = await s.random();
       if (!mounted) return;
       if (a == null) { toast(s.t('nobody')); return; }
-      s.play(a, force: true).catchError((_) => toast(s.t('e_server'), bad: true));
+      s.play(a, force: true, loop: a.popup).catchError((_) => toast(s.t('e_server'), bad: true));
       if (a.popup) sheet(context, (_) => PopupBody(a)).then((_) { if (s.playing == a.id) s.stop(); });
     } catch (e) {
       toast(s.err(e), bad: true);
@@ -35,7 +35,7 @@ class _HomeState extends State<HomePage> {
           TopBar(
             lead: IconBtn(Icons.menu_rounded, () => setState(() => menu = true)),
             center: const Brand(),
-            actions: [IconBtn(Icons.search_rounded, () => go(context, const SearchPage())), IconBtn(Icons.person_outline_rounded, () => go(context, ProfilePage(s.me?.username)))],
+            actions: [IconBtn(Icons.search_rounded, () => go(context, const SearchPage())), ListenableBuilder(listenable: s, builder: (_, __) => IconBtn(Icons.person_outline_rounded, () => go(context, ProfilePage(s.me?.username)), dot: s.unread > 0))],
           ),
           Expanded(child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
             TapButton(onTap: _tap),
@@ -159,7 +159,7 @@ class PopupBody extends StatelessWidget {
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(a.ownerName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)), Text(a.owner, style: TextStyle(color: sub(context), fontSize: 13))])),
         Icon(Icons.chevron_right_rounded, color: sub(context)),
       ])),
-      if (a.desc.trim().isNotEmpty) Padding(padding: EdgeInsets.only(top: a.pprof ? 12 : 0), child: Align(alignment: Alignment.centerLeft, child: Text(a.desc.trim(), maxLines: 4, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, height: 1.4)))),
+      if (a.desc.trim().isNotEmpty) Padding(padding: EdgeInsets.only(top: a.pprof ? 12 : 0), child: Align(alignment: Alignment.centerLeft, child: Text(a.desc.trim(), style: const TextStyle(fontSize: 15, height: 1.4)))),
       SizedBox(height: a.pprof || a.desc.trim().isNotEmpty ? 14 : 4),
       Container(
         padding: const EdgeInsets.fromLTRB(8, 8, 6, 8), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(26)),

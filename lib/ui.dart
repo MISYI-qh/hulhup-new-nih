@@ -469,13 +469,14 @@ class _BirthState extends State<_BirthSheet> {
 }
 
 const audiences = ['public', 'followers', 'following', 'both'];
-IconData audIcon(String v) => const {'public': Icons.public_rounded, 'followers': Icons.group_outlined, 'following': Icons.person_add_alt_1_outlined, 'both': Icons.people_alt_outlined}[v] ?? Icons.public_rounded;
+IconData audIcon(String v) => const {'public': Icons.public_rounded, 'followers': Icons.group_outlined, 'following': Icons.person_add_alt_1_outlined, 'both': Icons.people_alt_outlined, 'me': Icons.lock_outline_rounded}[v] ?? Icons.public_rounded;
 
 /// Pilihan audiens buatan sendiri (publik, pengikut, mengikuti, pengikut dan mengikuti).
 class Pick extends StatelessWidget {
   final String label, value;
   final ValueChanged<String> on;
-  const Pick(this.label, this.value, this.on, {super.key});
+  final List<String> opts;
+  const Pick(this.label, this.value, this.on, {super.key, this.opts = audiences});
   @override
   Widget build(BuildContext context) {
     final s = Store.i;
@@ -486,7 +487,7 @@ class Pick extends StatelessWidget {
         onTap: () async {
           final r = await sheet<String>(context, (sc) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
             Padding(padding: const EdgeInsets.only(left: 4, bottom: 12), child: Text(label, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18))),
-            for (final v in audiences) Tap(onTap: () => Navigator.pop(sc, v), scale: .98, child: AnimatedContainer(
+            for (final v in opts) Tap(onTap: () => Navigator.pop(sc, v), scale: .98, child: AnimatedContainer(
               duration: const Duration(milliseconds: 200), margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
               decoration: BoxDecoration(color: v == value ? ink(sc).withValues(alpha: .14) : soft(sc), borderRadius: BorderRadius.circular(24)),
               child: Row(children: [Icon(audIcon(v), size: 22, color: ink(sc)), const SizedBox(width: 14), Expanded(child: Text(s.t('a_$v'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16))), if (v == value) Icon(Icons.check_rounded, color: ink(sc))]),

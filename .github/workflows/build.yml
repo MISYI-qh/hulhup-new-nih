@@ -9,13 +9,8 @@ jobs:
         with: { channel: stable }
       - name: Buat folder platform
         run: flutter create . --project-name hulhup --org app.misyi --platforms=android,web,linux,windows,macos,ios
-      - name: Izin, nama, minSdk Android
-        run: |
-          M=android/app/src/main/AndroidManifest.xml
-          sed -i 's|<application|<uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\n    <application|' $M
-          sed -i 's|android:label="hulhup"|android:label="Hulhup"|' $M
-          sed -i 's|minSdk = flutter.minSdkVersion|minSdk = 24|; s|minSdkVersion flutter.minSdkVersion|minSdkVersion 24|' android/app/build.gradle* || true
-          sed -i 's|<title>hulhup</title>|<title>Hulhup</title>|' web/index.html || true
+      - name: Izin, nama, ikon notifikasi, Gradle
+        run: bash tool/setup_android.sh
       - run: flutter pub get
       - run: dart run flutter_launcher_icons
       - run: flutter build apk --release

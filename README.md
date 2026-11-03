@@ -14,3 +14,9 @@ Di PC: flutter create . --platforms=android,web,linux,windows,macos,ios && flutt
 
 Folder `backend/` (Cloudflare Worker + D1 + R2) belum dipakai; disiapkan untuk tahap online nanti. Antarmuka `Api` di lib/core.dart sama, jadi tinggal diganti.
 Font: Outfit (lisensi OFL, assets/fonts). Teks Tentang/Kebijakan/Privasi ada di lib/core.dart; mohon ditinjau sebelum rilis.
+
+## Catatan versi 1.1.0
+- Siapa yang bisa melihat audio di profil diatur lewat Pengaturan (publik, pengikut, mengikuti, pengikut dan mengikuti, hanya untuk saya). "Hanya untuk saya" hanya berlaku untuk profil, bukan untuk acak. Pilihan acak tetap per audio.
+- Pencarian mencari akun dan audio (lewat deskripsi). Deskripsi maksimal 200 karakter, foto profil maksimal 10 MB, foto profil bisa dipratinjau.
+- Audio di popup/profil berulang terus sampai dijeda; berhenti saat popup atau halaman ditutup.
+- Notifikasi di HP (flutter_local_notifications): pengingat jam 19.00 jika belum masuk hari itu, notifikasi suka/pengikut baru, dan hitungan hari berturut-turut. Ikon notifikasi dari tool/android_res, diatur oleh tool/setup_android.sh. Di web hanya ada notifikasi di dalam aplikasi.
