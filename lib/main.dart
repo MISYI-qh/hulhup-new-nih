@@ -8,6 +8,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Store.i.init();
   await Notifier.init();
+  await Store.i.refresh(); // status masuk sudah benar di layar pertama
   runApp(const HulhupApp());
   WidgetsBinding.instance.addObserver(_Life());
   _boot();

@@ -34,7 +34,10 @@ class _HomeState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final s = Store.i;
-    return Scaffold(
+    return PopScope(
+      canPop: !menu,
+      onPopInvokedWithResult: (didPop, _) { if (!didPop && menu) setState(() => menu = false); },
+      child: Scaffold(
       body: Stack(children: [
         Column(children: [
           TopBar(
@@ -54,7 +57,7 @@ class _HomeState extends State<HomePage> {
         ]),
         SideMenu(open: menu, close: () => setState(() => menu = false)),
       ]),
-    );
+    ));
   }
 }
 
@@ -162,9 +165,10 @@ class PopupBody extends StatelessWidget {
       if (a.pprof) Tap(onTap: () { Navigator.pop(context); go(context, ProfilePage(a.owner)); }, child: Row(children: [
         Avatar(a.ownerAvatar, a.ownerName, 46),
         const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(a.ownerName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)), Text(a.owner, style: TextStyle(color: sub(context), fontSize: 13))])),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(a.ownerName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)), Text(a.created > 0 ? '${a.owner} · ${s.when(a.created)}' : a.owner, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: sub(context), fontSize: 13))])),
         Icon(Icons.chevron_right_rounded, color: sub(context)),
       ])),
+      if (!a.pprof && a.created > 0) Align(alignment: Alignment.centerLeft, child: Padding(padding: const EdgeInsets.only(bottom: 6), child: Text(s.when(a.created), style: TextStyle(color: sub(context), fontSize: 13)))),
       if (a.desc.trim().isNotEmpty) Padding(padding: EdgeInsets.only(top: a.pprof ? 12 : 0), child: Align(alignment: Alignment.centerLeft, child: Text(a.desc.trim(), style: const TextStyle(fontSize: 15, height: 1.4)))),
       SizedBox(height: a.pprof || a.desc.trim().isNotEmpty ? 14 : 4),
       Container(

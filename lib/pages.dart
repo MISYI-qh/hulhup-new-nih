@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math';
-import 'dart:typed_data';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -107,6 +106,7 @@ class AudioRow extends StatelessWidget {
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(a.desc.trim().isEmpty ? s.t('untitled') : a.desc.trim(), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: a.desc.trim().isEmpty ? sub(context) : null)),
             const SizedBox(height: 4),
+            if (a.created > 0) Padding(padding: const EdgeInsets.only(bottom: 3), child: Text(s.when(a.created), style: TextStyle(color: sub(context), fontSize: 12.5))),
             Row(children: [
               ValueListenableBuilder<int>(valueListenable: s.pos, builder: (_, ms, __) => Text(on ? '${mmss(ms ~/ 1000)} / ${mmss(a.secs)}' : mmss(a.secs), style: TextStyle(color: on ? ink(context) : sub(context), fontSize: 13, fontWeight: FontWeight.w700))),
               if (mine) ...[const SizedBox(width: 10), Icon(vis, size: 15, color: sub(context))],
@@ -254,7 +254,7 @@ class _FollowsState extends State<FollowsPage> {
 
   Future<void> _remove(Map u) async {
     final s = Store.i;
-    if (!await confirm(context, s.t('remove_follower'), s.t('remove_follower_q').replaceAll('{name}', '${u['name']}'), s.t('remove'), danger: true)) return;
+    if (!await confirm(context, s.t('remove_follower'), s.t('remove_follower_q').replaceAll('{name}', '${u['name']}'), s.t('remove'), danger: true) || !mounted) return;
     try {
       await Api.req('DELETE', '/me/followers/${u['username']}');
       users!.remove(u);
@@ -380,9 +380,9 @@ class _StreakState extends State<StreakPage> {
       In(0, Align(alignment: Alignment.centerLeft, child: StreakChip(streak, total))),
       const SizedBox(height: 18),
       In(1, Row(children: [
-        IconBtn(Icons.chevron_left_rounded, () => setState(() => month = DateTime(month.year, month.month - 1)), color: canPrev ? null : sub(context).withValues(alpha: .3)),
+        IconBtn(Icons.chevron_left_rounded, () { if (canPrev) setState(() => month = DateTime(month.year, month.month - 1)); }, color: canPrev ? null : sub(context).withValues(alpha: .3)),
         Expanded(child: Center(child: Text('$mn ${month.year}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)))),
-        IconBtn(Icons.chevron_right_rounded, () => setState(() => month = DateTime(month.year, month.month + 1)), color: canNext ? null : sub(context).withValues(alpha: .3)),
+        IconBtn(Icons.chevron_right_rounded, () { if (canNext) setState(() => month = DateTime(month.year, month.month + 1)); }, color: canNext ? null : sub(context).withValues(alpha: .3)),
       ])),
       const SizedBox(height: 8),
       Row(children: [for (final w in wd) Expanded(child: Center(child: Text(w, style: TextStyle(color: sub(context), fontSize: 12.5, fontWeight: FontWeight.w600))))]),

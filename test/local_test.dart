@@ -67,7 +67,7 @@ void main() {
     expect((await Api.req('GET', '/random'))['audio'], isNull); // tamu
   });
 
-  test('acak: mengikuti, pengikut dan mengikuti, dan tidak mengulang berturut-turut', () async {
+  test('acak: mengikuti, dan tidak mengulang berturut-turut', () async {
     await reg('a');
     await up('satu');
     await up('dua');
@@ -79,19 +79,20 @@ void main() {
     }
     await Api.req('POST', '/logout');
     await reg('b');
-    await up('khusus', rand: 'following'); // hanya yang diikuti b
-    await Api.req('POST', '/users/a/follow');
-    await Api.req('POST', '/logout');
-    await Api.req('POST', '/login', body: {'username': 'a', 'password': 'secret1'});
-    var seen = <String>{};
-    for (var i = 0; i < 80; i++) { seen.add((await Api.req('GET', '/random'))['audio']['desc']); }
-    expect(seen.contains('khusus'), isFalse); // a belum diikuti b
-    await Api.req('POST', '/users/b/follow');
+    await up('khusus', rand: 'following'); // hanya didengar orang yang diikuti b
+    Future<Set<String>> draw(String u) async {
+      await Api.req('POST', '/logout');
+      await Api.req('POST', '/login', body: {'username': u, 'password': 'secret1'});
+      final seen = <String>{};
+      for (var i = 0; i < 80; i++) { seen.add((await Api.req('GET', '/random'))['audio']['desc']); }
+      return seen;
+    }
+    expect((await draw('a')).contains('khusus'), isFalse); // b belum mengikuti a
     await Api.req('POST', '/logout');
     await Api.req('POST', '/login', body: {'username': 'b', 'password': 'secret1'});
-    seen = {};
-    for (var i = 0; i < 80; i++) { seen.add((await Api.req('GET', '/random'))['audio']['desc']); }
-    expect(seen.contains('khusus'), isFalse); // pemilik tidak mendengar audio sendiri
+    await Api.req('POST', '/users/a/follow');
+    expect((await draw('a')).contains('khusus'), isTrue); // sekarang a diikuti b
+    expect((await draw('b')).contains('khusus'), isFalse); // pemilik tidak mendengar audionya sendiri
   });
 
   test('siapa yang melihat di profil: hanya untuk saya, pengikut', () async {

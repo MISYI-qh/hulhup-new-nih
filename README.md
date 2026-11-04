@@ -1,7 +1,7 @@
 # Hulhup (produk Misyi) - mode penyimpanan lokal
 Aplikasi Flutter (Android, iOS, web, desktop). Saat ini SEMUA data (akun, audio, like, ikuti, notifikasi) disimpan lokal di perangkat/browser lewat shared_preferences. Tidak ada server.
 
-STATUS: kode sudah ditulis tetapi BELUM dikompilasi dan BELUM dites. Jalankan build lalu laporkan error yang muncul.
+STATUS: build lolos di GitHub Actions. Lapisan data (lib/core.dart `Local`) punya tes otomatis di test/ dan dijalankan oleh workflow `check` (flutter analyze + flutter test). Antarmuka di HP/browser belum diuji manual.
 
 Konsekuensi mode lokal:
 - Suara acak hanya berasal dari audio yang diunggah di perangkat itu sendiri (sesuai pilihan audiens: publik, pengikut, mengikuti, atau pengikut dan mengikuti).

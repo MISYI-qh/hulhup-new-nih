@@ -161,7 +161,7 @@ class Local {
   static Map _av(Map a, Map? me) {
     final o = _byId(a['owner'])!, id = a['id'];
     return {
-      'id': id, 'desc': a['desc'], 'secs': a['secs'], 'popup': true, 'vis': a['vis'], 'url': 'mem:a$id', 'pprof': a['pprof'] != false, 'rand': a['rand'] ?? 'public',
+      'id': id, 'desc': a['desc'], 'secs': a['secs'], 'popup': true, 'vis': a['vis'], 'url': 'mem:a$id', 'pprof': a['pprof'] != false, 'rand': a['rand'] ?? 'public', 'created': a['created'] ?? 0,
       'likes': _cnt('likes', (l) => l['a'] == id), 'liked': me != null && _r('likes').any((l) => l['a'] == id && l['u'] == me['id']),
       'owner': o['username'], 'owner_name': o['name'], 'owner_avatar': _img(o, 'avatar'),
     };
@@ -385,7 +385,6 @@ class Local {
       final id = u['id'] as int;
       if (x[2] == null && m == 'GET') {
         final mine = me != null && me['id'] == id;
-        final isf = me != null && !mine && _r('follows').any((f) => f['from'] == me['id'] && f['to'] == id);
         final rows = _r('audios').where((a) => a['owner'] == id && (mine || _aud(u['pvis'] ?? 'public', u, me))).map((a) => _av(a, me)).toList();
         return {'user': _uv(u, me), 'audios': rows};
       }
@@ -453,16 +452,16 @@ class U {
 }
 
 class A {
-  final int id, secs;
+  final int id, secs, created;
   final String desc, url, vis, rand, owner, ownerName;
   final String? ownerAvatar;
   final bool popup, pprof;
   int likes;
   bool liked;
   A.from(Map j)
-      : id = j['id'], secs = j['secs'], desc = j['desc'] ?? '', url = j['url'], vis = j['vis'] ?? 'public', rand = j['rand'] ?? 'public', owner = j['owner'],
+      : id = j['id'], secs = j['secs'], created = j['created'] ?? 0, desc = j['desc'] ?? '', url = j['url'], vis = j['vis'] ?? 'public', rand = j['rand'] ?? 'public', owner = j['owner'],
         ownerName = j['owner_name'], ownerAvatar = j['owner_avatar'], popup = j['popup'] == true, pprof = j['pprof'] != false, likes = j['likes'] ?? 0, liked = j['liked'] == true;
-  Map<String, dynamic> toJson() => {'id': id, 'secs': secs, 'desc': desc, 'url': url, 'vis': vis, 'rand': rand, 'owner': owner, 'owner_name': ownerName, 'owner_avatar': ownerAvatar, 'popup': popup, 'pprof': pprof, 'likes': likes, 'liked': liked};
+  Map<String, dynamic> toJson() => {'id': id, 'secs': secs, 'created': created, 'desc': desc, 'url': url, 'vis': vis, 'rand': rand, 'owner': owner, 'owner_name': ownerName, 'owner_avatar': ownerAvatar, 'popup': popup, 'pprof': pprof, 'likes': likes, 'liked': liked};
 }
 
 String mmss(int s) => '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}';
@@ -499,6 +498,18 @@ class Store extends ChangeNotifier {
 
   String t(String k) => (S[k] ?? [k, k])[lang == 'id' ? 0 : 1];
   String err(Object e) => e is ApiErr ? (S.containsKey('e_${e.code}') ? t('e_${e.code}') : t('e_server')) : t('e_network');
+
+  /// Waktu posting: "3 jam lalu" untuk 7 hari terakhir, selebihnya tanggal.
+  String when(int ms) {
+    if (ms <= 0) return '';
+    final d = DateTime.fromMillisecondsSinceEpoch(ms);
+    if (DateTime.now().difference(d).inDays < 7) return ago(ms);
+    const m = {
+      'id': ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'],
+      'en': ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+    };
+    return '${d.day} ${m[lang]![d.month - 1]} ${d.year}';
+  }
 
   String ago(int ms) {
     final m = (DateTime.now().millisecondsSinceEpoch - ms) ~/ 60000;
@@ -552,7 +563,12 @@ class Store extends ChangeNotifier {
         if (unreadSocial > _pushed) await Notifier.show(1, 'Hulhup', t('push_unread').replaceAll('{n}', '$unreadSocial'), t('notif'));
         _pushed = unreadSocial;
       }
-      if (remind) { await Notifier.allow(); await syncReminders(); } else { await Notifier.cancelReminders(); }
+      if (remind) {
+        if (!(_sp.getBool('asked') ?? false)) { await Notifier.allow(); await _sp.setBool('asked', true); }
+        await syncReminders();
+      } else {
+        await Notifier.cancelReminders();
+      }
     } catch (_) {
     } finally {
       _starting = false;
@@ -571,7 +587,7 @@ class Store extends ChangeNotifier {
     remind = v;
     await _sp.setBool('remind', v);
     notifyListeners();
-    if (v) { await Notifier.allow(); await syncReminders(); } else { await Notifier.cancelReminders(); }
+    if (v) { await Notifier.allow(); await _sp.setBool('asked', true); await syncReminders(); } else { await Notifier.cancelReminders(); }
   }
 
   Future<void> _clear() async { await Local.setSession(null); me = null; unread = 0; unreadSocial = 0; _pushed = 0; }
