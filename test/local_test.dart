@@ -147,7 +147,7 @@ void main() {
     await reg('bob');
     final id = ((await Api.req('GET', '/users/ana'))['audios'] as List).first['id'];
     final pushed = <String>[];
-    Local.onNotify = (to, type, actor) => pushed.add('$to:$type:$actor');
+    Local.onNotify = (to, type, actor, extra) => pushed.add('$to:$type:$actor');
     await Api.req('POST', '/audios/$id/like');
     await Api.req('POST', '/audios/$id/like'); // batal suka
     await Api.req('POST', '/audios/$id/like'); // suka lagi: tidak ada notifikasi ganda
@@ -340,5 +340,14 @@ void main() {
     expect((j['audios'] as List).length, 1);
     await Api.req('DELETE', '/me');
     expect((Local.db['rels'] as List), isEmpty);
+  });
+
+  test('hapus foto profil kembali ke bawaan', () async {
+    await reg('ana');
+    await Api.raw('/me/avatar', Uint8List.fromList(List.filled(20, 1)), 'image/png');
+    expect((await Api.req('GET', '/me'))['user']['avatar'], isNotNull);
+    await Api.req('DELETE', '/me/avatar');
+    expect((await Api.req('GET', '/me'))['user']['avatar'], isNull);
+    expect(Local.bytes('mem:u1_avatar'), isNull);
   });
 }

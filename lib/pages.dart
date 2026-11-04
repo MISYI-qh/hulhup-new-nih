@@ -545,9 +545,16 @@ class _EditState extends State<EditProfilePage> {
     final r = await sheet<String>(context, (sc) => Column(mainAxisSize: MainAxisSize.min, children: [
       if (me.avatar != null) _opt(sc, Icons.visibility_outlined, s.t('view_photo'), 'view'),
       _opt(sc, Icons.photo_library_outlined, s.t('change_photo'), 'change'),
+      if (me.avatar != null) _opt(sc, Icons.delete_outline_rounded, s.t('remove_photo'), 'remove'),
     ]));
     if (!mounted) return;
     if (r == 'view') { go(context, ImageViewer(me.avatar!, me.name)); } else if (r == 'change') { _img('avatar'); }
+    else if (r == 'remove') {
+      if (!await confirm(context, s.t('remove_photo'), s.t('remove_photo_q'), s.t('delete'), danger: true)) return;
+      setState(() => up = 'avatar');
+      try { await Api.req('DELETE', '/me/avatar'); await s.refresh(); toast(s.t('photo_removed')); } catch (e) { toast(s.err(e), bad: true); }
+      if (mounted) setState(() => up = null);
+    }
   }
 
   Future<void> _save() async {

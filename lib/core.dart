@@ -352,6 +352,14 @@ class Local {
       await setSession(nu);
       return {'user': _uv(u, u)};
     }
+    x = RegExp(r'^/me/(avatar|cover)$').firstMatch(p);
+    if (x != null && m == 'DELETE') {
+      final u = need();
+      await _del('u${u['id']}_${x[1]}');
+      u[x[1] == 'avatar' ? 'av' : 'cv'] = false;
+      await _save();
+      return {'user': _uv(u, u)};
+    }
     if (p == '/me/password' && m == 'POST') {
       final u = need();
       if (_hash(u['salt'], '${b!['old'] ?? ''}') != u['pass']) throw ApiErr('bad_credentials');
@@ -438,9 +446,9 @@ class Local {
       Map row(Map r) { final o = _byId(r['a'] == u['id'] ? r['b'] : r['a'])!; return {'username': o['username'], 'name': o['name'], 'avatar': _img(o, 'avatar'), 'type': r['type']}; }
       final mine = _r('rels').where((r) => r['a'] == u['id'] || r['b'] == u['id']).toList();
       return {
-        'active': mine.where((r) => r['status'] == 'active').map(row).toList(),
-        'incoming': mine.where((r) => r['status'] == 'pending' && r['b'] == u['id']).map(row).toList(),
-        'outgoing': mine.where((r) => r['status'] == 'pending' && r['a'] == u['id']).map(row).toList(),
+        'active': mine.where((r) => r['status'] == 'active').map((r) => row(r)).toList(),
+        'incoming': mine.where((r) => r['status'] == 'pending' && r['b'] == u['id']).map((r) => row(r)).toList(),
+        'outgoing': mine.where((r) => r['status'] == 'pending' && r['a'] == u['id']).map((r) => row(r)).toList(),
       };
     }
     x = RegExp(r'^/users/([a-z0-9_]+)/relations$').firstMatch(p);
@@ -856,6 +864,7 @@ const S = <String, List<String>>{
   'noedit': ['Audio tidak bisa diedit, hanya dihapus.', 'Audio cannot be edited, only deleted.'],
   'search': ['Cari', 'Search'], 'notif': ['Notifikasi', 'Notifications'],
   'n_follow': ['mulai mengikutimu', 'started following you'],
+  'remove_photo': ['Hapus foto profil', 'Remove profile photo'], 'remove_photo_q': ['Foto profil akan kembali ke bawaan.', 'Your profile photo will go back to the default.'], 'photo_removed': ['Foto profil dihapus', 'Profile photo removed'],
   'a_friend': ['Teman', 'Friends'], 'a_best': ['Sahabat', 'Best friends'], 'a_partner': ['Pasangan', 'Partner'], 'a_family': ['Keluarga', 'Family'],
   'a_relations': ['Semua hubungan', 'All relationships'], 'a_accounts': ['Pilih akun', 'Choose accounts'], 'f_me': ['Untuk saya', 'For me'],
   'filter_title': ['Filter suara acak', 'Random voice filter'], 'filter_sub': ['Tombol acak hanya memutar suara dari kelompok ini.', 'The random button only plays voices from this group.'],
