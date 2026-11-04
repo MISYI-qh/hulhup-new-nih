@@ -659,7 +659,7 @@ class Store extends ChangeNotifier {
     await Local.init(_sp);
     Local.onNotify = (to, type, actor, extra) {
       if (me?.username == to) { banner?.call('$actor ${notifText(type, extra)}'); refresh(); }
-      return Notifier.show(200 + (_nid++ % 50), 'Hulhup', '$actor ${notifText(type, extra)} · @$to', t('notif'));
+      Notifier.show(200 + (_nid++ % 50), 'Hulhup', '$actor ${notifText(type, extra)} · @$to', t('notif'));
     };
     try { for (final j in jsonDecode(_sp.getString('offline') ?? '[]') as List) { offline.add(A.from(j as Map)); } } catch (_) {}
     _p.onPositionChanged.listen((d) => pos.value = d.inMilliseconds);
