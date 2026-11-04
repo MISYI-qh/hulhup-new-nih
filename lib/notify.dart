@@ -9,6 +9,7 @@ import 'package:timezone/timezone.dart' as tz;
 class Notifier {
   static final _n = FlutterLocalNotificationsPlugin();
   static bool _ok = false;
+  static String lastError = '';
 
   static Future<void> init() async {
     if (kIsWeb || _ok) return;
@@ -20,7 +21,17 @@ class Notifier {
       );
       await _n.initialize(s);
       _ok = true;
-    } catch (_) {}
+    } catch (e) { lastError = 'init: $e'; }
+  }
+
+  /// Apakah notifikasi sudah diizinkan di HP.
+  static Future<bool> enabled() async {
+    if (!_ok) return false;
+    try {
+      final a = _n.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      if (a != null) return (await a.areNotificationsEnabled()) ?? true;
+    } catch (e) { lastError = 'enabled: $e'; }
+    return true;
   }
 
   /// Minta izin notifikasi (Android 13+ / iOS). Aman dipanggil berulang.
@@ -31,7 +42,7 @@ class Notifier {
       if (a != null) return (await a.requestNotificationsPermission()) ?? true;
       final i = _n.resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
       if (i != null) return (await i.requestPermissions(alert: true, badge: true, sound: true)) ?? false;
-    } catch (_) {}
+    } catch (e) { lastError = 'allow: $e'; }
     return false;
   }
 
@@ -48,7 +59,10 @@ class Notifier {
 
   static Future<void> show(int id, String title, String body, String sub) async {
     if (!_ok) return;
-    try { await _n.show(id, title, body, _d(sub)); } catch (_) {}
+    try {
+      if (!await enabled()) await allow();
+      await _n.show(id, title, body, _d(sub));
+    } catch (e) { lastError = 'show: $e'; }
   }
 
   /// Notifikasi berulang tiap hari pada jam tertentu (waktu setempat), terlepas dari apakah aplikasi sudah dibuka hari itu.
@@ -60,7 +74,7 @@ class Notifier {
       if (!at.isAfter(n)) at = DateTime(n.year, n.month, n.day + 1, hour, minute);
       await _n.zonedSchedule(id, title, body, tz.TZDateTime.from(at, tz.UTC), _d(sub),
           androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle, matchDateTimeComponents: DateTimeComponents.time);
-    } catch (_) {}
+    } catch (e) { lastError = 'daily: $e'; }
   }
 
   static Future<void> cancelReminders() async {

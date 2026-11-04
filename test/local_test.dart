@@ -57,14 +57,15 @@ void main() {
   test('acak: hanya pengikut, pemilik tidak mendengar sendiri, publik untuk semua', () async {
     await reg('ana');
     await up('hanya pengikut', rand: 'followers');
-    expect((await Api.req('GET', '/random'))['audio'], isNull); // pemilik bukan pengikutnya sendiri
+    expect((await Api.req('GET', '/random?f=followers'))['audio'], isNull); // pemilik bukan pengikutnya sendiri
     await Api.req('POST', '/logout');
     await reg('bob');
-    expect((await Api.req('GET', '/random'))['audio'], isNull); // b belum mengikuti a
+    expect((await Api.req('GET', '/random?f=followers'))['audio'], isNull); // b belum mengikuti a
     await Api.req('POST', '/users/ana/follow');
-    expect((await Api.req('GET', '/random'))['audio']['desc'], 'hanya pengikut');
+    expect((await Api.req('GET', '/random?f=followers'))['audio']['desc'], 'hanya pengikut');
+    expect((await Api.req('GET', '/random'))['audio'], isNull); // filter publik tidak memuat audio pengikut
     await Api.req('POST', '/logout');
-    expect((await Api.req('GET', '/random'))['audio'], isNull); // tamu
+    expect((await Api.req('GET', '/random?f=followers'))['audio'], isNull); // tamu
   });
 
   test('acak: mengikuti, dan tidak mengulang berturut-turut', () async {
@@ -84,7 +85,7 @@ void main() {
       await Api.req('POST', '/logout');
       await Api.req('POST', '/login', body: {'username': u, 'password': 'secret1'});
       final seen = <String>{};
-      for (var i = 0; i < 80; i++) { seen.add((await Api.req('GET', '/random'))['audio']['desc']); }
+      for (var i = 0; i < 80; i++) { final a = (await Api.req('GET', '/random?f=following'))['audio']; if (a != null) seen.add(a['desc']); }
       return seen;
     }
     expect((await draw('ana')).contains('khusus'), isFalse); // b belum mengikuti a
@@ -122,6 +123,10 @@ void main() {
     await Api.req('PATCH', '/me/settings', body: {'pvis': 'me'});
     await Api.req('POST', '/logout');
     expect((await Api.req('GET', '/random'))['audio']['desc'], 'rahasia');
+    await Api.req('POST', '/login', body: {'username': 'cici', 'password': 'secret1'});
+    final lk = await Api.req('GET', '/users/ana');
+    expect(lk['locked'], isTrue); // profil terkunci untuk akun lain
+    expect(lk['audios'], isEmpty);
   });
 
   test('cari audio lewat deskripsi, deskripsi dipotong 200 karakter', () async {
@@ -219,5 +224,121 @@ void main() {
     expect((Local.db['follows'] as List), isEmpty);
     expect(await code(Api.req('GET', '/users/ana')), 'not_found');
     expect((await Api.req('GET', '/random'))['audio'], isNull);
+  });
+
+  Future<void> login(String u) async {
+    await Api.req('POST', '/logout');
+    await Api.req('POST', '/login', body: {'username': u, 'password': 'secret1'});
+  }
+
+  Future<List<String>> drawAll(String f) async {
+    final seen = <String>{};
+    for (var i = 0; i < 40; i++) {
+      final a = (await Api.req('GET', '/random?f=$f'))['audio'];
+      if (a != null) seen.add(a['desc']);
+    }
+    return seen.toList()..sort();
+  }
+
+  test('hubungan perlu persetujuan dua pihak, bisa ditolak dan diputus', () async {
+    await reg('ana');
+    await reg('bob');
+    await Api.req('POST', '/logout');
+    await login('ana');
+    await Api.req('POST', '/relations', body: {'to': 'bob', 'type': 'friend'});
+    expect(await code(Api.req('POST', '/relations', body: {'to': 'bob', 'type': 'family'})), 'rel_exists');
+    expect(await code(Api.req('POST', '/relations', body: {'to': 'ana', 'type': 'friend'})), 'forbidden');
+    expect(await code(Api.req('POST', '/relations', body: {'to': 'bob', 'type': 'musuh'})), 'bad_file');
+    expect((await Api.req('GET', '/users/bob'))['rel']['status'], 'out');
+    expect(((await Api.req('GET', '/users/bob/relations'))['items'] as List), isEmpty); // belum disetujui
+    expect(await code(Api.req('POST', '/relations/bob/accept')), 'forbidden'); // pengaju tidak bisa menyetujui sendiri
+    await login('bob');
+    expect((await Api.req('GET', '/users/ana'))['rel'], {'status': 'in', 'type': 'friend'});
+    final n = (await Api.req('GET', '/notifications'))['items'] as List;
+    expect(n.first['type'], 'rel_req');
+    expect(n.first['extra'], 'friend');
+    await Api.req('POST', '/relations/ana/decline');
+    expect((await Api.req('GET', '/users/ana'))['rel']['status'], 'none');
+    // ajukan lagi, disetujui
+    await Api.req('POST', '/relations', body: {'to': 'ana', 'type': 'best'});
+    await login('ana');
+    await Api.req('POST', '/relations/bob/accept');
+    expect((await Api.req('GET', '/users/bob'))['rel'], {'status': 'active', 'type': 'best'});
+    await Api.req('POST', '/logout');
+    final pub = (await Api.req('GET', '/users/ana/relations'))['items'] as List; // siapa pun bisa melihat
+    expect(pub.single['username'], 'bob');
+    expect(pub.single['type'], 'best');
+    await login('bob');
+    expect((await Api.req('GET', '/notifications'))['items'].any((e) => e['type'] == 'rel_ok'), isTrue);
+    await Api.req('DELETE', '/relations/ana'); // putus hubungan
+    expect(((await Api.req('GET', '/me/relations'))['active'] as List), isEmpty);
+    expect(((await Api.req('GET', '/users/ana/relations'))['items'] as List), isEmpty);
+  });
+
+  test('filter acak ketat per audiens: teman, sahabat, pasangan, keluarga, semua hubungan', () async {
+    await reg('ana');
+    for (final r in ['public', 'friend', 'best', 'partner', 'family', 'relations']) { await up(r, rand: r); }
+    await reg('bob');
+    await Api.req('POST', '/logout');
+    await login('bob');
+    expect(await drawAll('public'), ['public']);
+    expect(await drawAll('friend'), isEmpty); // belum berhubungan
+    expect(await drawAll('relations'), isEmpty);
+    await Api.req('POST', '/relations', body: {'to': 'ana', 'type': 'friend'});
+    expect(await drawAll('friend'), isEmpty); // belum disetujui
+    await login('ana');
+    await Api.req('POST', '/relations/bob/accept');
+    await login('bob');
+    expect(await drawAll('friend'), ['friend']);
+    expect(await drawAll('best'), isEmpty);
+    expect(await drawAll('relations'), ['relations']); // semua hubungan: hanya audio berlabel itu
+    expect(await drawAll('public'), ['public']);
+    await Api.req('DELETE', '/relations/ana');
+    expect(await drawAll('friend'), isEmpty);
+    expect(await drawAll('ngawur'), ['public']); // filter tak dikenal jatuh ke publik
+  });
+
+  test('pilih akun: muncul di "untuk saya" hanya untuk akun terpilih', () async {
+    await reg('ana');
+    await reg('bob');
+    await reg('cici');
+    await Api.req('POST', '/logout');
+    await login('ana');
+    expect(await code(Api.multi('/audios', Uint8List.fromList(List.filled(50, 1)), 'a.m4a', {'desc': 'x', 'secs': '3', 'rand': 'accounts', 'to': ''})), 'need_accounts');
+    expect(await code(Api.multi('/audios', Uint8List.fromList(List.filled(50, 1)), 'a.m4a', {'desc': 'x', 'secs': '3', 'rand': 'accounts', 'to': 'ana,tidakada'})), 'need_accounts');
+    expect((Local.db['audios'] as List), isEmpty); // gagal tidak meninggalkan data
+    await Api.multi('/audios', Uint8List.fromList(List.filled(50, 1)), 'a.m4a', {'desc': 'rahasia bob', 'secs': '3', 'rand': 'accounts', 'to': 'bob'});
+    expect(await drawAll('me'), isEmpty); // pengirim tidak menerima sendiri
+    await login('bob');
+    expect(await drawAll('me'), ['rahasia bob']);
+    expect(await drawAll('public'), isEmpty);
+    await login('cici');
+    expect(await drawAll('me'), isEmpty);
+    await Api.req('POST', '/logout');
+    expect(await drawAll('me'), isEmpty);
+  });
+
+  test('profil: semua daftar baru dipakai, hapus akun membersihkan hubungan', () async {
+    await reg('ana');
+    await reg('bob');
+    await Api.req('POST', '/logout');
+    await login('ana');
+    for (final v in ['public', 'followers', 'following', 'both', 'friend', 'best', 'partner', 'family', 'relations', 'me']) {
+      await Api.req('PATCH', '/me/settings', body: {'pvis': v});
+    }
+    expect(await code(Api.req('PATCH', '/me/settings', body: {'pvis': 'accounts'})), 'bad_file');
+    await Api.req('PATCH', '/me/settings', body: {'pvis': 'family'});
+    await up('keluarga saja');
+    await login('bob');
+    expect((await Api.req('GET', '/users/ana'))['locked'], isTrue);
+    await Api.req('POST', '/relations', body: {'to': 'ana', 'type': 'family'});
+    await login('ana');
+    await Api.req('POST', '/relations/bob/accept');
+    await login('bob');
+    final j = await Api.req('GET', '/users/ana');
+    expect(j['locked'], isFalse);
+    expect((j['audios'] as List).length, 1);
+    await Api.req('DELETE', '/me');
+    expect((Local.db['rels'] as List), isEmpty);
   });
 }

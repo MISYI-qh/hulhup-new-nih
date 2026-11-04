@@ -44,12 +44,14 @@ class Local {
   static Future<void> init(SharedPreferences p) async {
     sp = p;
     final s = sp.getString('db');
-    db = s == null ? {'seq': 0, 'users': [], 'audios': [], 'likes': [], 'follows': [], 'notifs': [], 'taps': 0} : jsonDecode(s) as Map<String, dynamic>;
+    db = s == null ? {'seq': 0, 'users': [], 'audios': [], 'likes': [], 'follows': [], 'notifs': [], 'rels': [], 'taps': 0} : jsonDecode(s) as Map<String, dynamic>;
+    db.putIfAbsent('rels', () => []);
     session = sp.getString('session');
     for (final a in _r('audios')) {
       a['vis'] = const {'all': 'public', 'me': 'followers'}[a['vis']] ?? a['vis'];
       a['rand'] ??= 'public';
       a['pprof'] ??= true;
+      a['to'] ??= [];
     }
     for (final u in _r('users')) {
       u['pvis'] ??= 'public';
@@ -94,14 +96,52 @@ class Local {
     if (viewer == null) return false;
     if (viewer['id'] == owner['id']) return self;
     if (mode == 'me') return false;
+    switch (mode) {
+      case 'friend':
+      case 'best':
+      case 'partner':
+      case 'family':
+        return _relType(viewer['id'], owner['id']) == mode;
+      case 'relations':
+        return _relType(viewer['id'], owner['id']) != null;
+    }
     final fol = _r('follows').any((f) => f['from'] == viewer['id'] && f['to'] == owner['id']);
     final ing = _r('follows').any((f) => f['from'] == owner['id'] && f['to'] == viewer['id']);
     switch (mode) {
       case 'followers': return fol;
       case 'following': return ing;
-      default: return fol || ing;
+      case 'both': return fol || ing;
+      default: return false;
     }
   }
+
+  /// Hubungan dua pihak (teman, sahabat, pasangan, keluarga). Satu pasangan akun hanya punya satu baris.
+  static Map? _rel(int a, int b) {
+    for (final r in _r('rels')) {
+      if ((r['a'] == a && r['b'] == b) || (r['a'] == b && r['b'] == a)) return r;
+    }
+    return null;
+  }
+
+  static String? _relType(int a, int b) {
+    final r = _rel(a, b);
+    return r != null && r['status'] == 'active' ? r['type'] as String : null;
+  }
+
+  /// Audiens satu audio. 'accounts' = hanya akun yang dipilih pengunggah.
+  static bool _audA(Map a, Map? viewer, {bool self = true}) {
+    final o = _byId(a['owner'])!;
+    final m = a['rand'] ?? 'public';
+    if (m == 'accounts') {
+      if (viewer == null) return false;
+      if (viewer['id'] == o['id']) return self;
+      return ((a['to'] as List?) ?? []).contains(viewer['id']);
+    }
+    return _aud(m, o, viewer, self: self);
+  }
+
+  static const filters = ['public', 'followers', 'following', 'both', 'friend', 'best', 'partner', 'family', 'relations', 'me'];
+  static const relTypes = ['friend', 'best', 'partner', 'family'];
 
   static Future<void> _save() => sp.setString('db', jsonEncode(db));
   static Future<void> setSession(String? v) async { session = v; v == null ? await sp.remove('session') : await sp.setString('session', v); }
@@ -170,14 +210,14 @@ class Local {
   static List _mini(Iterable us) => us.map((u) => {'username': u['username'], 'name': u['name'], 'avatar': _img(u, 'avatar')}).toList();
 
   /// Dipanggil saat notifikasi suka/ikuti baru dibuat (untuk menampilkan notifikasi HP): (username penerima, jenis, nama pelaku).
-  static void Function(String to, String type, String actor)? onNotify;
+  static void Function(String to, String type, String actor, String extra)? onNotify;
 
-  static void _notify(int to, String type, int actor, int? audio) {
+  static void _notify(int to, String type, int actor, int? audio, {String extra = ''}) {
     if (to == actor) return;
-    if (_r('notifs').any((n) => n['to'] == to && n['type'] == type && n['actor'] == actor && n['audio'] == audio)) return;
-    _r('notifs').add({'to': to, 'type': type, 'actor': actor, 'audio': audio, 'created': _now(), 'seen': false});
+    if (_r('notifs').any((n) => n['to'] == to && n['type'] == type && n['actor'] == actor && n['audio'] == audio && (n['extra'] ?? '') == extra)) return;
+    _r('notifs').add({'to': to, 'type': type, 'actor': actor, 'audio': audio, 'extra': extra, 'created': _now(), 'seen': false});
     final a = _byId(actor), r = _byId(to);
-    if (a != null && r != null) onNotify?.call('${r['username']}', type, '${a['name']}');
+    if (a != null && r != null) onNotify?.call('${r['username']}', type, '${a['name']}', extra);
   }
 
   static void _sys(int to, String type, int n) {
@@ -218,7 +258,9 @@ class Local {
       final taps = me != null ? ((me['taps'] ?? 0) as int) + 1 : (db['taps'] as int) + 1;
       if (me != null) { me['taps'] = taps; } else { db['taps'] = taps; }
       await _save();
-      final all = _r('audios').where((a) => _aud(a['rand'] ?? 'public', _byId(a['owner'])!, me, self: false)).toList();
+      final f = filters.contains(q['f']) ? q['f']! : 'public';
+      final want = f == 'me' ? 'accounts' : f;
+      final all = _r('audios').where((a) => (a['rand'] ?? 'public') == want && _audA(a, me, self: false)).toList();
       // Acak sungguhan (Random.secure), hanya tidak mengulang audio yang sama dua kali berturut-turut bila ada pilihan lain.
       var pool = all;
       if (pool.length > 1 && _lastRand != null) pool = pool.where((a) => a['id'] != _lastRand).toList();
@@ -237,12 +279,12 @@ class Local {
     }
     if (p == '/me' && m == 'GET') {
       final u = need();
-      return {'user': _uv(u, u), 'unread': _cnt('notifs', (n) => n['to'] == u['id'] && n['seen'] == false), 'unread_social': _cnt('notifs', (n) => n['to'] == u['id'] && n['seen'] == false && (n['type'] == 'like' || n['type'] == 'follow'))};
+      return {'user': _uv(u, u), 'unread': _cnt('notifs', (n) => n['to'] == u['id'] && n['seen'] == false), 'unread_social': _cnt('notifs', (n) => n['to'] == u['id'] && n['seen'] == false && (n['type'] == 'like' || n['type'] == 'follow' || n['type'] == 'rel_req' || n['type'] == 'rel_ok'))};
     }
     if (p == '/me/settings' && m == 'PATCH') {
       final u = need();
       final v = b!['pvis'];
-      if (!const ['public', 'followers', 'following', 'both', 'me'].contains(v)) throw ApiErr('bad_file');
+      if (!filters.contains(v)) throw ApiErr('bad_file');
       u['pvis'] = v;
       await _save();
       return {'user': _uv(u, u)};
@@ -328,6 +370,8 @@ class Local {
       _r('notifs').removeWhere((n) => n['to'] == id || n['actor'] == id || mine.contains(n['audio']));
       _r('audios').removeWhere((a) => a['owner'] == id);
       _r('follows').removeWhere((f) => f['from'] == id || f['to'] == id);
+      _r('rels').removeWhere((r) => r['a'] == id || r['b'] == id);
+      for (final a in _r('audios')) { (a['to'] as List?)?.remove(id); }
       await _del('u${id}_avatar'); await _del('u${id}_cover');
       _r('users').removeWhere((r) => r['id'] == id);
       await _save();
@@ -348,7 +392,7 @@ class Local {
         if (a == null) return null;
         String d = '';
         for (final au in _r('audios')) { if (au['id'] == n['audio']) d = au['desc']; }
-        return {'type': n['type'], 'created': n['created'], 'seen': n['seen'], 'username': a['username'], 'name': a['name'], 'avatar': _img(a, 'avatar'), 'desc': d};
+        return {'type': n['type'], 'created': n['created'], 'seen': n['seen'], 'username': a['username'], 'name': a['name'], 'avatar': _img(a, 'avatar'), 'desc': d, 'extra': n['extra'] ?? ''};
       }).whereType<Map>().toList();
       for (final n in _r('notifs')) { if (n['to'] == u['id']) n['seen'] = true; }
       await _save();
@@ -378,6 +422,63 @@ class Local {
       await _save();
       return {'liked': !had, 'likes': _cnt('likes', (l) => l['a'] == id)};
     }
+    if (p == '/relations' && m == 'POST') {
+      final mu = need(), t = '${b!['type']}', o = _byName('${b['to']}'.toLowerCase());
+      if (!relTypes.contains(t)) throw ApiErr('bad_file');
+      if (o == null) throw ApiErr('not_found');
+      if (o['id'] == mu['id']) throw ApiErr('forbidden');
+      if (_rel(mu['id'], o['id']) != null) throw ApiErr('rel_exists');
+      _r('rels').add({'a': mu['id'], 'b': o['id'], 'type': t, 'status': 'pending', 'created': _now()});
+      _notify(o['id'], 'rel_req', mu['id'], null, extra: t);
+      await _save();
+      return {'ok': true};
+    }
+    if (p == '/me/relations' && m == 'GET') {
+      final u = need();
+      Map row(Map r) { final o = _byId(r['a'] == u['id'] ? r['b'] : r['a'])!; return {'username': o['username'], 'name': o['name'], 'avatar': _img(o, 'avatar'), 'type': r['type']}; }
+      final mine = _r('rels').where((r) => r['a'] == u['id'] || r['b'] == u['id']).toList();
+      return {
+        'active': mine.where((r) => r['status'] == 'active').map(row).toList(),
+        'incoming': mine.where((r) => r['status'] == 'pending' && r['b'] == u['id']).map(row).toList(),
+        'outgoing': mine.where((r) => r['status'] == 'pending' && r['a'] == u['id']).map(row).toList(),
+      };
+    }
+    x = RegExp(r'^/users/([a-z0-9_]+)/relations$').firstMatch(p);
+    if (x != null && m == 'GET') {
+      final o = _byName(x[1]!);
+      if (o == null) throw ApiErr('not_found');
+      final rows = _r('rels').where((r) => r['status'] == 'active' && (r['a'] == o['id'] || r['b'] == o['id'])).map((r) {
+        final f = _byId(r['a'] == o['id'] ? r['b'] : r['a'])!;
+        return {'username': f['username'], 'name': f['name'], 'avatar': _img(f, 'avatar'), 'type': r['type']};
+      }).toList();
+      return {'items': rows};
+    }
+    x = RegExp(r'^/relations/([a-z0-9_]+)(/accept|/decline)?$').firstMatch(p);
+    if (x != null) {
+      final mu = need(), o = _byName(x[1]!);
+      if (o == null) throw ApiErr('not_found');
+      final r = _rel(mu['id'], o['id']);
+      if (r == null) throw ApiErr('not_found');
+      if (x[2] == '/accept' && m == 'POST') {
+        if (r['status'] != 'pending' || r['b'] != mu['id']) throw ApiErr('forbidden');
+        r['status'] = 'active';
+        r['since'] = _now();
+        _r('notifs').removeWhere((n) => n['type'] == 'rel_req' && n['actor'] == o['id'] && n['to'] == mu['id']);
+        _notify(o['id'], 'rel_ok', mu['id'], null, extra: '${r['type']}');
+      } else if (x[2] == '/decline' && m == 'POST') {
+        if (r['status'] != 'pending' || r['b'] != mu['id']) throw ApiErr('forbidden');
+        _r('rels').remove(r);
+        _r('notifs').removeWhere((n) => n['type'] == 'rel_req' && n['actor'] == o['id'] && n['to'] == mu['id']);
+      } else if (x[2] == null && m == 'DELETE') {
+        // Batalkan permintaan / putus hubungan (tanpa notifikasi ke pihak lain).
+        _r('rels').remove(r);
+        _r('notifs').removeWhere((n) => (n['type'] == 'rel_req' || n['type'] == 'rel_ok') && ((n['actor'] == o['id'] && n['to'] == mu['id']) || (n['actor'] == mu['id'] && n['to'] == o['id'])));
+      } else {
+        throw ApiErr('not_found');
+      }
+      await _save();
+      return {'ok': true};
+    }
     x = RegExp(r'^/users/([a-z0-9_]+)(/follow|/follows)?$').firstMatch(p);
     if (x != null) {
       final u = _byName(x[1]!);
@@ -385,8 +486,14 @@ class Local {
       final id = u['id'] as int;
       if (x[2] == null && m == 'GET') {
         final mine = me != null && me['id'] == id;
-        final rows = _r('audios').where((a) => a['owner'] == id && (mine || _aud(u['pvis'] ?? 'public', u, me))).map((a) => _av(a, me)).toList();
-        return {'user': _uv(u, me), 'audios': rows};
+        final locked = !mine && !_aud(u['pvis'] ?? 'public', u, me);
+        final rows = locked ? [] : _r('audios').where((a) => a['owner'] == id).map((a) => _av(a, me)).toList();
+        Map rel = {'status': 'none', 'type': ''};
+        if (me != null && !mine) {
+          final r = _rel(me['id'], id);
+          if (r != null) rel = {'status': r['status'] == 'active' ? 'active' : (r['a'] == me['id'] ? 'out' : 'in'), 'type': r['type']};
+        }
+        return {'user': _uv(u, me), 'audios': rows, 'locked': locked, 'rel': rel};
       }
       if (x[2] == '/follow' && m == 'POST') {
         final mu = need();
@@ -425,13 +532,21 @@ class Local {
     if (me == null) throw ApiErr('unauthorized');
     if (!_ext.contains(name.split('.').last.toLowerCase())) throw ApiErr('bad_file');
     if (b.isEmpty || b.length > 3 * 1024 * 1024) throw ApiErr('too_big');
+    final ok = filters.where((e) => e != 'me').toList();
+    final vis = 'public', rnd = f['rand'] == 'accounts' ? 'accounts' : (ok.contains(f['rand']) ? f['rand']! : 'public');
+    final to = <int>[];
+    if (rnd == 'accounts') {
+      for (final n in (f['to'] ?? '').split(',')) {
+        final o = _byName(n.trim().toLowerCase());
+        if (o != null && o['id'] != me['id'] && !to.contains(o['id'])) to.add(o['id']);
+      }
+      if (to.isEmpty) throw ApiErr('need_accounts');
+    }
     final id = _next();
     await _put('a$id', b);
     var d = (f['desc'] ?? '').trim();
     if (d.length > 200) d = d.substring(0, 200);
-    const ok = ['public', 'followers', 'following', 'both'];
-    final vis = ok.contains(f['vis']) ? f['vis'] : 'public', rnd = ok.contains(f['rand']) ? f['rand'] : 'public';
-    _r('audios').insert(0, {'id': id, 'owner': me['id'], 'desc': d, 'secs': (int.tryParse(f['secs'] ?? '') ?? 30).clamp(1, 30), 'popup': true, 'pprof': f['pprof'] != '0', 'vis': vis, 'rand': rnd, 'created': _now()});
+    _r('audios').insert(0, {'id': id, 'owner': me['id'], 'desc': d, 'secs': (int.tryParse(f['secs'] ?? '') ?? 30).clamp(1, 30), 'popup': true, 'pprof': f['pprof'] != '0', 'vis': vis, 'rand': rnd, 'to': to, 'created': _now()});
     await _save();
     return {'ok': true};
   }
@@ -483,6 +598,7 @@ class Store extends ChangeNotifier {
   String lang = 'id';
   ThemeMode mode = ThemeMode.system;
   bool remind = true, fromOffline = false;
+  String filter = 'public';
   final offline = <A>[];
   final _rnd = Random.secure();
   int? _lastOff;
@@ -524,8 +640,10 @@ class Store extends ChangeNotifier {
     lang = _sp.getString('lang') ?? 'id';
     mode = ThemeMode.values[(_sp.getInt('mode') ?? 0).clamp(0, 2)];
     remind = _sp.getBool('remind') ?? true;
+    filter = _sp.getString('filter') ?? 'public';
+    if (!Local.filters.contains(filter)) filter = 'public';
     await Local.init(_sp);
-    Local.onNotify = (to, type, actor) => Notifier.show(200 + (_nid++ % 50), 'Hulhup', '$actor ${t(type == 'like' ? 'n_like' : 'n_follow')} · @$to', t('notif'));
+    Local.onNotify = (to, type, actor, extra) => Notifier.show(200 + (_nid++ % 50), 'Hulhup', '$actor ${notifText(type, extra)} · @$to', t('notif'));
     try { for (final j in jsonDecode(_sp.getString('offline') ?? '[]') as List) { offline.add(A.from(j as Map)); } } catch (_) {}
     _p.onPositionChanged.listen((d) => pos.value = d.inMilliseconds);
     _p.onDurationChanged.listen((d) => dur = d.inMilliseconds);
@@ -563,16 +681,18 @@ class Store extends ChangeNotifier {
         if (unreadSocial > _pushed) await Notifier.show(1, 'Hulhup', t('push_unread').replaceAll('{n}', '$unreadSocial'), t('notif'));
         _pushed = unreadSocial;
       }
-      if (remind) {
-        if (!(_sp.getBool('asked') ?? false)) { await Notifier.allow(); await _sp.setBool('asked', true); }
-        await syncReminders();
-      } else {
-        await Notifier.cancelReminders();
-      }
     } catch (_) {
     } finally {
       _starting = false;
     }
+    try {
+      if (remind) {
+        if (!await Notifier.enabled()) await Notifier.allow();
+        await syncReminders();
+      } else {
+        await Notifier.cancelReminders();
+      }
+    } catch (_) {}
     return fresh;
   }
 
@@ -610,6 +730,22 @@ class Store extends ChangeNotifier {
   void setLang(String l) { lang = l; _sp.setString('lang', l); notifyListeners(); syncReminders(); }
   void setMode(ThemeMode m) { mode = m; _sp.setInt('mode', m.index); notifyListeners(); }
 
+  /// Teks notifikasi sosial (suka, ikuti, hubungan).
+  String notifText(String type, String extra) {
+    switch (type) {
+      case 'like': return t('n_like');
+      case 'rel_req': return t('n_rel_req').replaceAll('{r}', t('a_$extra').toLowerCase());
+      case 'rel_ok': return t('n_rel_ok').replaceAll('{r}', t('a_$extra').toLowerCase());
+      default: return t('n_follow');
+    }
+  }
+
+  Future<void> setFilter(String v) async {
+    filter = v;
+    await _sp.setString('filter', v);
+    notifyListeners();
+  }
+
   Future<void> setPvis(String v) async {
     final j = await Api.req('PATCH', '/me/settings', body: {'pvis': v});
     me = U.from(j['user']);
@@ -634,7 +770,7 @@ class Store extends ChangeNotifier {
     fromOffline = false;
     if (!await _online()) { fromOffline = true; return _pickOffline(); }
     try {
-      final j = await Api.req('GET', '/random');
+      final j = await Api.req('GET', '/random?f=${me == null ? 'public' : filter}');
       taps = j['taps'] ?? taps;
       notifyListeners();
       return j['audio'] == null ? null : A.from(j['audio']);
@@ -719,7 +855,24 @@ const S = <String, List<String>>{
   'who': ['Siapa boleh melihat di profil', 'Who can see it on profile'], 'v_all': ['Semua', 'Everyone'], 'v_fol': ['Pengikut', 'Followers'], 'v_me': ['Aku', 'Me'],
   'noedit': ['Audio tidak bisa diedit, hanya dihapus.', 'Audio cannot be edited, only deleted.'],
   'search': ['Cari', 'Search'], 'notif': ['Notifikasi', 'Notifications'],
-  'n_follow': ['mulai mengikutimu', 'started following you'], 'n_like': ['menyukai audiomu', 'liked your audio'],
+  'n_follow': ['mulai mengikutimu', 'started following you'],
+  'a_friend': ['Teman', 'Friends'], 'a_best': ['Sahabat', 'Best friends'], 'a_partner': ['Pasangan', 'Partner'], 'a_family': ['Keluarga', 'Family'],
+  'a_relations': ['Semua hubungan', 'All relationships'], 'a_accounts': ['Pilih akun', 'Choose accounts'], 'f_me': ['Untuk saya', 'For me'],
+  'filter_title': ['Filter suara acak', 'Random voice filter'], 'filter_sub': ['Tombol acak hanya memutar suara dari kelompok ini.', 'The random button only plays voices from this group.'],
+  'nofilter': ['Belum ada suara untuk filter ini', 'No voices for this filter yet'], 'filter_login': ['Masuk dulu untuk memakai filter lain', 'Sign in to use other filters'],
+  'locked': ['Postingan akun ini tidak dapat dilihat', 'This account\'s posts cannot be viewed'],
+  'rel_title': ['Hubungan', 'Relationships'], 'rel_none': ['Belum ada hubungan', 'No relationships yet'], 'rel_add': ['Ajak berhubungan', 'Request relationship'],
+  'rel_pick': ['Pilih jenis hubungan', 'Choose relationship type'], 'rel_wait': ['Menunggu persetujuan', 'Waiting for approval'], 'rel_cancel': ['Batalkan permintaan', 'Cancel request'],
+  'rel_accept': ['Terima', 'Accept'], 'rel_decline': ['Tolak', 'Decline'], 'rel_end': ['Putus hubungan', 'End relationship'],
+  'rel_end_q': ['Putus hubungan dengan {n}? Pihak lain tidak diberi tahu.', 'End the relationship with {n}? They will not be notified.'],
+  'rel_sent': ['Permintaan terkirim', 'Request sent'], 'rel_ended': ['Hubungan berakhir', 'Relationship ended'], 'rel_made': ['Hubungan dibuat', 'Relationship created'],
+  'rel_in': ['Permintaan masuk', 'Incoming requests'], 'rel_out': ['Permintaan terkirim', 'Sent requests'],
+  'n_rel_req': ['mengajakmu berhubungan sebagai {r}', 'wants to be your {r}'], 'n_rel_ok': ['menerima hubungan {r} denganmu', 'accepted your {r} relationship'],
+  'e_rel_exists': ['Sudah ada hubungan atau permintaan dengan akun ini', 'A relationship or request with this account already exists'],
+  'e_need_accounts': ['Pilih minimal satu akun', 'Choose at least one account'],
+  'pick_acc': ['Pilih akun', 'Choose accounts'], 'pick_acc_n': ['{n} akun dipilih', '{n} accounts chosen'], 'search_acc': ['Cari akun', 'Search accounts'], 'pick_acc_hint': ['Ketik nama untuk mencari akun', 'Type a name to find accounts'],
+  'test_notif': ['Tes notifikasi', 'Test notification'], 'test_notif_sub': ['Kirim notifikasi percobaan ke HP ini', 'Send a test notification to this phone'],
+  'notif_off': ['Notifikasi dimatikan di HP. Aktifkan lewat pengaturan aplikasi.', 'Notifications are off on this phone. Turn them on in app settings.'], 'test_sent': ['Notifikasi percobaan dikirim', 'Test notification sent'], 'n_like': ['menyukai audiomu', 'liked your audio'],
   'empty_audio': ['Belum ada audio', 'No audio yet'], 'empty_liked': ['Belum ada yang disukai', 'Nothing liked yet'],
   'empty_notif': ['Belum ada notifikasi', 'No notifications yet'], 'empty_search': ['Tidak ada hasil', 'No results'], 'empty_list': ['Belum ada akun', 'No accounts yet'],
   'follow': ['Ikuti', 'Follow'], 'unfollow': ['Mengikuti', 'Following'], 'photo': ['Foto profil', 'Profile photo'], 'cover': ['Latar profil', 'Cover'],

@@ -20,7 +20,7 @@ class _HomeState extends State<HomePage> {
     try {
       final a = await s.random();
       if (!mounted) return;
-      if (a == null) { toast(s.t(s.fromOffline ? 'no_net_empty' : 'nobody')); return; }
+      if (a == null) { toast(s.t(s.fromOffline ? 'no_net_empty' : (s.me != null && s.filter != 'public') ? 'nofilter' : 'nobody')); return; }
       if (s.fromOffline) toast(s.t('no_net'));
       s.play(a, force: true).catchError((_) => toast(s.t('e_server'), bad: true));
       sheet(context, (_) => PopupBody(a)).then((_) { if (s.playing == a.id) s.stop(); });
@@ -29,6 +29,14 @@ class _HomeState extends State<HomePage> {
     } finally {
       _busy = false;
     }
+  }
+
+  Future<void> _filter() async {
+    final s = Store.i;
+    final r = await chooseSheet(context, s.t('filter_title'), filterAud, s.me == null ? 'public' : s.filter, filter: true);
+    if (r == null) return;
+    if (s.me == null && r != 'public') { toast(s.t('filter_login')); return; }
+    await s.setFilter(r);
   }
 
   @override
@@ -42,7 +50,7 @@ class _HomeState extends State<HomePage> {
         Column(children: [
           TopBar(
             lead: IconBtn(Icons.menu_rounded, () => setState(() => menu = true)),
-            center: const Brand(),
+            center: Brand(onTap: _filter),
             actions: [IconBtn(Icons.search_rounded, () => go(context, const SearchPage())), ListenableBuilder(listenable: s, builder: (_, __) => IconBtn(Icons.person_outline_rounded, () => go(context, ProfilePage(s.me?.username)), dot: s.unread > 0))],
           ),
           Expanded(child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -53,6 +61,14 @@ class _HomeState extends State<HomePage> {
               transitionBuilder: (w, a) => FadeTransition(opacity: a, child: SlideTransition(position: Tween(begin: const Offset(0, .3), end: Offset.zero).animate(a), child: w)),
               child: Text(fmt(s.taps), key: ValueKey(s.taps), style: TextStyle(fontSize: 38, fontWeight: FontWeight.w800, letterSpacing: -1.2, color: ink(context))),
             )),
+            const SizedBox(height: 16),
+            ListenableBuilder(listenable: s, builder: (_, __) {
+              final f = s.me == null ? 'public' : s.filter;
+              return Tap(onTap: _filter, scale: .96, child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(22)),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(audIcon(f, filter: true), size: 16, color: ink(context)), const SizedBox(width: 7), Text(audLabel(f, filter: true), style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)), const SizedBox(width: 2), Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: sub(context))]),
+              ));
+            }),
           ]))),
         ]),
         SideMenu(open: menu, close: () => setState(() => menu = false)),

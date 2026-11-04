@@ -7,6 +7,21 @@ sed -i 's|minSdk = flutter.minSdkVersion|minSdk = 24|; s|minSdkVersion flutter.m
 sed -i 's|<title>hulhup</title>|<title>Hulhup</title>|' web/index.html || true
 # ikon notifikasi: logo Hulhup (kecil putih + besar berwarna)
 cp -r tool/android_res/* android/app/src/main/res/
+mkdir -p android/app/src/main/res/raw
+cat > android/app/src/main/res/raw/keep.xml <<'XML'
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:keep="@drawable/ic_stat_hulhup,@drawable/hulhup_large" tools:shrinkMode="strict" />
+XML
+cat > android/app/proguard-rules.pro <<'PRO'
+-keep class com.dexterous.** { *; }
+-keep class androidx.core.app.** { *; }
+-keepattributes Signature
+-keepattributes *Annotation*
+-keep class * extends com.google.gson.TypeAdapter
+-keep class com.google.gson.reflect.TypeToken { *; }
+-keep class * extends com.google.gson.reflect.TypeToken
+-dontwarn **
+PRO
 python3 - <<'PY'
 import re, glob
 m = 'android/app/src/main/AndroidManifest.xml'
@@ -34,5 +49,13 @@ if 'oreLibraryDesugaring' not in t:
     else:
         t = re.sub(r'compileOptions\s*\{', lambda x: x.group(0) + '\n        coreLibraryDesugaringEnabled true', t, 1)
         t += "\n\ndependencies {\n    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'\n}\n"
+    open(g, 'w').write(t)
+g = glob.glob('android/app/build.gradle*')[0]
+t = open(g).read()
+if 'hulhup-release' not in t:
+    if g.endswith('.kts'):
+        t = re.sub(r'buildTypes\s*\{\s*release\s*\{', lambda x: x.group(0) + '\n            // hulhup-release\n            isMinifyEnabled = false\n            isShrinkResources = false', t, 1)
+    else:
+        t = re.sub(r'buildTypes\s*\{\s*release\s*\{', lambda x: x.group(0) + '\n            // hulhup-release\n            minifyEnabled false\n            shrinkResources false', t, 1)
     open(g, 'w').write(t)
 PY

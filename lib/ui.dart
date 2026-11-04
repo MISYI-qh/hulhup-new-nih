@@ -276,13 +276,18 @@ class Logo extends StatelessWidget {
 }
 
 class Brand extends StatelessWidget {
-  const Brand({super.key});
+  final VoidCallback? onTap;
+  const Brand({super.key, this.onTap});
   @override
-  Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
-        Container(width: 30, height: 30, decoration: const BoxDecoration(color: green, shape: BoxShape.circle), child: const Logo(30, cream)),
-        const SizedBox(width: 9),
-        Text('Hulhup', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 21, letterSpacing: -.4, color: ink(context))),
-      ]);
+  Widget build(BuildContext context) {
+    final w = Row(mainAxisSize: MainAxisSize.min, children: [
+      Container(width: 30, height: 30, decoration: const BoxDecoration(color: green, shape: BoxShape.circle), child: const Logo(30, cream)),
+      const SizedBox(width: 9),
+      Text('Hulhup', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 21, letterSpacing: -.4, color: ink(context))),
+      if (onTap != null) Icon(Icons.keyboard_arrow_down_rounded, size: 22, color: sub(context)),
+    ]);
+    return onTap == null ? w : Tap(onTap: onTap, scale: .96, child: Padding(padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6), child: w));
+  }
 }
 
 class TopBar extends StatelessWidget {
@@ -470,10 +475,34 @@ class _BirthState extends State<_BirthSheet> {
 
 List<String> monthNames(String lang) => _months[lang] ?? _months['id']!;
 
-const audiences = ['public', 'followers', 'following', 'both'];
-IconData audIcon(String v) => const {'public': Icons.public_rounded, 'followers': Icons.group_outlined, 'following': Icons.person_add_alt_1_outlined, 'both': Icons.people_alt_outlined, 'me': Icons.lock_outline_rounded}[v] ?? Icons.public_rounded;
+const audiences = ['public', 'followers', 'following', 'both', 'friend', 'best', 'partner', 'family', 'relations'];
+const profileAud = [...audiences, 'me'];
+const uploadAud = [...audiences, 'accounts'];
+const filterAud = [...audiences, 'me'];
+const relKinds = ['friend', 'best', 'partner', 'family'];
+IconData audIcon(String v, {bool filter = false}) => (filter && v == 'me' ? Icons.move_to_inbox_outlined : const {
+      'public': Icons.public_rounded, 'followers': Icons.group_outlined, 'following': Icons.person_add_alt_1_outlined, 'both': Icons.people_alt_outlined,
+      'friend': Icons.sentiment_satisfied_alt_rounded, 'best': Icons.star_outline_rounded, 'partner': Icons.favorite_border_rounded, 'family': Icons.home_outlined,
+      'relations': Icons.diversity_3_rounded, 'accounts': Icons.person_search_outlined, 'me': Icons.lock_outline_rounded,
+    }[v]) ?? Icons.public_rounded;
+String audLabel(String v, {bool filter = false}) => Store.i.t(filter && v == 'me' ? 'f_me' : 'a_$v');
 
-/// Pilihan audiens buatan sendiri (publik, pengikut, mengikuti, pengikut dan mengikuti).
+/// Daftar pilihan bergulir (bisa banyak opsi). Mengembalikan nilai yang dipilih.
+Future<String?> chooseSheet(BuildContext context, String title, List<String> opts, String? value, {bool filter = false}) => sheet<String>(context, (sc) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Padding(padding: const EdgeInsets.only(left: 4, bottom: 12), child: Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18))),
+      ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(sc).size.height * .6),
+        child: SingleChildScrollView(child: Column(children: [
+          for (final v in opts) Tap(onTap: () => Navigator.pop(sc, v), scale: .98, child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200), margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            decoration: BoxDecoration(color: v == value ? ink(sc).withValues(alpha: .14) : soft(sc), borderRadius: BorderRadius.circular(24)),
+            child: Row(children: [Icon(audIcon(v, filter: filter), size: 22, color: ink(sc)), const SizedBox(width: 14), Expanded(child: Text(audLabel(v, filter: filter), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16))), if (v == value) Icon(Icons.check_rounded, color: ink(sc))]),
+          )),
+        ])),
+      ),
+    ]));
+
+/// Pilihan audiens buatan sendiri.
 class Pick extends StatelessWidget {
   final String label, value;
   final ValueChanged<String> on;
@@ -487,14 +516,7 @@ class Pick extends StatelessWidget {
       Tap(
         scale: .98,
         onTap: () async {
-          final r = await sheet<String>(context, (sc) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Padding(padding: const EdgeInsets.only(left: 4, bottom: 12), child: Text(label, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18))),
-            for (final v in opts) Tap(onTap: () => Navigator.pop(sc, v), scale: .98, child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200), margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-              decoration: BoxDecoration(color: v == value ? ink(sc).withValues(alpha: .14) : soft(sc), borderRadius: BorderRadius.circular(24)),
-              child: Row(children: [Icon(audIcon(v), size: 22, color: ink(sc)), const SizedBox(width: 14), Expanded(child: Text(s.t('a_$v'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16))), if (v == value) Icon(Icons.check_rounded, color: ink(sc))]),
-            )),
-          ]));
+          final r = await chooseSheet(context, label, opts, value);
           if (r != null) on(r);
         },
         child: Container(

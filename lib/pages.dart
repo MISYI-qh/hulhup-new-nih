@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'core.dart';
+import 'notify.dart';
 import 'ui.dart';
 
 Future<void> likeAudio(A a) async {
@@ -133,9 +134,11 @@ class ProfilePage extends StatefulWidget {
 class _ProfileState extends State<ProfilePage> {
   U? user;
   List<A> list = [], likedList = [];
-  bool loading = true, busy = false;
+  bool loading = true, busy = false, locked = false;
   String? error;
   int tab = 0;
+  Map rel = {'status': 'none', 'type': ''};
+  List rels = [], relIn = [], relOut = [];
   bool get mine => widget.u != null && widget.u == Store.i.me?.username;
 
   @override
@@ -148,6 +151,15 @@ class _ProfileState extends State<ProfilePage> {
       final j = await Api.req('GET', '/users/${widget.u}');
       user = U.from(j['user']);
       list = (j['audios'] as List).map((e) => A.from(e)).toList();
+      locked = j['locked'] == true;
+      rel = Map.from(j['rel'] ?? {'status': 'none', 'type': ''});
+      if (mine) {
+        final r = await Api.req('GET', '/me/relations');
+        rels = r['active']; relIn = r['incoming']; relOut = r['outgoing'];
+      } else {
+        rels = (await Api.req('GET', '/users/${widget.u}/relations'))['items'];
+        relIn = []; relOut = [];
+      }
       if (mine) likedList = ((await Api.req('GET', '/me/liked'))['audios'] as List).map((e) => A.from(e)).toList();
       error = null;
     } catch (e) { error = Store.i.err(e); }
@@ -162,6 +174,62 @@ class _ProfileState extends State<ProfilePage> {
       user!.followers = j['followers'];
     } catch (e) { toast(Store.i.err(e), bad: true); }
     if (mounted) setState(() => busy = false);
+  }
+
+  Future<void> _relReq(Future<dynamic> Function() f, String ok) async {
+    try { await f(); toast(ok); await _load(); } catch (e) { toast(Store.i.err(e), bad: true); }
+  }
+
+  Future<void> _relAdd() async {
+    final s = Store.i;
+    final t = await chooseSheet(context, s.t('rel_pick'), relKinds, null);
+    if (t == null) return;
+    _relReq(() => Api.req('POST', '/relations', body: {'to': widget.u, 'type': t}), s.t('rel_sent'));
+  }
+
+  Future<void> _relEnd(String uname, String name) async {
+    final s = Store.i;
+    if (!await confirm(context, s.t('rel_end'), s.t('rel_end_q').replaceAll('{n}', name), s.t('rel_end'), danger: true)) return;
+    _relReq(() => Api.req('DELETE', '/relations/$uname'), s.t('rel_ended'));
+  }
+
+  Widget _relBtns(Store s) {
+    final st = '${rel['status']}', ty = '${rel['type']}';
+    if (st == 'none') return PBtn(s.t('rel_add'), _relAdd, ghost: true, icon: Icons.favorite_border_rounded);
+    if (st == 'out') return PBtn('${s.t('rel_wait')} · ${s.t('rel_cancel')}', () => _relReq(() => Api.req('DELETE', '/relations/${widget.u}'), s.t('rel_ended')), ghost: true, icon: Icons.hourglass_empty_rounded);
+    if (st == 'in') {
+      return Row(children: [
+        Expanded(child: PBtn(s.t('rel_accept'), () => _relReq(() => Api.req('POST', '/relations/${widget.u}/accept'), s.t('rel_made')), icon: Icons.check_rounded)),
+        const SizedBox(width: 10),
+        Expanded(child: PBtn(s.t('rel_decline'), () => _relReq(() => Api.req('POST', '/relations/${widget.u}/decline'), s.t('rel_ended')), ghost: true)),
+      ]);
+    }
+    return PBtn('${s.t('a_$ty')} · ${s.t('rel_end')}', () => _relEnd(widget.u!, user!.name), ghost: true, icon: audIcon(ty));
+  }
+
+  Widget _relSection(Store s) {
+    Widget chip(String t) => Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: ink(context).withValues(alpha: .1), borderRadius: BorderRadius.circular(14)), child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(audIcon(t), size: 13, color: ink(context)), const SizedBox(width: 5), Text(s.t('a_$t'), style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700))]));
+    Widget row(Map r, {List<Widget> act = const []}) => Tap(onTap: () => go(context, ProfilePage(r['username'])), child: Container(
+          margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.fromLTRB(10, 8, 10, 8), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(24)),
+          child: Row(children: [
+            Avatar(r['avatar'], r['name'], 40), const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(r['name'], maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)), Text(r['username'], style: TextStyle(color: sub(context), fontSize: 12.5))])),
+            chip('${r['type']}'), ...act,
+          ]),
+        ));
+    Widget head(String t) => Padding(padding: const EdgeInsets.only(top: 6, bottom: 8, left: 4), child: Text(t, style: TextStyle(color: sub(context), fontWeight: FontWeight.w700, fontSize: 13)));
+    final empty = rels.isEmpty && relIn.isEmpty && relOut.isEmpty;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(s.t('rel_title'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+      const SizedBox(height: 10),
+      if (empty) Padding(padding: const EdgeInsets.only(left: 4), child: Text(s.t('rel_none'), style: TextStyle(color: sub(context), fontSize: 14))),
+      if (relIn.isNotEmpty) ...[head(s.t('rel_in')), for (final r in relIn) row(r, act: [
+        IconBtn(Icons.check_rounded, () => _relReq(() => Api.req('POST', '/relations/${r['username']}/accept'), s.t('rel_made'))),
+        IconBtn(Icons.close_rounded, () => _relReq(() => Api.req('POST', '/relations/${r['username']}/decline'), s.t('rel_ended'))),
+      ])],
+      if (relOut.isNotEmpty) ...[head(s.t('rel_out')), for (final r in relOut) row(r, act: [IconBtn(Icons.close_rounded, () => _relReq(() => Api.req('DELETE', '/relations/${r['username']}'), s.t('rel_ended')))])],
+      if (rels.isNotEmpty) ...[if (relIn.isNotEmpty || relOut.isNotEmpty) head(s.t('rel_title')), for (final r in rels) row(r, act: mine ? [IconBtn(Icons.link_off_rounded, () => _relEnd(r['username'], r['name']))] : [])],
+    ]);
   }
 
   Future<void> _del(A a) async {
@@ -213,12 +281,15 @@ class _ProfileState extends State<ProfilePage> {
         if (mine && (u.streak > 0 || u.days > 0)) Padding(padding: const EdgeInsets.only(top: 14), child: StreakChip(u.streak, u.days, open: true)),
         const SizedBox(height: 18),
         if (mine) Row(children: [Expanded(child: PBtn(s.t('edit_profile'), _edit, ghost: true, icon: Icons.edit_outlined)), const SizedBox(width: 10), Expanded(child: PBtn(s.t('upload'), () async { await go(context, const UploadPage()); _load(); }, icon: Icons.add_rounded))])
-        else if (s.me != null) PBtn(u.isFollowing ? s.t('unfollow') : s.t('follow'), _follow, loading: busy, ghost: u.isFollowing, icon: u.isFollowing ? Icons.check_rounded : Icons.person_add_alt_1_rounded),
+        else if (s.me != null) ...[PBtn(u.isFollowing ? s.t('unfollow') : s.t('follow'), _follow, loading: busy, ghost: u.isFollowing, icon: u.isFollowing ? Icons.check_rounded : Icons.person_add_alt_1_rounded), const SizedBox(height: 10), _relBtns(s)],
       ]))),
+      const SizedBox(height: 22),
+      Padding(padding: const EdgeInsets.symmetric(horizontal: 24), child: _relSection(s)),
       const SizedBox(height: 22),
       if (mine) Padding(padding: const EdgeInsets.symmetric(horizontal: 24), child: Seg<int>([(0, s.t('audio')), (1, s.t('liked'))], tab, (v) => setState(() => tab = v))),
       const SizedBox(height: 14),
-      if (shown.isEmpty) Empty(tab == 1 ? Icons.favorite_border_rounded : Icons.graphic_eq_rounded, tab == 1 ? s.t('empty_liked') : s.t('empty_audio'))
+      if (locked && !mine) Empty(Icons.lock_outline_rounded, s.t('locked'))
+      else if (shown.isEmpty) Empty(tab == 1 ? Icons.favorite_border_rounded : Icons.graphic_eq_rounded, tab == 1 ? s.t('empty_liked') : s.t('empty_audio'))
       else Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Column(children: [for (var i = 0; i < shown.length; i++) In(i, AudioRow(shown[i], key: ValueKey('${tab}_${shown[i].id}'), scope: this, mine: mine && tab == 0, showOwner: tab == 1, onDelete: mine && tab == 0 ? () => _del(shown[i]) : null))])),
     ]));
   }
@@ -528,7 +599,7 @@ class SettingsPage extends StatelessWidget {
           row(Icons.edit_outlined, s.t('edit_profile'), () => go(context, const EditProfilePage())),
           row(Icons.key_rounded, s.t('change_pw'), () => sheet(context, (_) => const PwSheet())),
           const SizedBox(height: 6),
-          Pick(s.t('pvis'), s.me!.pvis, (v) async { try { await s.setPvis(v); toast(s.t('saved')); } catch (e) { toast(s.err(e), bad: true); } }, opts: const ['public', 'followers', 'following', 'both', 'me']),
+          Pick(s.t('pvis'), s.me!.pvis, (v) async { try { await s.setPvis(v); toast(s.t('saved')); } catch (e) { toast(s.err(e), bad: true); } }, opts: profileAud),
         ],
         if (!kIsWeb) ...[
           label(s.t('notif')),
@@ -540,6 +611,15 @@ class SettingsPage extends StatelessWidget {
               const SizedBox(width: 10), Toggle(s.remind, s.setRemind),
             ]),
           ),
+          const SizedBox(height: 10),
+          row(Icons.send_rounded, s.t('test_notif'), () async {
+            await Notifier.init();
+            if (!await Notifier.enabled()) await Notifier.allow();
+            if (Notifier.lastError.isNotEmpty) { toast(Notifier.lastError, bad: true); return; }
+            if (!await Notifier.enabled()) { toast(s.t('notif_off'), bad: true); return; }
+            await Notifier.show(2, 'Hulhup', s.t('r_body'), s.t('notif'));
+            toast(Notifier.lastError.isNotEmpty ? Notifier.lastError : s.t('test_sent'), bad: Notifier.lastError.isNotEmpty);
+          }),
         ],
         label(s.t('language')),
         Seg<String>([('id', 'Indonesia'), ('en', 'English')], s.lang, s.setLang),
@@ -645,7 +725,7 @@ class _NotifState extends State<NotifPage> {
 
   Widget _item(Map n, int i) {
     final s = Store.i;
-    final k = '${n['type']}', sys = k == 'streak' || k == 'missed' || k == 'tired', like = k == 'like';
+    final k = '${n['type']}', sys = k == 'streak' || k == 'missed' || k == 'tired', like = k == 'like', relk = k == 'rel_req' || k == 'rel_ok';
     final bg = n['seen'] == true ? soft(context) : ink(context).withValues(alpha: .12);
     final when = Text(s.ago(n['created'] as int), style: TextStyle(color: sub(context), fontSize: 12));
     if (sys) {
@@ -657,10 +737,10 @@ class _NotifState extends State<NotifPage> {
       ])));
     }
     return In(i, Tap(onTap: () => go(context, ProfilePage(n['username'])), child: Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(26)), child: Row(children: [
-      Stack(clipBehavior: Clip.none, children: [Avatar(n['avatar'], n['name'], 46), Positioned(right: -4, bottom: -4, child: Container(width: 22, height: 22, decoration: BoxDecoration(color: like ? heart : green, shape: BoxShape.circle, border: Border.all(color: bgOf(context), width: 2)), child: Icon(like ? Icons.favorite_rounded : Icons.person_add_alt_1_rounded, size: 11, color: cream)))]),
+      Stack(clipBehavior: Clip.none, children: [Avatar(n['avatar'], n['name'], 46), Positioned(right: -4, bottom: -4, child: Container(width: 22, height: 22, decoration: BoxDecoration(color: like ? heart : green, shape: BoxShape.circle, border: Border.all(color: bgOf(context), width: 2)), child: Icon(like ? Icons.favorite_rounded : relk ? Icons.diversity_3_rounded : Icons.person_add_alt_1_rounded, size: 11, color: cream)))]),
       const SizedBox(width: 14),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text.rich(TextSpan(children: [TextSpan(text: n['name'], style: const TextStyle(fontWeight: FontWeight.w800)), TextSpan(text: '  ${like ? s.t('n_like') : s.t('n_follow')}')]), style: const TextStyle(fontSize: 15, height: 1.4)),
+        Text.rich(TextSpan(children: [TextSpan(text: n['name'], style: const TextStyle(fontWeight: FontWeight.w800)), TextSpan(text: '  ${s.notifText(k, '${n['extra'] ?? ''}')}')]), style: const TextStyle(fontSize: 15, height: 1.4)),
         const SizedBox(height: 2), when,
       ])),
     ]))));
@@ -696,6 +776,7 @@ class _UploadState extends State<UploadPage> {
   int ms = 0;
   bool recording = false, pprof = true, busy = false, previewing = false;
   String rand = 'public';
+  Map<String, Map> picked = {};
   Timer? timer;
 
   @override
@@ -756,11 +837,18 @@ class _UploadState extends State<UploadPage> {
     await pv.play(BytesSource(bytes!, mimeType: mimeOf(bytes!)));
   }
 
+  Future<void> _pickAcc() async {
+    final r = await sheet<Map<String, Map>>(context, (_) => AccountPickSheet(Map.of(picked)));
+    if (r == null || !mounted) return;
+    setState(() { picked = r; if (r.isEmpty && rand == 'accounts') rand = 'public'; });
+  }
+
   Future<void> _send() async {
     final s = Store.i;
+    if (rand == 'accounts' && picked.isEmpty) { toast(s.t('e_need_accounts'), bad: true); return; }
     setState(() => busy = true);
     try {
-      await Api.multi('/audios', bytes!, 'a.$ext', {'desc': desc.text, 'secs': '${max(1, (ms / 1000).ceil())}', 'pprof': pprof ? '1' : '0', 'rand': rand});
+      await Api.multi('/audios', bytes!, 'a.$ext', {'desc': desc.text, 'secs': '${max(1, (ms / 1000).ceil())}', 'pprof': pprof ? '1' : '0', 'rand': rand, 'to': picked.keys.join(',')});
       if (!mounted) return;
       Navigator.pop(context);
       toast(s.t('uploaded'));
@@ -789,7 +877,14 @@ class _UploadState extends State<UploadPage> {
         const SizedBox(height: 18),
         Row(children: [Expanded(child: Text(s.t('pprof'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16))), Toggle(pprof, (v) => setState(() => pprof = v))]),
         const SizedBox(height: 22),
-        Pick(s.t('who_rand'), rand, (v) => setState(() => rand = v)),
+        Pick(s.t('who_rand'), rand, (v) async {
+          if (v == 'accounts') { await _pickAcc(); if (picked.isEmpty) return; }
+          if (mounted) setState(() => rand = v);
+        }, opts: uploadAud),
+        if (rand == 'accounts') Padding(padding: const EdgeInsets.only(top: 10), child: Tap(onTap: _pickAcc, scale: .98, child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(24)),
+          child: Row(children: [Icon(Icons.person_search_outlined, size: 20, color: ink(context)), const SizedBox(width: 12), Expanded(child: Text(s.t('pick_acc_n').replaceAll('{n}', '${picked.length}'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15))), Icon(Icons.edit_outlined, size: 18, color: sub(context))]),
+        ))),
         const SizedBox(height: 28),
         PBtn(s.t('upload'), bytes == null || recording ? null : _send, loading: busy, icon: Icons.arrow_upward_rounded),
         const SizedBox(height: 12),
@@ -811,4 +906,68 @@ class _Arc extends CustomPainter {
   }
   @override
   bool shouldRepaint(_Arc o) => o.v != v || o.c != c;
+}
+
+/// Pilih akun (untuk "Pilih akun" saat unggah): cari, centang beberapa akun, lalu selesai.
+class AccountPickSheet extends StatefulWidget {
+  final Map<String, Map> init;
+  const AccountPickSheet(this.init, {super.key});
+  @override
+  State<AccountPickSheet> createState() => _AccountPickState();
+}
+
+class _AccountPickState extends State<AccountPickSheet> {
+  late final Map<String, Map> sel = Map.of(widget.init);
+  final q = TextEditingController();
+  List found = [];
+  int _seq = 0;
+  @override
+  void dispose() { q.dispose(); super.dispose(); }
+
+  Future<void> _search(String v) async {
+    final id = ++_seq;
+    if (v.trim().isEmpty) { setState(() => found = []); return; }
+    try {
+      final j = await Api.req('GET', '/search?q=${Uri.encodeQueryComponent(v.trim())}');
+      if (!mounted || id != _seq) return;
+      final me = Store.i.me?.username;
+      setState(() => found = (j['users'] as List).where((u) => u['username'] != me).toList());
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = Store.i;
+    Widget tile(Map u) {
+      final on = sel.containsKey(u['username']);
+      return Tap(onTap: () => setState(() { on ? sel.remove(u['username']) : sel['${u['username']}'] = u; }), scale: .98, child: Container(
+        margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.fromLTRB(10, 8, 14, 8),
+        decoration: BoxDecoration(color: on ? ink(context).withValues(alpha: .14) : soft(context), borderRadius: BorderRadius.circular(24)),
+        child: Row(children: [
+          Avatar(u['avatar'], u['name'], 38), const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(u['name'], maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)), Text(u['username'], style: TextStyle(color: sub(context), fontSize: 12.5))])),
+          Icon(on ? Icons.check_circle_rounded : Icons.circle_outlined, color: on ? ink(context) : sub(context)),
+        ]),
+      ));
+    }
+    final chosen = sel.values.toList();
+    return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Padding(padding: const EdgeInsets.only(left: 4, bottom: 12), child: Text(s.t('pick_acc'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18))),
+      Field(s.t('search_acc'), q, onChanged: _search),
+      const SizedBox(height: 12),
+      ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * .38),
+        child: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          if (chosen.isNotEmpty) ...[
+            Padding(padding: const EdgeInsets.only(left: 4, bottom: 8), child: Text(s.t('pick_acc_n').replaceAll('{n}', '${chosen.length}'), style: TextStyle(color: sub(context), fontWeight: FontWeight.w700, fontSize: 13))),
+            for (final u in chosen) tile(u),
+          ],
+          if (q.text.trim().isEmpty && chosen.isEmpty) Padding(padding: const EdgeInsets.all(8), child: Text(s.t('pick_acc_hint'), style: TextStyle(color: sub(context)))),
+          if (found.isNotEmpty) ...[const SizedBox(height: 6), for (final u in found.where((u) => !sel.containsKey(u['username']))) tile(u)],
+        ])),
+      ),
+      const SizedBox(height: 14),
+      PBtn(s.t('done'), () => Navigator.pop(context, sel)),
+    ]);
+  }
 }
