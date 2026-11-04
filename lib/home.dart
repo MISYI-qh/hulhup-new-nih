@@ -50,7 +50,7 @@ class _HomeState extends State<HomePage> {
         Column(children: [
           TopBar(
             lead: IconBtn(Icons.menu_rounded, () => setState(() => menu = true)),
-            center: Brand(onTap: _filter),
+            center: const Brand(),
             actions: [IconBtn(Icons.search_rounded, () => go(context, const SearchPage())), ListenableBuilder(listenable: s, builder: (_, __) => IconBtn(Icons.person_outline_rounded, () => go(context, ProfilePage(s.me?.username)), dot: s.unread > 0))],
           ),
           Expanded(child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
