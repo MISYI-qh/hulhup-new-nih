@@ -607,6 +607,7 @@ class Store extends ChangeNotifier {
   ThemeMode mode = ThemeMode.system;
   bool remind = true, fromOffline = false;
   String filter = 'public';
+  void Function(String)? banner; // pemberitahuan di dalam aplikasi (diisi dari main)
   final offline = <A>[];
   final _rnd = Random.secure();
   int? _lastOff;
@@ -651,7 +652,10 @@ class Store extends ChangeNotifier {
     filter = _sp.getString('filter') ?? 'public';
     if (!Local.filters.contains(filter)) filter = 'public';
     await Local.init(_sp);
-    Local.onNotify = (to, type, actor, extra) => Notifier.show(200 + (_nid++ % 50), 'Hulhup', '$actor ${notifText(type, extra)} · @$to', t('notif'));
+    Local.onNotify = (to, type, actor, extra) {
+      if (me?.username == to) { banner?.call('$actor ${notifText(type, extra)}'); refresh(); }
+      return Notifier.show(200 + (_nid++ % 50), 'Hulhup', '$actor ${notifText(type, extra)} · @$to', t('notif'));
+    };
     try { for (final j in jsonDecode(_sp.getString('offline') ?? '[]') as List) { offline.add(A.from(j as Map)); } } catch (_) {}
     _p.onPositionChanged.listen((d) => pos.value = d.inMilliseconds);
     _p.onDurationChanged.listen((d) => dur = d.inMilliseconds);
@@ -686,7 +690,11 @@ class Store extends ChangeNotifier {
         if (j['new'] == true) fresh = j['streak'] as int?;
         await Api.req('POST', '/me/reminders', body: {'on': remind});
         await refresh();
-        if (unreadSocial > _pushed) await Notifier.show(1, 'Hulhup', t('push_unread').replaceAll('{n}', '$unreadSocial'), t('notif'));
+        if (unreadSocial > _pushed) {
+          final msg = t('push_unread').replaceAll('{n}', '$unreadSocial');
+          banner?.call(msg);
+          await Notifier.show(1, 'Hulhup', msg, t('notif'));
+        }
         _pushed = unreadSocial;
       }
     } catch (_) {

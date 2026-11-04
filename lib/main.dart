@@ -7,6 +7,7 @@ import 'ui.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Store.i.init();
+  Store.i.banner = (m) => toast(m);
   await Notifier.init();
   await Store.i.refresh(); // status masuk sudah benar di layar pertama
   runApp(const HulhupApp());
