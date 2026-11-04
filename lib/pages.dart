@@ -599,6 +599,7 @@ class SettingsPage extends StatelessWidget {
             if (Notifier.lastError.isNotEmpty) { toast(Notifier.lastError, bad: true); return; }
             if (!await Notifier.enabled()) { toast(s.t('notif_off'), bad: true); return; }
             await Notifier.show(2, 'Hulhup', s.t('r_body'), s.t('notif'));
+            if (s.me != null) { try { await Api.req('POST', '/me/reminders', body: {'test': true}); await s.refresh(); } catch (_) {} }
             toast(Notifier.lastError.isNotEmpty ? Notifier.lastError : s.t('test_sent'), bad: Notifier.lastError.isNotEmpty);
           }),
         ],

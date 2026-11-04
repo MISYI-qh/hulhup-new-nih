@@ -320,6 +320,11 @@ class Local {
     if (p == '/me/reminders' && m == 'POST') {
       // Catat notifikasi "Kamu lelah?" jam 19.00 yang sudah lewat ke daftar notifikasi di aplikasi.
       final u = need(), slot = _slot();
+      if (b?['test'] == true) {
+        _r('notifs').add({'to': u['id'], 'type': 'tired', 'actor': null, 'audio': null, 'n': 0, 'created': _now(), 'seen': false});
+        await _save();
+        return {'ok': true, 'added': true};
+      }
       final fresh = u['rem'] != null && u['rem'] != slot.$1 && b?['on'] != false;
       if (fresh) _r('notifs').add({'to': u['id'], 'type': 'tired', 'actor': null, 'audio': null, 'n': 0, 'created': slot.$2, 'seen': false});
       u['rem'] = slot.$1;
