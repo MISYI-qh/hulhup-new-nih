@@ -17,6 +17,6 @@ Font: Outfit (lisensi OFL, assets/fonts). Teks Tentang/Kebijakan/Privasi ada di 
 
 ## Catatan versi 1.1.0
 - Siapa yang bisa melihat audio di profil diatur lewat Pengaturan (publik, pengikut, mengikuti, pengikut dan mengikuti, hanya untuk saya). "Hanya untuk saya" hanya berlaku untuk profil, bukan untuk acak. Pilihan acak tetap per audio.
-- Pencarian mencari akun dan audio (lewat deskripsi). Deskripsi maksimal 200 karakter, foto profil maksimal 10 MB, foto profil bisa dipratinjau.
+- Pencarian mencari akun dan audio (lewat deskripsi). Deskripsi maksimal 200 karakter, foto profil maksimal 3 MB, foto profil bisa dipratinjau.
 - Audio di popup/profil berulang terus sampai dijeda; berhenti saat popup atau halaman ditutup.
 - Notifikasi di HP (flutter_local_notifications): pengingat jam 19.00 jika belum masuk hari itu ("Kamu lelah? Coba lah untuk mendengarkan beberapa suara"), notifikasi suka/pengikut baru, dan hitungan hari berturut-turut. Ikon notifikasi dari tool/android_res, diatur oleh tool/setup_android.sh. Di web hanya ada notifikasi di dalam aplikasi.

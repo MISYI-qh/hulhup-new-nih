@@ -199,10 +199,10 @@ void main() {
     expect(r['added'], false);
   });
 
-  test('foto profil maksimal 10 MB, audio maksimal 3 MB', () async {
+  test('foto profil maksimal 3 MB, audio maksimal 3 MB', () async {
     await reg('ana');
-    await Api.raw('/me/avatar', Uint8List(5 * 1024 * 1024), 'image/jpeg');
-    expect(await code(Api.raw('/me/avatar', Uint8List(11 * 1024 * 1024), 'image/png')), 'too_big_img');
+    await Api.raw('/me/avatar', Uint8List(2 * 1024 * 1024), 'image/jpeg');
+    expect(await code(Api.raw('/me/avatar', Uint8List(4 * 1024 * 1024), 'image/png')), 'too_big_img');
     expect(await code(Api.raw('/me/avatar', Uint8List(10), 'image/gif')), 'bad_file');
     expect(await code(up('besar', bytes: 4 * 1024 * 1024)), 'too_big');
   });
