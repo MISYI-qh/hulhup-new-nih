@@ -1,0 +1,10 @@
+{
+  "name": "hulhup-api",
+  "version": "1.2.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": "22.x" },
+  "scripts": { "test": "node --test test/" },
+  "dependencies": { "mongodb": "^6.10.0", "pg": "^8.13.0" },
+  "devDependencies": { "@electric-sql/pglite": "^0.2.12" }
+}
