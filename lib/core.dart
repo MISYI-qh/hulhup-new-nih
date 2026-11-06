@@ -12,7 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'notify.dart';
 
 const kBuild = int.fromEnvironment('BUILD');
-const kApkUrl = 'https://github.com/MISYI-qh/hulhup-new-nih/releases/latest/download/hulhup.apk';
+const kApkUrl = 'https://hulhup.my.id/hulhup.apk';
 
 class ApiErr implements Exception {
   final String code;
@@ -816,19 +816,20 @@ class Store extends ChangeNotifier {
   bool updateReady = false;
   DateTime? _updChecked;
 
-  /// Cek rilis APK terbaru di GitHub; bila build-nya lebih baru, tampilkan ajakan memperbarui (hanya Android).
-  Future<void> checkUpdate() async {
-    if (kIsWeb || kBuild == 0) return;
+  /// Cek versi terbaru di hulhup.my.id (version.json); bila build-nya lebih baru, tampilkan ajakan memperbarui (hanya Android).
+  Future<bool> checkUpdate({bool force = false}) async {
+    if (kIsWeb) return false;
     final n = DateTime.now();
-    if (_updChecked != null && n.difference(_updChecked!).inMinutes < 30) return;
+    if (!force && (kBuild == 0 || (_updChecked != null && n.difference(_updChecked!).inMinutes < 30))) return updateReady;
     _updChecked = n;
     try {
-      final r = await http.get(Uri.parse('https://api.github.com/repos/MISYI-qh/hulhup-new-nih/releases/tags/latest')).timeout(const Duration(seconds: 15));
-      if (r.statusCode != 200) return;
-      final b = (jsonDecode(r.body) as Map)['body']?.toString() ?? '';
-      final m = RegExp(r'build:(\d+)').firstMatch(b);
-      if (m != null && int.parse(m[1]!) > kBuild) { updateReady = true; notifyListeners(); }
+      final r = await http.get(Uri.parse('https://hulhup.my.id/version.json?t=${n.millisecondsSinceEpoch}')).timeout(const Duration(seconds: 15));
+      if (r.statusCode != 200) return updateReady;
+      final b = int.tryParse('${(jsonDecode(r.body) as Map)['build']}') ?? 0;
+      final up = b > kBuild;
+      if (up != updateReady) { updateReady = up; notifyListeners(); }
     } catch (_) {}
+    return updateReady;
   }
 
   /// Server tidak mendorong notifikasi; aplikasi menanyakan berkala saat terbuka.
@@ -997,7 +998,7 @@ const S = <String, List<String>>{
   'cancel': ['Batal', 'Cancel'], 'save': ['Simpan', 'Save'], 'saved': ['Tersimpan', 'Saved'], 'delete': ['Hapus', 'Delete'],
   'delete_audio_q': ['Hapus audio ini? Audio tidak bisa diedit, hanya dihapus.', 'Delete this audio? Audio cannot be edited, only deleted.'],
   'language': ['Bahasa', 'Language'], 'appearance': ['Tampilan', 'Appearance'], 'system': ['Sistem', 'System'], 'light': ['Cerah', 'Light'], 'dark': ['Gelap', 'Dark'],
-  'upd_title': ['Versi baru tersedia', 'New version available'], 'upd_btn': ['Perbarui', 'Update'],
+  'upd_menu': ['Perbarui aplikasi', 'Update app'], 'upd_none': ['Aplikasimu sudah versi terbaru', 'Your app is up to date'], 'upd_title': ['Versi baru tersedia', 'New version available'], 'upd_btn': ['Perbarui', 'Update'],
   'get_app': ['Unduh aplikasi Android', 'Download Android app'], 'website': ['Situs web hulhup.my.id', 'Website hulhup.my.id'], 'about': ['Tentang Hulhup', 'About Hulhup'], 'policy': ['Kebijakan', 'Policy'], 'privacy': ['Privasi', 'Privacy'],
   'followers': ['Pengikut', 'Followers'], 'following': ['Mengikuti', 'Following'], 'audio': ['Audio', 'Audio'], 'liked': ['Disukai', 'Liked'],
   'upload': ['Unggah audio', 'Upload audio'], 'record': ['Rekam', 'Record'], 'stop': ['Berhenti', 'Stop'], 'pick': ['Pilih file', 'Pick file'],

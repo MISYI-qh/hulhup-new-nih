@@ -1,7 +1,5 @@
 name: build
 on: workflow_dispatch
-permissions:
-  contents: write
 env:
   API_URL: https://hulhup-api.vercel.app
 jobs:
@@ -23,9 +21,3 @@ jobs:
         with: { name: hulhup-apk, path: build/app/outputs/flutter-apk/app-release.apk }
       - uses: actions/upload-artifact@v4
         with: { name: hulhup-web, path: build/web }
-      - name: Rilis APK (untuk tombol unduh di web)
-        env: { GH_TOKEN: "${{ github.token }}" }
-        run: |
-          cp build/app/outputs/flutter-apk/app-release.apk hulhup.apk
-          gh release delete latest --yes --cleanup-tag || true
-          gh release create latest hulhup.apk --title "Hulhup (terbaru)" --notes "APK Android terbaru. build:${{ github.run_number }}" --latest
