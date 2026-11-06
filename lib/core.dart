@@ -36,7 +36,22 @@ class Api {
     } else { await Local.setSession(v); }
   }
 
-  static Future<dynamic> req(String m, String p, {Map? body}) => remote ? Remote.req(m, p, body) : Local.handle(m, p, body);
+  /// Kata sandi: spasi di ujung diabaikan, spasi di tengah tidak boleh.
+  static Map? _pw(String p, Map? b) {
+    if (b == null || !(p == '/register' || p == '/login' || p == '/me/password')) return b;
+    final o = {...b};
+    for (final k in ['password', 'old', 'new']) {
+      if (o[k] is String) o[k] = (o[k] as String).trim();
+    }
+    final fresh = p == '/register' ? o['password'] : (p == '/me/password' ? o['new'] : null);
+    if (fresh is String && RegExp(r'\s').hasMatch(fresh)) throw ApiErr('bad_password');
+    return o;
+  }
+
+  static Future<dynamic> req(String m, String p, {Map? body}) {
+    body = _pw(p, body);
+    return remote ? Remote.req(m, p, body) : Local.handle(m, p, body);
+  }
   static Future<dynamic> raw(String p, Uint8List b, String type) => remote ? Remote.send('POST', p, b, type) : Local.raw(p, b, type);
   static Future<dynamic> multi(String p, Uint8List b, String name, Map<String, String> f) =>
       remote ? Remote.send('POST', '$p?${Uri(queryParameters: f).query}', b, 'application/octet-stream') : Local.multi(p, b, name, f);
@@ -1040,7 +1055,7 @@ const S = <String, List<String>>{
   'e_bad_credentials': ['Nama pengguna atau kata sandi salah', 'Wrong username or password'],
   'e_bad_username': ['Nama pengguna 3-20 karakter: huruf kecil, angka, garis bawah', 'Username 3-20 chars: lowercase, digits, underscore'],
   'e_bad_name': ['Nama wajib diisi (maks 40 karakter)', 'Name is required (max 40 chars)'],
-  'e_bad_password': ['Kata sandi minimal 6 karakter', 'Password must be at least 6 characters'],
+  'e_bad_password': ['Kata sandi minimal 6 karakter dan tanpa spasi', 'Password must be at least 6 characters with no spaces'],
   'e_bad_age': ['Tanggal lahir tidak valid', 'Invalid date of birth'], 'e_bad_bio': ['Bio maksimal 300 karakter', 'Bio max 300 characters'],
   'e_bad_file': ['File tidak valid', 'Invalid file'], 'e_too_big': ['File terlalu besar (maks 3 MB)', 'File too large (max 3 MB)'],
   'e_not_found': ['Tidak ditemukan', 'Not found'],

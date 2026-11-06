@@ -39,6 +39,17 @@ void main() {
     expect(Local.session, 'rani');
   });
 
+  test('kata sandi: spasi ujung diabaikan, spasi tengah ditolak', () async {
+    expect(await code(Api.req('POST', '/register', body: {'name': 'Sp', 'username': 'spasi1', 'password': 'a b c d e', 'birth': '2000-01-01'})), 'bad_password');
+    await Api.req('POST', '/register', body: {'name': 'Sp', 'username': 'spasi2', 'password': '  rahasia1  ', 'birth': '2000-01-01'});
+    await Api.req('POST', '/logout');
+    await Api.req('POST', '/login', body: {'username': 'spasi2', 'password': 'rahasia1'});
+    expect(Local.session, 'spasi2');
+    await Api.req('POST', '/logout');
+    await Api.req('POST', '/login', body: {'username': 'spasi2', 'password': 'rahasia1   '});
+    expect(Local.session, 'spasi2');
+  });
+
   test('angka tap per akun, akun baru mulai dari 0, tamu terpisah', () async {
     await up('x').catchError((_) {}); // tamu tidak boleh unggah
     await Api.req('GET', '/random');
