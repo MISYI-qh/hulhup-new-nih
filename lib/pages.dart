@@ -1068,7 +1068,7 @@ class _SessionsState extends State<SessionsPage> {
           ]),
         ),
         if (list.length > 1) Padding(padding: const EdgeInsets.only(top: 8), child: PBtn(s.t('sess_all'), _all, ghost: true, icon: Icons.devices_other_rounded)) else Padding(padding: const EdgeInsets.only(top: 18), child: Center(child: Text(s.t('sess_empty'), style: TextStyle(color: sub(context))))),
-      ])))),
+      ]))),
     ]));
   }
 }
