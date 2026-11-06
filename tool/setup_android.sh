@@ -59,3 +59,37 @@ if 'hulhup-release' not in t:
         t = re.sub(r'buildTypes\s*\{\s*release\s*\{', lambda x: x.group(0) + '\n            // hulhup-release\n            minifyEnabled false\n            shrinkResources false', t, 1)
     open(g, 'w').write(t)
 PY
+
+# Tanda tangan APK tetap (tool/hulhup.p12) supaya pembaruan di atas versi lama bisa dipasang.
+# Kata sandi dibaca dari variabel KEYSTORE_PASSWORD (GitHub Secret). Tanpa itu, dipakai kunci debug.
+python3 - <<'PY'
+import re, glob
+g = glob.glob('android/app/build.gradle*')[0]
+t = open(g).read()
+if 'hulhup.p12' not in t:
+    if g.endswith('.kts'):
+        sc = '''    signingConfigs {
+        create("hulhup") {
+            storeFile = file("../../tool/hulhup.p12")
+            storePassword = System.getenv("KEYSTORE_PASSWORD")
+            keyAlias = "hulhup"
+            keyPassword = System.getenv("KEYSTORE_PASSWORD")
+        }
+    }
+    buildTypes {'''
+        t = re.sub(r'buildTypes\s*\{', lambda m: sc, t, 1)
+        t = re.sub(r'signingConfig\s*=\s*signingConfigs\.getByName\("debug"\)', 'signingConfig = if (System.getenv("KEYSTORE_PASSWORD") != null) signingConfigs.getByName("hulhup") else signingConfigs.getByName("debug")', t)
+    else:
+        sc = '''    signingConfigs {
+        hulhup {
+            storeFile file("../../tool/hulhup.p12")
+            storePassword System.getenv("KEYSTORE_PASSWORD")
+            keyAlias "hulhup"
+            keyPassword System.getenv("KEYSTORE_PASSWORD")
+        }
+    }
+    buildTypes {'''
+        t = re.sub(r'buildTypes\s*\{', lambda m: sc, t, 1)
+        t = re.sub(r'signingConfig\s+signingConfigs\.debug', 'signingConfig System.getenv("KEYSTORE_PASSWORD") ? signingConfigs.hulhup : signingConfigs.debug', t)
+    open(g, 'w').write(t)
+PY

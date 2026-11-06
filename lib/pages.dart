@@ -116,6 +116,7 @@ class AudioRow extends StatelessWidget {
               Tap(onTap: () => toggleOffline(a), child: Padding(padding: const EdgeInsets.all(4), child: Icon(s.isOffline(a.id) ? Icons.offline_pin_rounded : Icons.download_for_offline_outlined, size: 20, color: s.isOffline(a.id) ? ink(context) : sub(context)))),
             ]),
           ])),
+          if (!mine && s.me != null && s.me!.username != a.owner) Tap(onTap: () => reportSheet(context, audio: a.id), child: Padding(padding: const EdgeInsets.all(6), child: Icon(Icons.flag_outlined, size: 19, color: sub(context)))),
           LikeBtn(a.liked, a.likes, () => likeAudio(a)),
           if (onDelete != null) IconBtn(Icons.delete_outline_rounded, onDelete!, color: sub(context)),
         ]),
@@ -609,7 +610,7 @@ class SettingsPage extends StatelessWidget {
         Seg<ThemeMode>([(ThemeMode.system, s.t('system')), (ThemeMode.light, s.t('light')), (ThemeMode.dark, s.t('dark'))], s.mode, s.setMode),
         if (s.me != null) ...[
           label(''),
-          row(Icons.devices_other_rounded, s.t('logout_others'), () async { try { await Api.req('POST', '/me/logout-others'); toast(s.t('logout_others_done')); } catch (e) { toast(s.err(e), bad: true); } }),
+          row(Icons.devices_other_rounded, s.t('logout_others'), () => go(context, const SessionsPage())),
           row(Icons.logout_rounded, s.t('logout'), () async { await s.logout(); if (context.mounted) Navigator.of(context).popUntil((r) => r.isFirst); }, c: heart),
           row(Icons.delete_outline_rounded, s.t('delete_acc'), () async {
             if (!await confirm(context, s.t('delete_acc'), s.t('delete_acc_q'), s.t('delete'), danger: true)) return;
@@ -1013,6 +1014,61 @@ class _RelationsState extends State<RelationsPage> {
         if (relOut.isNotEmpty) ...[head(s.t('rel_out')), for (var i = 0; i < relOut.length; i++) row(relOut[i], i, act: [IconBtn(Icons.close_rounded, () => _relReq(() => Api.req('DELETE', '/relations/${relOut[i]['username']}'), s.t('rel_ended')))])],
         if (rels.isNotEmpty) ...[if (relIn.isNotEmpty || relOut.isNotEmpty) head(s.t('rel_title')), for (var i = 0; i < rels.length; i++) row(rels[i], i, act: mine ? [IconBtn(Icons.link_off_rounded, () => _relEnd(rels[i]['username'], rels[i]['name']))] : [])],
       ]))),
+    ]));
+  }
+}
+
+
+class SessionsPage extends StatefulWidget {
+  const SessionsPage({super.key});
+  @override
+  State<SessionsPage> createState() => _SessionsState();
+}
+
+class _SessionsState extends State<SessionsPage> {
+  List? items;
+  String? error;
+  @override
+  void initState() { super.initState(); _load(); }
+  Future<void> _load() async {
+    try { items = (await Api.req('GET', '/me/sessions'))['items']; error = null; } catch (e) { error = Store.i.err(e); }
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _out(Map it) async {
+    final s = Store.i;
+    if (!await confirm(context, s.t('sess_out'), s.t('sess_out_q'), s.t('sess_out'), danger: true)) return;
+    try { await Api.req('DELETE', '/me/sessions/${it['id']}'); toast(s.t('logout_others_done')); _load(); } catch (e) { toast(s.err(e), bad: true); }
+  }
+
+  Future<void> _all() async {
+    final s = Store.i;
+    try { await Api.req('POST', '/me/logout-others'); toast(s.t('logout_others_done')); _load(); } catch (e) { toast(s.err(e), bad: true); }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = Store.i;
+    final list = items;
+    return Scaffold(body: Column(children: [
+      TopBar(back: true, title: s.t('sess_t')),
+      Expanded(child: list == null && error == null ? const Loader() : error != null ? Empty(Icons.cloud_off_rounded, error!, action: SizedBox(width: 160, child: PBtn(s.t('retry'), () { setState(() => error = null); _load(); }))) : RefreshIndicator(color: ink(context), backgroundColor: card(context), onRefresh: _load, child: ListView(padding: const EdgeInsets.fromLTRB(20, 8, 20, 40), children: [
+        for (final it in list!) Container(
+          margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+          decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(24)),
+          child: Row(children: [
+            Icon('${it['device']}'.toLowerCase().contains('app') ? Icons.smartphone_rounded : Icons.language_rounded, size: 26, color: ink(context)),
+            const SizedBox(width: 14),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('${it['device']}', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15.5)),
+              const SizedBox(height: 3),
+              Text(it['current'] == true ? s.t('sess_this') : '${s.t('sess_active')} ${s.when((it['last_seen'] as num).toInt())}', style: TextStyle(color: it['current'] == true ? const Color(0xFF2F8F5B) : sub(context), fontSize: 13, fontWeight: FontWeight.w600)),
+            ])),
+            if (it['current'] != true) Tap(onTap: () => _out(it), child: Padding(padding: const EdgeInsets.all(10), child: Text(s.t('sess_out'), style: const TextStyle(color: heart, fontWeight: FontWeight.w800, fontSize: 14)))),
+          ]),
+        ),
+        if (list.length > 1) Padding(padding: const EdgeInsets.only(top: 8), child: PBtn(s.t('sess_all'), _all, ghost: true, icon: Icons.devices_other_rounded)) else Padding(padding: const EdgeInsets.only(top: 18), child: Center(child: Text(s.t('sess_empty'), style: TextStyle(color: sub(context))))),
+      ])))),
     ]));
   }
 }

@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 import 'package:ota_update/ota_update.dart';
@@ -168,7 +170,7 @@ class SideMenu extends StatelessWidget {
             item(Icons.lock_outline_rounded, 'privacy', () => TextPage(s.t('privacy'), s.t('privacy_t'))),
             if (!kIsWeb) Tap(onTap: () { close(); launchUrl(Uri.parse('https://hulhup.my.id'), mode: LaunchMode.externalApplication); }, child: Padding(padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8), child: Row(children: [Icon(Icons.language_rounded, size: 24, color: ink(context)), const SizedBox(width: 16), Text(s.t('website'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600))]))),
             if (!kIsWeb) Tap(onTap: () { close(); () async { final up = await s.checkUpdate(force: true); if (up) { showUpdate(context); } else { toast(s.t('upd_none')); } }(); }, child: Padding(padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8), child: Row(children: [Icon(Icons.system_update_rounded, size: 24, color: ink(context)), const SizedBox(width: 16), Text(s.t('upd_menu'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600))]))),
-            if (kIsWeb) Tap(onTap: () { close(); launchUrl(Uri.parse('https://hulhup.my.id/hulhup.apk'), mode: LaunchMode.externalApplication); }, child: Padding(padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8), child: Row(children: [Icon(Icons.android_rounded, size: 24, color: ink(context)), const SizedBox(width: 16), Text(s.t('get_app'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600))]))),
+            if (kIsWeb) Tap(onTap: () { close(); showGetApp(context); }, child: Padding(padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8), child: Row(children: [Icon(Icons.android_rounded, size: 24, color: ink(context)), const SizedBox(width: 16), Text(s.t('get_app'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600))]))),
             const Spacer(),
             if (s.me == null) PBtn(s.t('login'), () { close(); go(context, const AuthPage()); }, icon: Icons.login_rounded)
             else PBtn(s.t('logout'), () async { close(); await s.logout(); }, icon: Icons.logout_rounded, ghost: true, fgc: heart),
@@ -296,8 +298,58 @@ class _UpdateBodyState extends State<_UpdateBody> {
       ],
       const SizedBox(height: 18),
       if (!busy) PBtn(step == 'fail' ? s.t('retry') : s.t('upd_now'), _go, icon: Icons.download_rounded),
+      if (step == 'fail') ...[const SizedBox(height: 10), PBtn(s.t('upd_browser'), () => launchUrl(Uri.parse(kApkUrl), mode: LaunchMode.externalApplication), ghost: true, icon: Icons.open_in_browser_rounded)],
     ]);
   }
 }
 
 
+
+
+/// Halaman unduh aplikasi Android di web, dengan tampilan sendiri.
+Future<void> showGetApp(BuildContext context) => sheet(context, (_) => const _GetAppBody());
+
+class _GetAppBody extends StatefulWidget {
+  const _GetAppBody();
+  @override
+  State<_GetAppBody> createState() => _GetAppState();
+}
+
+class _GetAppState extends State<_GetAppBody> {
+  String ver = '', size = '';
+  @override
+  void initState() { super.initState(); _info(); }
+  Future<void> _info() async {
+    try {
+      final r = await http.get(Uri.parse('https://hulhup.my.id/version.json')).timeout(const Duration(seconds: 8));
+      ver = '${(jsonDecode(r.body) as Map)['version'] ?? ''}';
+      final h = await http.head(Uri.parse(kApkUrl)).timeout(const Duration(seconds: 8));
+      final n = int.tryParse(h.headers['content-length'] ?? '');
+      if (n != null) size = '${(n / 1048576).round()} MB';
+    } catch (_) {}
+    if (mounted) setState(() {});
+  }
+
+  Widget _step(int n, String t) => Padding(padding: const EdgeInsets.only(bottom: 10), child: Row(children: [
+        Container(width: 26, height: 26, alignment: Alignment.center, decoration: BoxDecoration(color: soft(context), shape: BoxShape.circle), child: Text('$n', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13))),
+        const SizedBox(width: 12),
+        Expanded(child: Text(t, style: const TextStyle(fontSize: 14.5, height: 1.35))),
+      ]));
+
+  @override
+  Widget build(BuildContext context) {
+    final s = Store.i;
+    return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Center(child: Icon(Icons.android_rounded, size: 44, color: ink(context))),
+      const SizedBox(height: 10),
+      Center(child: Text(s.t('ga_title'), textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20))),
+      const SizedBox(height: 8),
+      Text(s.t('ga_note'), textAlign: TextAlign.center, style: TextStyle(color: sub(context), fontSize: 14, height: 1.4)),
+      if (ver.isNotEmpty || size.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 12), child: Center(child: Text([if (ver.isNotEmpty) '${s.t('ga_ver')} $ver', if (size.isNotEmpty) '${s.t('ga_size')} $size'].join(' · '), style: TextStyle(color: sub(context), fontWeight: FontWeight.w700, fontSize: 13)))),
+      const SizedBox(height: 18),
+      _step(1, s.t('ga_s1')), _step(2, s.t('ga_s2')), _step(3, s.t('ga_s3')),
+      const SizedBox(height: 8),
+      PBtn(s.t('ga_btn'), () => launchUrl(Uri.parse(kApkUrl), mode: LaunchMode.externalApplication), icon: Icons.download_rounded),
+    ]);
+  }
+}

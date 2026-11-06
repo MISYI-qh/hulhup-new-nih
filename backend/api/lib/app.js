@@ -42,6 +42,7 @@ function audCond(f) {
 /** Apakah pemirsa boleh melihat sesuatu berdasarkan mode audiens pemilik (untuk visibilitas profil). */
 async function canSee(mode, ownerId, viewerId, self = true) {
   if (mode === 'public') return true;
+  viewerId = Number(viewerId) || 0; ownerId = Number(ownerId);
   if (!viewerId) return false;
   if (viewerId === ownerId) return self;
   if (mode === 'me' || mode === 'accounts') return false;
@@ -99,9 +100,18 @@ async function notify(c, to, type, actor, audio, extra = '') {
 }
 
 // ---------- otentikasi ----------
-async function newSession(userId) {
+function deviceOf(req) {
+  const x = String(req.headers['x-device'] || '').replace(/[^\w .·()+\-/]/g, '').trim().slice(0, 60);
+  if (x) return x;
+  const ua = String(req.headers['user-agent'] || '');
+  const os = /Android/i.test(ua) ? 'Android' : /iPhone|iPad/i.test(ua) ? 'iOS' : /Windows/i.test(ua) ? 'Windows' : /Mac OS/i.test(ua) ? 'Mac' : /Linux/i.test(ua) ? 'Linux' : '';
+  const br = /Edg\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera' : /Firefox/i.test(ua) ? 'Firefox' : /Chrome/i.test(ua) ? 'Chrome' : /Safari/i.test(ua) ? 'Safari' : '';
+  return ('Web ' + br + (os ? ' · ' + os : '')).trim();
+}
+
+async function newSession(userId, req) {
   const t = token();
-  await q('insert into sessions(token_hash, user_id, created, expires) values ($1,$2,$3,$4)', [sha(t), userId, now(), now() + SESSION_MS]);
+  await q('insert into sessions(token_hash, user_id, created, expires, device, last_seen) values ($1,$2,$3,$4,$5,$3)', [sha(t), userId, now(), now() + SESSION_MS, req ? deviceOf(req) : '']);
   return t;
 }
 
@@ -109,8 +119,9 @@ async function authUser(req) {
   const h = req.headers.authorization || '';
   const t = h.startsWith('Bearer ') ? h.slice(7) : '';
   if (!t || t.length > 200) return null;
-  const u = await one(`select u.* from sessions s join users u on u.id=s.user_id where s.token_hash=$1 and s.expires>$2`, [sha(t), now()]);
+  const u = await one(`select u.*, s.last_seen as sess_seen from sessions s join users u on u.id=s.user_id where s.token_hash=$1 and s.expires>$2`, [sha(t), now()]);
   if (!u) return null;
+  if (now() - Number(u.sess_seen) > 5 * 60 * 1000) await q('update sessions set last_seen=$2 where token_hash=$1', [sha(t), now()]);
   if (u.status !== 'active') throw new ApiErr('banned', 403);
   return u;
 }
@@ -151,7 +162,7 @@ route('POST', /^\/register$/, async (c) => {
     if (e.code === '23505') throw new ApiErr('username_taken', 409);
     throw e;
   }
-  return { token: await newSession(u.id), user: await uv(u, u, c.today) };
+  return { token: await newSession(u.id, c.req), user: await uv(u, u, c.today) };
 });
 
 route('POST', /^\/login$/, async (c) => {
@@ -161,7 +172,7 @@ route('POST', /^\/login$/, async (c) => {
   const u = await one('select * from users where username=$1', [username]);
   if (!u || !(await checkPw(String(c.body.password ?? '').trim(), u.pass_salt, u.pass_hash))) throw new ApiErr('bad_credentials', 401);
   if (u.status !== 'active') throw new ApiErr('banned', 403);
-  return { token: await newSession(u.id), user: await uv(u, u, c.today) };
+  return { token: await newSession(u.id, c.req), user: await uv(u, u, c.today) };
 });
 
 route('POST', /^\/logout$/, async (c) => {
@@ -313,6 +324,21 @@ route('POST', /^\/me\/logout-others$/, async (c) => {
   return { ok: true, closed: d.rowCount };
 });
 
+route('GET', /^\/me\/sessions$/, async (c) => {
+  const u = c.need();
+  const cur = sha((c.req.headers.authorization || '').slice(7));
+  const rows = await many('select token_hash, device, created, last_seen from sessions where user_id=$1 and expires>$2 order by last_seen desc limit 50', [u.id, now()]);
+  return { items: rows.map((r) => ({ id: r.token_hash.slice(0, 16), device: r.device || 'Perangkat', created: Number(r.created), last_seen: Number(r.last_seen) || Number(r.created), current: r.token_hash === cur })) };
+});
+
+route('DELETE', /^\/me\/sessions\/([0-9a-f]{16})$/, async (c, m) => {
+  const u = c.need();
+  const cur = sha((c.req.headers.authorization || '').slice(7));
+  const d = await q('delete from sessions where user_id=$1 and left(token_hash,16)=$2 and token_hash<>$3', [u.id, m[1], cur]);
+  if (!d.rowCount) throw new ApiErr('not_found', 404);
+  return { ok: true };
+});
+
 // ---------- laporan ----------
 const REASONS = ['abuse', 'sexual', 'violence', 'spam', 'impersonate', 'other'];
 route('POST', /^\/reports$/, async (c) => {
@@ -426,7 +452,7 @@ route('POST', /^\/audios$/, async (c) => {
 route('GET', /^\/audios\/(\d+)\/file$/, async (c, m) => {
   const a = await one(`select a.*, u.pvis, u.status ostatus from audios a join users u on u.id=a.owner where a.id=$1`, [m[1]]);
   if (!a) throw new ApiErr('not_found', 404);
-  const vid = c.me ? c.me.id : 0, owner = Number(a.owner);
+  const vid = c.me ? Number(c.me.id) : 0, owner = Number(a.owner);
   let ok = vid === owner;
   if (!ok && !a.hidden && a.ostatus === 'active') {
     if (a.rand === 'accounts') ok = !!vid && !!(await one('select 1 from audio_to where audio_id=$1 and user_id=$2', [a.id, vid]));
@@ -543,7 +569,7 @@ route('DELETE', /^\/relations\/([a-z0-9_]+)$/, async (c, m) => {
 route('GET', /^\/users\/([a-z0-9_]+)$/, async (c, m) => {
   const u = await one(`select * from users where username=$1 and status='active'`, [m[1]]);
   if (!u) throw new ApiErr('not_found', 404);
-  const uid = Number(u.id), vid = c.me ? c.me.id : 0, mine = vid === uid;
+  const uid = Number(u.id), vid = c.me ? Number(c.me.id) : 0, mine = vid === uid;
   const locked = !mine && !(await canSee(u.pvis, uid, vid));
   const rows = locked ? [] : await many(`${AUD_SQL} where a.owner=$2 ${mine ? '' : 'and not a.hidden'} order by a.id desc limit 200`, [vid, uid]);
   let rel = { status: 'none', type: '' };

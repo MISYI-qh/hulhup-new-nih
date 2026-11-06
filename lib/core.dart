@@ -5,10 +5,11 @@ import 'dart:typed_data';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:crypto/crypto.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'files_web.dart' if (dart.library.io) 'files_io.dart';
 import 'notify.dart';
 
 const kBuild = int.fromEnvironment('BUILD');
@@ -58,6 +59,7 @@ class Api {
 
   /// Ambil berkas audio (perlu login) dari server; disimpan sebentar di memori.
   static Future<Uint8List?> bytes(String url) async {
+    if (url.startsWith('file:')) return readOffline(url.substring(5));
     final l = Local.bytes(url);
     if (l != null || !remote || !url.startsWith('/')) return l;
     final c = _media[url];
@@ -79,6 +81,7 @@ class Remote {
       if (Api.token != null) 'Authorization': 'Bearer ${Api.token}',
       'X-Today': '${n.year}-${d2(n.month)}-${d2(n.day)}',
       if (type != null) 'Content-Type': type,
+      if (!kIsWeb) 'X-Device': 'Hulhup app - ${defaultTargetPlatform == TargetPlatform.iOS ? 'iOS' : 'Android'}',
     };
   }
 
@@ -959,14 +962,19 @@ class Store extends ChangeNotifier {
   Future<void> toggleOffline(A a) async {
     final i = offline.indexWhere((o) => o.id == a.id);
     if (i >= 0) {
+      await deleteOffline('off${a.id}.audio');
       await Local.delBlob('off${a.id}');
       offline.removeAt(i);
     } else {
       final b = await Api.bytes(a.url);
       if (b == null) throw ApiErr('server');
-      await Local.putBlob('off${a.id}', b);
       final j = a.toJson();
-      j['url'] = 'mem:off${a.id}';
+      if (await saveOffline('off${a.id}.audio', b)) {
+        j['url'] = 'file:off${a.id}.audio';
+      } else {
+        await Local.putBlob('off${a.id}', b);
+        j['url'] = 'mem:off${a.id}';
+      }
       offline.insert(0, A.from(j));
     }
     await _sp.setString('offline', jsonEncode(offline.map((o) => o.toJson()).toList()));
@@ -1034,7 +1042,9 @@ const S = <String, List<String>>{
   'report': ['Laporkan', 'Report'], 'report_title': ['Laporkan konten ini', 'Report this'], 'report_done': ['Terima kasih, laporanmu kami terima', 'Thanks, we received your report'],
   'r_abuse': ['Pelecehan atau ujaran kebencian', 'Harassment or hate'], 'r_sexual': ['Konten seksual', 'Sexual content'], 'r_violence': ['Kekerasan', 'Violence'], 'r_spam': ['Spam', 'Spam'], 'r_impersonate': ['Meniru orang lain', 'Impersonation'], 'r_other': ['Lainnya', 'Other'],
   'logout_others': ['Keluar dari perangkat lain', 'Sign out of other devices'], 'logout_others_done': ['Perangkat lain sudah dikeluarkan', 'Other devices signed out'],
-  'speed': ['Kecepatan', 'Speed'], 'upd_down': ['Mengunduh pembaruan…', 'Downloading update…'], 'upd_inst': ['Membuka pemasang…', 'Opening installer…'], 'upd_fail': ['Gagal memperbarui, coba lagi', 'Update failed, try again'], 'upd_now': ['Perbarui sekarang', 'Update now'], 'upd_note': ['Setelah diunduh, Android akan meminta kamu menekan Pasang.', 'After downloading, Android will ask you to tap Install.'],
+  'sess_t': ['Perangkat yang masuk', 'Signed-in devices'], 'sess_this': ['Perangkat ini', 'This device'], 'sess_active': ['Aktif', 'Active'], 'sess_out': ['Keluarkan', 'Sign out'], 'sess_out_q': ['Perangkat ini akan keluar dari akunmu.', 'This device will be signed out of your account.'], 'sess_all': ['Keluar dari semua perangkat lain', 'Sign out of all other devices'], 'sess_empty': ['Tidak ada perangkat lain', 'No other devices'],
+  'ga_title': ['Unduh Hulhup untuk Android', 'Download Hulhup for Android'], 'ga_note': ['Pasang aplikasi Hulhup di HP Android kamu: notifikasi lebih lengkap dan audio offline tersimpan di HP.', 'Install Hulhup on your Android phone: richer notifications and offline audio saved on your phone.'], 'ga_s1': ['Ketuk Unduh APK', 'Tap Download APK'], 'ga_s2': ['Buka berkas yang terunduh', 'Open the downloaded file'], 'ga_s3': ['Izinkan pemasangan dari sumber ini jika diminta', 'Allow installs from this source if asked'], 'ga_btn': ['Unduh APK', 'Download APK'], 'ga_ver': ['Versi', 'Version'], 'ga_size': ['Ukuran', 'Size'], 'upd_browser': ['Unduh lewat peramban', 'Download via browser'],
+  'speed': ['Kecepatan', 'Speed'], 'upd_down': ['Mengunduh pembaruan…', 'Downloading update…'], 'upd_inst': ['Membuka pemasang…', 'Opening installer…'], 'upd_fail': ['Gagal memperbarui. Jika muncul "Aplikasi tidak terpasang", hapus aplikasi lama lalu pasang ulang dari hulhup.my.id (cukup sekali).', 'Update failed. If you see "App not installed", uninstall the old app and reinstall from hulhup.my.id (only once).'], 'upd_now': ['Perbarui sekarang', 'Update now'], 'upd_note': ['Setelah diunduh, Android akan meminta kamu menekan Pasang.', 'After downloading, Android will ask you to tap Install.'],
   'upd_menu': ['Perbarui aplikasi', 'Update app'], 'upd_none': ['Aplikasimu sudah versi terbaru', 'Your app is up to date'], 'upd_title': ['Versi baru tersedia', 'New version available'], 'upd_btn': ['Perbarui', 'Update'],
   'get_app': ['Unduh aplikasi Android', 'Download Android app'], 'website': ['Situs web hulhup.my.id', 'Website hulhup.my.id'], 'about': ['Tentang Hulhup', 'About Hulhup'], 'policy': ['Kebijakan', 'Policy'], 'privacy': ['Privasi', 'Privacy'],
   'followers': ['Pengikut', 'Followers'], 'following': ['Mengikuti', 'Following'], 'audio': ['Audio', 'Audio'], 'liked': ['Disukai', 'Liked'],

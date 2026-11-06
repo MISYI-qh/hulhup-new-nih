@@ -29,8 +29,12 @@ CREATE TABLE IF NOT EXISTS sessions (
   token_hash  TEXT PRIMARY KEY,
   user_id     BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   created     BIGINT NOT NULL,
-  expires     BIGINT NOT NULL
+  expires     BIGINT NOT NULL,
+  device      TEXT NOT NULL DEFAULT '',
+  last_seen   BIGINT NOT NULL DEFAULT 0
 );
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS device TEXT NOT NULL DEFAULT '';
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS last_seen BIGINT NOT NULL DEFAULT 0;
 CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
 
 CREATE TABLE IF NOT EXISTS logins (
