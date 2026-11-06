@@ -78,7 +78,8 @@ test('laporan, keluar perangkat lain, spasi sandi', async () => {
   assert.equal((await call('POST', '/reports', { token: a, body: { audio: id, reason: 'spam' } })).error, 'forbidden');
   for (const t of [b, c, d]) assert.equal((await call('POST', '/reports', { token: t, body: { audio: id, reason: 'spam' } })).ok, true);
   const { one } = await import('../lib/db.js');
-  assert.equal((await one('select hidden from audios where id=$1', [id])).hidden, true);
+  assert.equal((await one('select hidden from audios where id=$1', [id])).hidden, false); // laporan tidak diproses otomatis
+  assert.equal((await one('select count(*)::int n from reports where target_audio=$1', [id])).n, 3);
   const t2 = (await call('POST', '/login', { body: { username: 'frank', password: 'secret1' }, ip: '8.8.8.8' })).token;
   const o = await call('POST', '/me/logout-others', { token: a });
   assert.equal(o.closed, 1);

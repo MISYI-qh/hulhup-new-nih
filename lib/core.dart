@@ -760,6 +760,7 @@ class Store extends ChangeNotifier {
 
   Future<void> init() async {
     _sp = await SharedPreferences.getInstance();
+    if (Api.remote) { try { http.get(Uri.parse('${Api.base}/health?warm=1')).catchError((_) => http.Response('', 500)); } catch (_) {} }
     lang = _sp.getString('lang') ?? 'id';
     mode = ThemeMode.values[(_sp.getInt('mode') ?? 0).clamp(0, 2)];
     remind = _sp.getBool('remind') ?? true;
@@ -768,7 +769,7 @@ class Store extends ChangeNotifier {
     if (!Local.filters.contains(filter)) filter = 'public';
     await Local.init(_sp);
     await Api.init(_sp);
-    if (Api.remote) Timer.periodic(const Duration(seconds: 60), (_) => _poll());
+    if (Api.remote) Timer.periodic(const Duration(seconds: 30), (_) => _poll());
     Local.onNotify = (to, type, actor, extra) {
       if (me?.username == to) { banner?.call('$actor ${notifText(type, extra)}'); refresh(); }
       Notifier.show(200 + (_nid++ % 50), 'Hulhup', '$actor ${notifText(type, extra)} · @$to', t('notif'));
@@ -786,6 +787,7 @@ class Store extends ChangeNotifier {
         me = U.from(j['user']);
         unread = j['unread'] ?? 0;
         unreadSocial = j['unread_social'] ?? 0;
+        if (unreadSocial < _pushed) { _pushed = unreadSocial; _sp.setInt('pushed', _pushed); }
       }
       taps = (await Api.req('GET', '/stats'))['taps'] ?? taps;
     } on ApiErr catch (e) {
@@ -814,6 +816,8 @@ class Store extends ChangeNotifier {
           await Notifier.show(1, 'Hulhup', msg, t('notif'));
         }
         _pushed = unreadSocial;
+        _sp.setInt('pushed', _pushed);
+        Notifier.watch(true);
       }
     } catch (_) {
     } finally {
@@ -860,6 +864,7 @@ class Store extends ChangeNotifier {
         await Notifier.show(1, 'Hulhup', msg, t('notif'));
       }
       _pushed = unreadSocial;
+      _sp.setInt('pushed', _pushed);
     } catch (_) {}
   }
 
@@ -877,7 +882,7 @@ class Store extends ChangeNotifier {
     if (v) { await Notifier.allow(); await _sp.setBool('asked', true); await syncReminders(); } else { await Notifier.cancelReminders(); }
   }
 
-  Future<void> _clear() async { await Api.setSession(null); me = null; unread = 0; unreadSocial = 0; _pushed = 0; }
+  Future<void> _clear() async { await Api.setSession(null); me = null; unread = 0; unreadSocial = 0; _pushed = 0; _sp.setInt('pushed', 0); Notifier.watch(false); }
 
   Future<void> auth(String path, Map body) async {
     final j = await Api.req('POST', path, body: body);
@@ -1044,7 +1049,7 @@ const S = <String, List<String>>{
   'a_relations': ['Semua hubungan', 'All relationships'], 'a_accounts': ['Pilih akun', 'Choose accounts'], 'f_me': ['Untuk saya', 'For me'],
   'filter_title': ['Filter suara acak', 'Random voice filter'], 'filter_sub': ['Tombol acak hanya memutar suara dari kelompok ini.', 'The random button only plays voices from this group.'],
   'nofilter': ['Belum ada suara untuk filter ini', 'No voices for this filter yet'], 'filter_login': ['Masuk dulu untuk memakai filter lain', 'Sign in to use other filters'],
-  'locked': ['Postingan akun ini tidak dapat dilihat', 'This account\'s posts cannot be viewed'],
+  'locked': ['Akun ini menggunakan privasi tampilan di profil', 'This account uses profile display privacy'], 'rel_wait_cancel': ['Menunggu · Batalkan', 'Pending · Cancel'],
   'rel_title': ['Hubungan', 'Relationships'], 'rel_none': ['Belum ada hubungan', 'No relationships yet'], 'rel_add': ['Ajak berhubungan', 'Request relationship'],
   'rel_pick': ['Pilih jenis hubungan', 'Choose relationship type'], 'rel_wait': ['Menunggu persetujuan', 'Waiting for approval'], 'rel_cancel': ['Batalkan permintaan', 'Cancel request'],
   'rel_accept': ['Terima', 'Accept'], 'rel_decline': ['Tolak', 'Decline'], 'rel_end': ['Putus hubungan', 'End relationship'],
@@ -1106,6 +1111,6 @@ const S = <String, List<String>>{
     'Dengan memakai Hulhup kamu setuju pada aturan berikut.\n\n1. Audio yang kamu unggah berdurasi maksimal 15 detik, dengan deskripsi maksimal 200 karakter, dan harus milikmu atau kamu punya izin memakainya. Foto profil maksimal 3 MB.\n2. Dilarang mengunggah konten yang melecehkan, menebar kebencian, mengandung kekerasan atau seksual, melanggar hukum, atau meniru orang lain.\n3. Dilarang spam dan menyalahgunakan layanan.\n4. Untuk setiap audio kamu memilih siapa yang bisa mendengarnya secara acak: publik, pengikut, mengikuti, atau pengikut dan mengikuti. Audio publik dapat didengar siapa saja.\n5. Di Pengaturan kamu memilih siapa yang bisa melihat audiomu di profil dan di hasil pencarian: publik, pengikut, mengikuti, pengikut dan mengikuti, atau hanya untuk saya. Pilihan hanya untuk saya hanya berlaku untuk tampilan profil dan tidak memengaruhi pilihan acak.\n6. Audio tidak bisa diedit, hanya dihapus. Kamu bebas menghapus audio atau akunmu kapan saja.\n7. Kami dapat menghapus konten, memberi tanda verifikasi, atau membatasi dan memblokir akun yang melanggar aturan ini.\n8. Hulhup disediakan apa adanya, aturan dapat diperbarui dan versi terbaru selalu ada di halaman ini.',
     'By using Hulhup you agree to the following.\n\n1. Audio you upload is at most 15 seconds, with a description of at most 200 characters, and must be yours or you must have permission to use it. Profile photos are at most 3 MB.\n2. Do not upload content that harasses, spreads hate, contains violence or sexual material, breaks the law, or impersonates others.\n3. No spam or misuse of the service.\n4. For each audio you choose who can hear it randomly: public, followers, following, or followers and following. Public audio can be heard by anyone.\n5. In Settings you choose who can see your audio on your profile and in search results: public, followers, following, followers and following, or only me. Only me applies to the profile view only and does not affect the random setting.\n6. Audio cannot be edited, only deleted. You may delete audio or your account at any time.\n7. We may remove content, mark accounts as verified, or restrict and ban accounts that break these rules.\n8. Hulhup is provided as is. These rules may be updated and the latest version is always on this page.'],
   'privacy_t': [
-    'Data yang kami simpan: nama, nama pengguna, tanggal lahir, bio, foto profil, audio yang kamu unggah, suka, pengikut, serta jumlah hari kamu masuk. Tanggal lahir dan usiamu tidak ditampilkan ke pengguna lain.\n\nKata sandi disimpan dalam bentuk hash, tidak pernah dalam bentuk asli.\n\nNotifikasi: Hulhup meminta izin notifikasi untuk mengirim pengingat harian setiap jam 19.00, dan pemberitahuan suka dan pengikut baru. Pengingat dijadwalkan di perangkatmu sendiri. Kamu bisa mematikannya di Pengaturan atau di pengaturan sistem perangkat.\n\nMikrofon hanya dipakai saat kamu menekan tombol rekam. Galeri hanya dibuka saat kamu memilih foto.\n\nTanpa login, kamu hanya mendengar suara; kami tidak membuat profil tamu.\n\nAudio yang kamu jadikan offline disalin dan disimpan di perangkatmu supaya bisa diputar tanpa internet. Kamu bisa menghapusnya kapan saja dari menu Audio offline.\n\nPenyimpanan: akun, foto profil, dan data teksmu disimpan di server database kami; audio disimpan di layanan penyimpanan cloud terpisah (durasi pendek dan panjang di tempat berbeda). Koneksi ke server dienkripsi (HTTPS). Audio hanya bisa diputar oleh orang yang berhak sesuai pilihan privasimu. Moderasi (menghapus konten pelanggar, tanda verifikasi, pembatasan akun) dilakukan langsung oleh tim kami di server, tidak ada halaman admin publik.\n\nKami tidak menjual datamu dan tidak menampilkan iklan.\n\nMenghapus audio atau akun akan menghapus datanya secara permanen dari server.',
-    'Data we store: name, username, date of birth, bio, profile photo, audio you upload, likes, followers, and the number of days you signed in. Your date of birth and age are never shown to other users.\n\nPasswords are stored as hashes, never in plain form.\n\nNotifications: Hulhup asks for notification permission to send a daily reminder every day at 7 PM, and alerts for new likes and followers. Reminders are scheduled on your own device. You can turn them off in Settings or in your device settings.\n\nThe microphone is used only when you press record. The gallery opens only when you pick a photo.\n\nWithout signing in you only listen; we do not create guest profiles.\n\nAudio you make available offline is copied and stored on your device so it can play without internet. You can remove it anytime from the Offline audio menu.\n\nStorage: your account, profile photos and text data are kept in our server database; audio is kept in separate cloud storage (short and longer clips in different places). Connections to the server are encrypted (HTTPS). Audio can only be played by people allowed by your privacy choices. Moderation (removing violating content, verification marks, restricting accounts) is done directly by our team on the server; there is no public admin page.\n\nWe do not sell your data and show no ads.\n\nDeleting audio or your account permanently removes the data from the server.'],
+    'Data yang kami simpan: nama, nama pengguna, tanggal lahir, bio, foto profil, audio yang kamu unggah, suka, pengikut, serta jumlah hari kamu masuk. Tanggal lahir dan usiamu tidak ditampilkan ke pengguna lain.\n\nKata sandi disimpan dalam bentuk hash, tidak pernah dalam bentuk asli.\n\nNotifikasi: Hulhup meminta izin notifikasi untuk mengirim pengingat harian setiap jam 19.00, dan pemberitahuan suka dan pengikut baru. Pengingat dijadwalkan di perangkatmu sendiri. Kamu bisa mematikannya di Pengaturan atau di pengaturan sistem perangkat.\n\nMikrofon hanya dipakai saat kamu menekan tombol rekam. Galeri hanya dibuka saat kamu memilih foto.\n\nTanpa login, kamu hanya mendengar suara; kami tidak membuat profil tamu.\n\nAudio yang kamu jadikan offline disalin dan disimpan di perangkatmu supaya bisa diputar tanpa internet. Kamu bisa menghapusnya kapan saja dari menu Audio offline.\n\nPenyimpanan: akun, foto profil, dan data teksmu disimpan di server database kami; audio disimpan di layanan penyimpanan cloud terpisah (durasi pendek dan panjang di tempat berbeda). Koneksi ke server dienkripsi (HTTPS). Audio hanya bisa diputar oleh orang yang berhak sesuai pilihan privasimu. Moderasi (menghapus konten pelanggar, tanda verifikasi, pembatasan akun) dilakukan langsung oleh tim kami di server, tidak ada halaman admin publik.\n\nKami tidak menjual datamu dan tidak menampilkan iklan untuk saat ini.\n\nMenghapus audio atau akun akan menghapus datanya secara permanen dari server.',
+    'Data we store: name, username, date of birth, bio, profile photo, audio you upload, likes, followers, and the number of days you signed in. Your date of birth and age are never shown to other users.\n\nPasswords are stored as hashes, never in plain form.\n\nNotifications: Hulhup asks for notification permission to send a daily reminder every day at 7 PM, and alerts for new likes and followers. Reminders are scheduled on your own device. You can turn them off in Settings or in your device settings.\n\nThe microphone is used only when you press record. The gallery opens only when you pick a photo.\n\nWithout signing in you only listen; we do not create guest profiles.\n\nAudio you make available offline is copied and stored on your device so it can play without internet. You can remove it anytime from the Offline audio menu.\n\nStorage: your account, profile photos and text data are kept in our server database; audio is kept in separate cloud storage (short and longer clips in different places). Connections to the server are encrypted (HTTPS). Audio can only be played by people allowed by your privacy choices. Moderation (removing violating content, verification marks, restricting accounts) is done directly by our team on the server; there is no public admin page.\n\nWe do not sell your data and show no ads for now.\n\nDeleting audio or your account permanently removes the data from the server.'],
 };

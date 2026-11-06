@@ -336,10 +336,6 @@ route('POST', /^\/reports$/, async (c) => {
   const dup = await one(`select 1 from reports where reporter=$1 and target_user=$2 and target_audio is not distinct from $3 and status='open'`, [u.id, tu, ta]);
   if (!dup) {
     await q('insert into reports(reporter, target_user, target_audio, reason, created) values ($1,$2,$3,$4,$5)', [u.id, tu, ta, (reason + (note ? ': ' + note : '')).slice(0, 320), now()]);
-    if (ta) { // banyak pelapor berbeda -> sembunyikan sementara sampai ditinjau lewat konsol
-      const n = await one(`select count(distinct reporter)::int n from reports where target_audio=$1 and status='open'`, [ta]);
-      if (n.n >= 3) await q('update audios set hidden=true where id=$1', [ta]);
-    }
   }
   return { ok: true };
 });
@@ -594,7 +590,7 @@ route('GET', /^\/users\/([a-z0-9_]+)\/follows$/, async (c, m) => {
 export async function handle(req, url) {
   const m0 = req.method;
   const path = url.pathname.replace(/\/+$/, '') || '/';
-  if (path === '/' || path === '/health') return { ok: true, service: 'hulhup-api' };
+  if (path === '/' || path === '/health') { if (url.searchParams.get('warm')) await one('select 1 as x'); return { ok: true, service: 'hulhup-api' }; }
   const me = await authUser(req);
   const ip = ipOf(req);
   await hit(`ip:${ip}`, 600, 60);

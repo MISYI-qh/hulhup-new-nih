@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'core.dart';
 import 'home.dart';
 import 'notify.dart';
@@ -55,6 +56,21 @@ class HulhupApp extends StatelessWidget {
           title: 'Hulhup', debugShowCheckedModeBanner: false, navigatorKey: navKey,
           themeMode: Store.i.mode, theme: theme(false), darkTheme: theme(true),
           scrollBehavior: const MaterialScrollBehavior().copyWith(physics: const BouncingScrollPhysics()),
+          builder: (ctx, child) {
+            final dk = Theme.of(ctx).brightness == Brightness.dark;
+            final bg = dk ? const Color(0xFF0E1511) : const Color(0xFFFEFDF9);
+            return AnnotatedRegion<SystemUiOverlayStyle>(
+              value: SystemUiOverlayStyle(
+                statusBarColor: Colors.transparent,
+                statusBarIconBrightness: dk ? Brightness.light : Brightness.dark,
+                statusBarBrightness: dk ? Brightness.dark : Brightness.light,
+                systemNavigationBarColor: bg,
+                systemNavigationBarDividerColor: bg,
+                systemNavigationBarIconBrightness: dk ? Brightness.light : Brightness.dark,
+              ),
+              child: child!,
+            );
+          },
           home: const HomePage(),
         ),
       );

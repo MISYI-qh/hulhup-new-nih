@@ -196,7 +196,7 @@ class _ProfileState extends State<ProfilePage> {
   Widget _relBtns(Store s) {
     final st = '${rel['status']}', ty = '${rel['type']}';
     if (st == 'none') return PBtn(s.t('rel_add'), _relAdd, ghost: true, icon: Icons.favorite_border_rounded);
-    if (st == 'out') return PBtn('${s.t('rel_wait')} · ${s.t('rel_cancel')}', () => _relReq(() => Api.req('DELETE', '/relations/${widget.u}'), s.t('rel_ended')), ghost: true, icon: Icons.hourglass_empty_rounded);
+    if (st == 'out') return PBtn(s.t('rel_wait_cancel'), () => _relReq(() => Api.req('DELETE', '/relations/${widget.u}'), s.t('rel_ended')), ghost: true, icon: Icons.hourglass_empty_rounded);
     if (st == 'in') {
       return Row(children: [
         Expanded(child: PBtn(s.t('rel_accept'), () => _relReq(() => Api.req('POST', '/relations/${widget.u}/accept'), s.t('rel_made')), icon: Icons.check_rounded)),

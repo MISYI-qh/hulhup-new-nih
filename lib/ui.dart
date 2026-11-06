@@ -87,8 +87,8 @@ class PBtn extends StatelessWidget {
           child: loading
               ? SizedBox(key: const ValueKey('l'), width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.4, strokeCap: StrokeCap.round, color: fg))
               : Row(key: const ValueKey('t'), mainAxisSize: MainAxisSize.min, children: [
-                  if (icon != null) ...[Icon(icon, size: 20, color: fg), const SizedBox(width: 8)],
-                  Text(label, style: TextStyle(color: fg, fontWeight: FontWeight.w700, fontSize: 15)),
+                  if (icon != null) ...[Padding(padding: const EdgeInsets.only(left: 14), child: Icon(icon, size: 20, color: fg)), const SizedBox(width: 0)],
+                  Flexible(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 14), child: FittedBox(fit: BoxFit.scaleDown, child: Text(label, maxLines: 1, style: TextStyle(color: fg, fontWeight: FontWeight.w700, fontSize: 15))))),
                 ]),
         ),
       ),
