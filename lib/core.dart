@@ -48,7 +48,7 @@ class Api {
     return o;
   }
 
-  static Future<dynamic> req(String m, String p, {Map? body}) {
+  static Future<dynamic> req(String m, String p, {Map? body}) async {
     body = _pw(p, body);
     return remote ? Remote.req(m, p, body) : Local.handle(m, p, body);
   }
