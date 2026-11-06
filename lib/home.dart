@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
+import 'package:ota_update/ota_update.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'core.dart';
 import 'ui.dart';
@@ -55,7 +56,7 @@ class _HomeState extends State<HomePage> {
             center: const Brand(),
             actions: [IconBtn(Icons.search_rounded, () => go(context, const SearchPage())), ListenableBuilder(listenable: s, builder: (_, __) => IconBtn(Icons.person_outline_rounded, () => go(context, ProfilePage(s.me?.username)), dot: s.unread > 0))],
           ),
-          ListenableBuilder(listenable: s, builder: (_, __) => !s.updateReady ? const SizedBox() : Padding(padding: const EdgeInsets.fromLTRB(20, 4, 20, 0), child: Tap(onTap: () => launchUrl(Uri.parse(kApkUrl), mode: LaunchMode.externalApplication), scale: .98, child: Container(
+          ListenableBuilder(listenable: s, builder: (_, __) => !s.updateReady ? const SizedBox() : Padding(padding: const EdgeInsets.fromLTRB(20, 4, 20, 0), child: Tap(onTap: () => showUpdate(context), scale: .98, child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(18)),
             child: Row(children: [Icon(Icons.system_update_rounded, size: 20, color: ink(context)), const SizedBox(width: 12), Expanded(child: Text(s.t('upd_title'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14))), Text(s.t('upd_btn'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14))]),
           )))),
@@ -166,7 +167,7 @@ class SideMenu extends StatelessWidget {
             item(Icons.rule_rounded, 'policy', () => TextPage(s.t('policy'), s.t('policy_t'))),
             item(Icons.lock_outline_rounded, 'privacy', () => TextPage(s.t('privacy'), s.t('privacy_t'))),
             if (!kIsWeb) Tap(onTap: () { close(); launchUrl(Uri.parse('https://hulhup.my.id'), mode: LaunchMode.externalApplication); }, child: Padding(padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8), child: Row(children: [Icon(Icons.language_rounded, size: 24, color: ink(context)), const SizedBox(width: 16), Text(s.t('website'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600))]))),
-            if (!kIsWeb) Tap(onTap: () { close(); () async { final up = await s.checkUpdate(force: true); if (up) { launchUrl(Uri.parse(kApkUrl), mode: LaunchMode.externalApplication); } else { toast(s.t('upd_none')); } }(); }, child: Padding(padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8), child: Row(children: [Icon(Icons.system_update_rounded, size: 24, color: ink(context)), const SizedBox(width: 16), Text(s.t('upd_menu'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600))]))),
+            if (!kIsWeb) Tap(onTap: () { close(); () async { final up = await s.checkUpdate(force: true); if (up) { showUpdate(context); } else { toast(s.t('upd_none')); } }(); }, child: Padding(padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8), child: Row(children: [Icon(Icons.system_update_rounded, size: 24, color: ink(context)), const SizedBox(width: 16), Text(s.t('upd_menu'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600))]))),
             if (kIsWeb) Tap(onTap: () { close(); launchUrl(Uri.parse('https://hulhup.my.id/hulhup.apk'), mode: LaunchMode.externalApplication); }, child: Padding(padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8), child: Row(children: [Icon(Icons.android_rounded, size: 24, color: ink(context)), const SizedBox(width: 16), Text(s.t('get_app'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600))]))),
             const Spacer(),
             if (s.me == null) PBtn(s.t('login'), () { close(); go(context, const AuthPage()); }, icon: Icons.login_rounded)
@@ -212,10 +213,88 @@ class PopupBody extends StatelessWidget {
         }),
       ),
       const SizedBox(height: 10),
+      const SpeedRow(),
+      const SizedBox(height: 10),
       ListenableBuilder(listenable: s, builder: (_, __) {
         final off = s.isOffline(a.id);
         return PBtn(off ? s.t('is_offline') : s.t('mk_offline'), () => toggleOffline(a), ghost: true, icon: off ? Icons.offline_pin_rounded : Icons.download_for_offline_outlined);
       }),
+    ]);
+  }
+}
+
+
+/// Pemilih kecepatan putar buatan sendiri (bukan bawaan hp/browser).
+class SpeedRow extends StatelessWidget {
+  const SpeedRow({super.key});
+  static const rates = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+  String _l(double r) => r == r.roundToDouble() ? '${r.toInt()}×' : '${r.toString().replaceAll(RegExp(r'0+$'), '')}×';
+  @override
+  Widget build(BuildContext context) {
+    final s = Store.i;
+    return ListenableBuilder(listenable: s, builder: (_, __) => Row(children: [
+      Icon(Icons.speed_rounded, size: 18, color: sub(context)),
+      const SizedBox(width: 8),
+      Expanded(child: Container(
+        padding: const EdgeInsets.all(3), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(18)),
+        child: Row(children: [for (final r in rates) Expanded(child: Tap(onTap: () => s.setRate(r), scale: .94, child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200), height: 32, alignment: Alignment.center,
+          decoration: BoxDecoration(color: s.rate == r ? ink(context) : Colors.transparent, borderRadius: BorderRadius.circular(15)),
+          child: Text(_l(r), style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: s.rate == r ? bgOf(context) : sub(context))),
+        )))]),
+      )),
+    ]));
+  }
+}
+
+/// Pembaruan di dalam aplikasi: unduh dengan tampilan sendiri, lalu buka pemasang Android.
+Future<void> showUpdate(BuildContext context) => sheet(context, (_) => const _UpdateBody());
+
+class _UpdateBody extends StatefulWidget {
+  const _UpdateBody();
+  @override
+  State<_UpdateBody> createState() => _UpdateBodyState();
+}
+
+class _UpdateBodyState extends State<_UpdateBody> {
+  String step = 'idle'; // idle | down | inst | fail
+  double pct = 0;
+
+  void _go() {
+    setState(() { step = 'down'; pct = 0; });
+    try {
+      OtaUpdate().execute(kApkUrl, destinationFilename: 'hulhup.apk').listen((e) {
+        if (!mounted) return;
+        setState(() {
+          switch (e.status) {
+            case OtaStatus.DOWNLOADING: step = 'down'; pct = ((double.tryParse(e.value ?? '') ?? 0) / 100).clamp(0.0, 1.0); break;
+            case OtaStatus.INSTALLING: step = 'inst'; pct = 1; break;
+            case OtaStatus.INSTALLATION_DONE: break;
+            default: step = 'fail';
+          }
+        });
+      }, onError: (_) { if (mounted) setState(() => step = 'fail'); });
+    } catch (_) { setState(() => step = 'fail'); }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = Store.i;
+    final busy = step == 'down' || step == 'inst';
+    return Column(mainAxisSize: MainAxisSize.min, children: [
+      Icon(Icons.system_update_rounded, size: 40, color: ink(context)),
+      const SizedBox(height: 12),
+      Text(s.t('upd_title'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20)),
+      const SizedBox(height: 8),
+      Text(step == 'fail' ? s.t('upd_fail') : step == 'down' ? s.t('upd_down') : step == 'inst' ? s.t('upd_inst') : s.t('upd_note'), textAlign: TextAlign.center, style: TextStyle(color: sub(context), fontSize: 14, height: 1.4)),
+      if (busy) ...[
+        const SizedBox(height: 18),
+        ClipRRect(borderRadius: BorderRadius.circular(5), child: LinearProgressIndicator(value: step == 'inst' ? 1 : (pct > 0 ? pct : null), minHeight: 8, backgroundColor: ink(context).withValues(alpha: .12), color: ink(context))),
+        const SizedBox(height: 8),
+        Text(step == 'down' && pct > 0 ? '${(pct * 100).round()}%' : '', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+      ],
+      const SizedBox(height: 18),
+      if (!busy) PBtn(step == 'fail' ? s.t('retry') : s.t('upd_now'), _go, icon: Icons.download_rounded),
     ]);
   }
 }

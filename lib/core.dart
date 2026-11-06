@@ -763,6 +763,7 @@ class Store extends ChangeNotifier {
     mode = ThemeMode.values[(_sp.getInt('mode') ?? 0).clamp(0, 2)];
     remind = _sp.getBool('remind') ?? true;
     filter = _sp.getString('filter') ?? 'public';
+    rate = (_sp.getDouble('rate') ?? 1.0).clamp(0.5, 2.0);
     if (!Local.filters.contains(filter)) filter = 'public';
     await Local.init(_sp);
     await Api.init(_sp);
@@ -968,6 +969,16 @@ class Store extends ChangeNotifier {
 
   /// [loop]: audio berulang terus sampai dijeda atau popup/halaman ditutup.
   /// [scope]: halaman yang memutar; saat halaman itu ditutup, panggil [leave] agar suara berhenti.
+  double rate = 1.0;
+
+  /// Kecepatan putar (0.5x–2x), diingat untuk pemutaran berikutnya.
+  Future<void> setRate(double r) async {
+    rate = r;
+    notifyListeners();
+    try { await _p.setPlaybackRate(r); } catch (_) {}
+    await _sp.setDouble('rate', r);
+  }
+
   Future<void> play(A a, {bool force = false, bool loop = true, Object? scope}) async {
     if (!force && playing == a.id) { await stop(); return; }
     playing = a.id;
@@ -979,6 +990,7 @@ class Store extends ChangeNotifier {
     await _p.setReleaseMode(loop ? ReleaseMode.loop : ReleaseMode.release);
     final b = await Api.bytes(a.url);
     await _p.play(b != null ? BytesSource(b, mimeType: mimeOf(b)) : UrlSource(a.url));
+    try { await _p.setPlaybackRate(rate); } catch (_) {}
   }
 
   Future<void> stop() async {
@@ -1013,6 +1025,7 @@ const S = <String, List<String>>{
   'cancel': ['Batal', 'Cancel'], 'save': ['Simpan', 'Save'], 'saved': ['Tersimpan', 'Saved'], 'delete': ['Hapus', 'Delete'],
   'delete_audio_q': ['Hapus audio ini? Audio tidak bisa diedit, hanya dihapus.', 'Delete this audio? Audio cannot be edited, only deleted.'],
   'language': ['Bahasa', 'Language'], 'appearance': ['Tampilan', 'Appearance'], 'system': ['Sistem', 'System'], 'light': ['Cerah', 'Light'], 'dark': ['Gelap', 'Dark'],
+  'speed': ['Kecepatan', 'Speed'], 'upd_down': ['Mengunduh pembaruan…', 'Downloading update…'], 'upd_inst': ['Membuka pemasang…', 'Opening installer…'], 'upd_fail': ['Gagal memperbarui, coba lagi', 'Update failed, try again'], 'upd_now': ['Perbarui sekarang', 'Update now'], 'upd_note': ['Setelah diunduh, Android akan meminta kamu menekan Pasang.', 'After downloading, Android will ask you to tap Install.'],
   'upd_menu': ['Perbarui aplikasi', 'Update app'], 'upd_none': ['Aplikasimu sudah versi terbaru', 'Your app is up to date'], 'upd_title': ['Versi baru tersedia', 'New version available'], 'upd_btn': ['Perbarui', 'Update'],
   'get_app': ['Unduh aplikasi Android', 'Download Android app'], 'website': ['Situs web hulhup.my.id', 'Website hulhup.my.id'], 'about': ['Tentang Hulhup', 'About Hulhup'], 'policy': ['Kebijakan', 'Policy'], 'privacy': ['Privasi', 'Privacy'],
   'followers': ['Pengikut', 'Followers'], 'following': ['Mengikuti', 'Following'], 'audio': ['Audio', 'Audio'], 'liked': ['Disukai', 'Liked'],

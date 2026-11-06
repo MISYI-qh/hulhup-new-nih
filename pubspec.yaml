@@ -19,6 +19,7 @@ dependencies:
   connectivity_plus: ^6.1.0
   http: ^1.2.2
   url_launcher: ^6.3.0
+  ota_update: any
 dev_dependencies:
   flutter_launcher_icons: ^0.14.0
   flutter_test:

@@ -26,7 +26,7 @@ python3 - <<'PY'
 import re, glob
 m = 'android/app/src/main/AndroidManifest.xml'
 s = open(m).read()
-perms = ''.join('    <uses-permission android:name="android.permission.%s"/>\n' % p for p in ['INTERNET', 'RECORD_AUDIO', 'POST_NOTIFICATIONS', 'RECEIVE_BOOT_COMPLETED'])
+perms = ''.join('    <uses-permission android:name="android.permission.%s"/>\n' % p for p in ['INTERNET', 'RECORD_AUDIO', 'POST_NOTIFICATIONS', 'RECEIVE_BOOT_COMPLETED', 'REQUEST_INSTALL_PACKAGES'])
 s = s.replace('<application', perms + '    <application', 1)
 rec = '''        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
