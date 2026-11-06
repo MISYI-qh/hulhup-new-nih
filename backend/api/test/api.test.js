@@ -67,3 +67,21 @@ test('akun dibanned diblokir', async () => {
   await q(`update users set status='banned' where username='dave'`);
   assert.equal((await call('GET', '/me', { token: t })).error, 'banned');
 });
+
+test('laporan, keluar perangkat lain, spasi sandi', async () => {
+  assert.equal((await call('POST', '/register', { body: { name: 'x', username: 'spasi', password: 'a b c d e', birth: '2000-01-01' }, ip: '7.7.7.7' })).error, 'bad_password');
+  const a = await reg('frank'), b = await reg('gina'), c = await reg('hank'), d = await reg('iris');
+  await call('POST', '/audios?secs=3&rand=public&desc=lapor', { token: a, raw: mp3() });
+  let id = null;
+  for (let i = 0; i < 80 && !id; i++) { const r = await call('GET', '/random?f=public', { token: b }); if (r.audio && r.audio.owner === 'frank') id = r.audio.id; }
+  assert.ok(id);
+  assert.equal((await call('POST', '/reports', { token: a, body: { audio: id, reason: 'spam' } })).error, 'forbidden');
+  for (const t of [b, c, d]) assert.equal((await call('POST', '/reports', { token: t, body: { audio: id, reason: 'spam' } })).ok, true);
+  const { one } = await import('../lib/db.js');
+  assert.equal((await one('select hidden from audios where id=$1', [id])).hidden, true);
+  const t2 = (await call('POST', '/login', { body: { username: 'frank', password: 'secret1' }, ip: '8.8.8.8' })).token;
+  const o = await call('POST', '/me/logout-others', { token: a });
+  assert.equal(o.closed, 1);
+  assert.equal((await call('GET', '/me', { token: t2 })).error, 'unauthorized');
+  assert.equal((await call('GET', '/me', { token: a })).ok, true);
+});

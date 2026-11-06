@@ -219,6 +219,7 @@ class PopupBody extends StatelessWidget {
         final off = s.isOffline(a.id);
         return PBtn(off ? s.t('is_offline') : s.t('mk_offline'), () => toggleOffline(a), ghost: true, icon: off ? Icons.offline_pin_rounded : Icons.download_for_offline_outlined);
       }),
+      if (s.me != null && s.me!.username != a.owner) Tap(onTap: () => reportSheet(context, audio: a.id), child: Padding(padding: const EdgeInsets.only(top: 12, bottom: 2), child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.flag_outlined, size: 16, color: sub(context)), const SizedBox(width: 6), Text(s.t('report'), style: TextStyle(color: sub(context), fontSize: 13, fontWeight: FontWeight.w600))]))),
     ]);
   }
 }
@@ -298,3 +299,22 @@ class _UpdateBodyState extends State<_UpdateBody> {
     ]);
   }
 }
+
+
+/// Lembar pelaporan buatan sendiri: pilih alasan, laporan dikirim ke server.
+Future<void> reportSheet(BuildContext context, {int? audio, String? user}) => sheet(context, (ctx) {
+  final s = Store.i;
+  Future<void> send(String r) async {
+    Navigator.pop(ctx);
+    try {
+      await Api.req('POST', '/reports', body: {if (audio != null) 'audio': audio, if (user != null) 'user': user, 'reason': r});
+      toast(s.t('report_done'));
+    } catch (e) { toast(s.err(e), bad: true); }
+  }
+  return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+    Text(s.t('report_title'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20)),
+    const SizedBox(height: 8),
+    for (final r in ['abuse', 'sexual', 'violence', 'spam', 'impersonate', 'other'])
+      Tap(onTap: () => send(r), child: Padding(padding: const EdgeInsets.symmetric(vertical: 14), child: Row(children: [Expanded(child: Text(s.t('r_$r'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600))), Icon(Icons.chevron_right_rounded, color: sub(context))]))),
+  ]);
+});

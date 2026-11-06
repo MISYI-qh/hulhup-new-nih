@@ -359,6 +359,7 @@ class Local {
       return {'token': 'local', 'user': _uv(row, row)};
     }
     if (p == '/logout') { await setSession(null); return {'ok': true}; }
+    if (p == '/reports' || p == '/me/logout-others') { need(); return {'ok': true, 'closed': 0}; }
     if (p == '/stats') return {'taps': me != null ? (me['taps'] ?? 0) : db['taps']};
     if (p == '/random') {
       // Hitungan ketukan per akun; tamu punya hitungan sendiri.
@@ -1025,6 +1026,9 @@ const S = <String, List<String>>{
   'cancel': ['Batal', 'Cancel'], 'save': ['Simpan', 'Save'], 'saved': ['Tersimpan', 'Saved'], 'delete': ['Hapus', 'Delete'],
   'delete_audio_q': ['Hapus audio ini? Audio tidak bisa diedit, hanya dihapus.', 'Delete this audio? Audio cannot be edited, only deleted.'],
   'language': ['Bahasa', 'Language'], 'appearance': ['Tampilan', 'Appearance'], 'system': ['Sistem', 'System'], 'light': ['Cerah', 'Light'], 'dark': ['Gelap', 'Dark'],
+  'report': ['Laporkan', 'Report'], 'report_title': ['Laporkan konten ini', 'Report this'], 'report_done': ['Terima kasih, laporanmu kami terima', 'Thanks, we received your report'],
+  'r_abuse': ['Pelecehan atau ujaran kebencian', 'Harassment or hate'], 'r_sexual': ['Konten seksual', 'Sexual content'], 'r_violence': ['Kekerasan', 'Violence'], 'r_spam': ['Spam', 'Spam'], 'r_impersonate': ['Meniru orang lain', 'Impersonation'], 'r_other': ['Lainnya', 'Other'],
+  'logout_others': ['Keluar dari perangkat lain', 'Sign out of other devices'], 'logout_others_done': ['Perangkat lain sudah dikeluarkan', 'Other devices signed out'],
   'speed': ['Kecepatan', 'Speed'], 'upd_down': ['Mengunduh pembaruan…', 'Downloading update…'], 'upd_inst': ['Membuka pemasang…', 'Opening installer…'], 'upd_fail': ['Gagal memperbarui, coba lagi', 'Update failed, try again'], 'upd_now': ['Perbarui sekarang', 'Update now'], 'upd_note': ['Setelah diunduh, Android akan meminta kamu menekan Pasang.', 'After downloading, Android will ask you to tap Install.'],
   'upd_menu': ['Perbarui aplikasi', 'Update app'], 'upd_none': ['Aplikasimu sudah versi terbaru', 'Your app is up to date'], 'upd_title': ['Versi baru tersedia', 'New version available'], 'upd_btn': ['Perbarui', 'Update'],
   'get_app': ['Unduh aplikasi Android', 'Download Android app'], 'website': ['Situs web hulhup.my.id', 'Website hulhup.my.id'], 'about': ['Tentang Hulhup', 'About Hulhup'], 'policy': ['Kebijakan', 'Policy'], 'privacy': ['Privasi', 'Privacy'],

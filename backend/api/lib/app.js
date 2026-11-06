@@ -137,10 +137,10 @@ const route = (method, re, fn) => routes.push([method, re, fn]);
 route('POST', /^\/register$/, async (c) => {
   await hit(`reg:${c.ip}`, 5, 3600);
   const b = c.body;
-  const name = String(b.name ?? '').trim(), username = String(b.username ?? '').trim().toLowerCase(), pw = String(b.password ?? ''), birth = String(b.birth ?? '').trim();
+  const name = String(b.name ?? '').trim(), username = String(b.username ?? '').trim().toLowerCase(), pw = String(b.password ?? '').trim(), birth = String(b.birth ?? '').trim();
   if (!name || name.length > 40) throw new ApiErr('bad_name');
   if (!UN.test(username)) throw new ApiErr('bad_username');
-  if (pw.length < 6 || pw.length > 100) throw new ApiErr('bad_password');
+  if (pw.length < 6 || pw.length > 100 || /\s/.test(pw)) throw new ApiErr('bad_password');
   if (!okBirth(birth)) throw new ApiErr('bad_age');
   const { salt, hash } = await hashPw(pw);
   let u;
@@ -159,7 +159,7 @@ route('POST', /^\/login$/, async (c) => {
   await hit(`login:${c.ip}`, 20, 600);
   await hit(`loginu:${username}`, 8, 600);
   const u = await one('select * from users where username=$1', [username]);
-  if (!u || !(await checkPw(String(c.body.password ?? ''), u.pass_salt, u.pass_hash))) throw new ApiErr('bad_credentials', 401);
+  if (!u || !(await checkPw(String(c.body.password ?? '').trim(), u.pass_salt, u.pass_hash))) throw new ApiErr('bad_credentials', 401);
   if (u.status !== 'active') throw new ApiErr('banned', 403);
   return { token: await newSession(u.id), user: await uv(u, u, c.today) };
 });
@@ -294,15 +294,53 @@ route('PATCH', /^\/me$/, async (c) => {
 route('POST', /^\/me\/password$/, async (c) => {
   const u = c.need();
   await hit(`pw:${u.id}`, 8, 600);
-  if (!(await checkPw(String(c.body.old ?? ''), u.pass_salt, u.pass_hash))) throw new ApiErr('bad_credentials', 401);
-  const pw = String(c.body.new ?? '');
-  if (pw.length < 6 || pw.length > 100) throw new ApiErr('bad_password');
+  if (!(await checkPw(String(c.body.old ?? '').trim(), u.pass_salt, u.pass_hash))) throw new ApiErr('bad_credentials', 401);
+  const pw = String(c.body.new ?? '').trim();
+  if (pw.length < 6 || pw.length > 100 || /\s/.test(pw)) throw new ApiErr('bad_password');
   const { salt, hash } = await hashPw(pw);
   const cur = sha((c.req.headers.authorization || '').slice(7));
   await tx(async (t) => {
     await t.query('update users set pass_hash=$2, pass_salt=$3 where id=$1', [u.id, hash, salt]);
     await t.query('delete from sessions where user_id=$1 and token_hash<>$2', [u.id, cur]); // sesi lain hangus
   });
+  return { ok: true };
+});
+
+route('POST', /^\/me\/logout-others$/, async (c) => {
+  const u = c.need();
+  const cur = sha((c.req.headers.authorization || '').slice(7));
+  const d = await q('delete from sessions where user_id=$1 and token_hash<>$2', [u.id, cur]);
+  return { ok: true, closed: d.rowCount };
+});
+
+// ---------- laporan ----------
+const REASONS = ['abuse', 'sexual', 'violence', 'spam', 'impersonate', 'other'];
+route('POST', /^\/reports$/, async (c) => {
+  const u = c.need();
+  await hit(`rep:${u.id}`, 20, 3600);
+  const reason = REASONS.includes(c.body.reason) ? c.body.reason : 'other';
+  const note = String(c.body.note ?? '').trim().slice(0, 300);
+  const aid = Number(c.body.audio) || null;
+  let tu = null, ta = null;
+  if (aid) {
+    const a = await one('select id, owner from audios where id=$1', [aid]);
+    if (!a) throw new ApiErr('not_found', 404);
+    if (Number(a.owner) === Number(u.id)) throw new ApiErr('forbidden', 403);
+    ta = a.id; tu = a.owner;
+  } else {
+    const o = await one('select id from users where username=$1', [String(c.body.user ?? '').toLowerCase()]);
+    if (!o) throw new ApiErr('not_found', 404);
+    if (Number(o.id) === Number(u.id)) throw new ApiErr('forbidden', 403);
+    tu = o.id;
+  }
+  const dup = await one(`select 1 from reports where reporter=$1 and target_user=$2 and target_audio is not distinct from $3 and status='open'`, [u.id, tu, ta]);
+  if (!dup) {
+    await q('insert into reports(reporter, target_user, target_audio, reason, created) values ($1,$2,$3,$4,$5)', [u.id, tu, ta, (reason + (note ? ': ' + note : '')).slice(0, 320), now()]);
+    if (ta) { // banyak pelapor berbeda -> sembunyikan sementara sampai ditinjau lewat konsol
+      const n = await one(`select count(distinct reporter)::int n from reports where target_audio=$1 and status='open'`, [ta]);
+      if (n.n >= 3) await q('update audios set hidden=true where id=$1', [ta]);
+    }
+  }
   return { ok: true };
 });
 
