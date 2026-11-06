@@ -138,3 +138,14 @@ CREATE TABLE IF NOT EXISTS rate_hits (
   n      INT NOT NULL,
   PRIMARY KEY (k, win)
 );
+
+-- Saat akun dihapus, hitungan pengikut/mengikuti/suka milik akun lain ikut dikurangi.
+create or replace function users_before_delete() returns trigger language plpgsql as $$
+begin
+  update users set followers = greatest(0, followers - 1) where id in (select dst from follows where src = old.id);
+  update users set following = greatest(0, following - 1) where id in (select src from follows where dst = old.id);
+  update audios set likes = greatest(0, likes - 1) where id in (select audio_id from likes where user_id = old.id);
+  return old;
+end $$;
+drop trigger if exists users_before_delete on users;
+create trigger users_before_delete before delete on users for each row execute function users_before_delete();
