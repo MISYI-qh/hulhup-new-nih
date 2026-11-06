@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'core.dart';
 import 'ui.dart';
 import 'pages.dart';
@@ -159,6 +161,7 @@ class SideMenu extends StatelessWidget {
             item(Icons.info_outline_rounded, 'about', () => TextPage(s.t('about'), s.t('about_t'))),
             item(Icons.rule_rounded, 'policy', () => TextPage(s.t('policy'), s.t('policy_t'))),
             item(Icons.lock_outline_rounded, 'privacy', () => TextPage(s.t('privacy'), s.t('privacy_t'))),
+            if (!kIsWeb) Tap(onTap: () { close(); launchUrl(Uri.parse('https://hulhup.my.id'), mode: LaunchMode.externalApplication); }, child: Padding(padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8), child: Row(children: [Icon(Icons.language_rounded, size: 24, color: ink(context)), const SizedBox(width: 16), Text(s.t('website'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600))]))),
             const Spacer(),
             if (s.me == null) PBtn(s.t('login'), () { close(); go(context, const AuthPage()); }, icon: Icons.login_rounded)
             else PBtn(s.t('logout'), () async { close(); await s.logout(); }, icon: Icons.logout_rounded, ghost: true, fgc: heart),
@@ -181,7 +184,7 @@ class PopupBody extends StatelessWidget {
       if (a.pprof) Tap(onTap: () { Navigator.pop(context); go(context, ProfilePage(a.owner)); }, child: Row(children: [
         Avatar(a.ownerAvatar, a.ownerName, 46),
         const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(a.ownerName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)), Text(a.created > 0 ? '${a.owner} · ${s.when(a.created)}' : a.owner, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: sub(context), fontSize: 13))])),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Flexible(child: Text(a.ownerName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16))), if (a.ownerVerified) const Padding(padding: EdgeInsets.only(left: 4), child: Icon(Icons.verified_rounded, size: 16, color: Color(0xFF2F8F5B)))]), Text(a.created > 0 ? '${a.owner} · ${s.when(a.created)}' : a.owner, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: sub(context), fontSize: 13))])),
         Icon(Icons.chevron_right_rounded, color: sub(context)),
       ])),
       if (!a.pprof && a.created > 0) Align(alignment: Alignment.centerLeft, child: Padding(padding: const EdgeInsets.only(bottom: 6), child: Text(s.when(a.created), style: TextStyle(color: sub(context), fontSize: 13)))),

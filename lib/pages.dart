@@ -247,7 +247,7 @@ class _ProfileState extends State<ProfilePage> {
       In(0, Padding(padding: const EdgeInsets.symmetric(horizontal: 24), child: Align(alignment: Alignment.centerLeft, child: Container(padding: const EdgeInsets.all(5), decoration: BoxDecoration(color: bgOf(context), shape: BoxShape.circle, boxShadow: [BoxShadow(color: green.withValues(alpha: .16), blurRadius: 28, offset: const Offset(0, 10))]), child: Tap(onTap: u.avatar == null ? null : () => go(context, ImageViewer(u.avatar!, u.name)), scale: .96, child: Avatar(u.avatar, u.name, 96)))))),
       const SizedBox(height: 16),
       Padding(padding: const EdgeInsets.fromLTRB(24, 0, 24, 0), child: In(1, Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(u.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 24, letterSpacing: -.5)),
+        Row(children: [Flexible(child: Text(u.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 24, letterSpacing: -.5))), if (u.verified) const Padding(padding: EdgeInsets.only(left: 6), child: Icon(Icons.verified_rounded, size: 22, color: Color(0xFF2F8F5B)))]),
         const SizedBox(height: 2),
         Text(u.username, style: TextStyle(color: sub(context), fontSize: 15)),
         if (u.bio.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 12), child: Text(u.bio, style: const TextStyle(fontSize: 15, height: 1.45))),

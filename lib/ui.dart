@@ -369,7 +369,8 @@ class LikeBtn extends StatelessWidget {
 Widget img(String url, {BoxFit fit = BoxFit.cover, Widget? fallback}) {
   final b = Local.bytes(url);
   final fb = fallback ?? const SizedBox();
-  return b != null ? Image.memory(b, fit: fit, gaplessPlayback: true, errorBuilder: (_, __, ___) => fb) : Image.network(url, fit: fit, errorBuilder: (_, __, ___) => fb);
+  final net = url.startsWith('/') ? '${Api.base}$url' : url;
+  return b != null ? Image.memory(b, fit: fit, gaplessPlayback: true, errorBuilder: (_, __, ___) => fb) : Image.network(net, fit: fit, errorBuilder: (_, __, ___) => fb);
 }
 
 /// Latar profil: penuh lebar, memudar halus ke warna halaman di semua sisi.

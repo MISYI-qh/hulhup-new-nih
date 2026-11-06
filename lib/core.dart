@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
@@ -5,6 +6,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'notify.dart';
 
@@ -13,12 +15,98 @@ class ApiErr implements Exception {
   ApiErr(this.code);
 }
 
-/// Lapisan data. Sekarang semuanya tersimpan lokal di perangkat (Local).
-/// Antarmuka sama dengan API server, jadi nanti tinggal diganti ke backend.
+/// Lapisan data. Dengan --dart-define=API_URL=... memakai server (Remote); tanpa itu memakai Local (tes & mode lokal).
 class Api {
-  static Future<dynamic> req(String m, String p, {Map? body}) => Local.handle(m, p, body);
-  static Future<dynamic> raw(String p, Uint8List b, String type) => Local.raw(p, b, type);
-  static Future<dynamic> multi(String p, Uint8List b, String name, Map<String, String> f) => Local.multi(p, b, name, f);
+  static const base = String.fromEnvironment('API_URL');
+  static bool get remote => base.isNotEmpty;
+  static String? token;
+  static final _media = <String, Uint8List>{};
+
+  static Future<void> init(SharedPreferences sp) async { token = sp.getString('token'); }
+  static bool get hasSession => remote ? token != null : Local.session != null;
+  static Future<void> setSession(String? v) async {
+    if (remote) {
+      token = v;
+      final sp = await SharedPreferences.getInstance();
+      v == null ? await sp.remove('token') : await sp.setString('token', v);
+    } else { await Local.setSession(v); }
+  }
+
+  static Future<dynamic> req(String m, String p, {Map? body}) => remote ? Remote.req(m, p, body) : Local.handle(m, p, body);
+  static Future<dynamic> raw(String p, Uint8List b, String type) => remote ? Remote.send('POST', p, b, type) : Local.raw(p, b, type);
+  static Future<dynamic> multi(String p, Uint8List b, String name, Map<String, String> f) =>
+      remote ? Remote.send('POST', '$p?${Uri(queryParameters: f).query}', b, 'application/octet-stream') : Local.multi(p, b, name, f);
+
+  /// Ambil berkas audio (perlu login) dari server; disimpan sebentar di memori.
+  static Future<Uint8List?> bytes(String url) async {
+    final l = Local.bytes(url);
+    if (l != null || !remote || !url.startsWith('/')) return l;
+    final c = _media[url];
+    if (c != null) return c;
+    final r = await Remote.fetch(url);
+    if (_media.length >= 6) _media.remove(_media.keys.first);
+    _media[url] = r;
+    return r;
+  }
+}
+
+class Remote {
+  static final _c = http.Client();
+
+  static Map<String, String> _h([String? type]) {
+    final n = DateTime.now();
+    String d2(int v) => v.toString().padLeft(2, '0');
+    return {
+      if (Api.token != null) 'Authorization': 'Bearer ${Api.token}',
+      'X-Today': '${n.year}-${d2(n.month)}-${d2(n.day)}',
+      if (type != null) 'Content-Type': type,
+    };
+  }
+
+  static dynamic _out(http.Response r) {
+    dynamic j;
+    try { j = r.body.isEmpty ? {} : jsonDecode(utf8.decode(r.bodyBytes)); } catch (_) { j = null; }
+    if (r.statusCode >= 200 && r.statusCode < 300) return j ?? {};
+    final code = j is Map && j['error'] is String ? j['error'] as String : (r.statusCode == 401 ? 'unauthorized' : 'server');
+    throw ApiErr(code);
+  }
+
+  static Future<dynamic> req(String m, String p, Map? body) async {
+    if (p == '/me/reminders' && body?['test'] != true) {
+      final n = DateTime.now();
+      var slot = DateTime(n.year, n.month, n.day, 19);
+      if (n.isBefore(slot)) slot = slot.subtract(const Duration(days: 1));
+      String d2(int v) => v.toString().padLeft(2, '0');
+      body = {...?body, 'slot': '${slot.year}-${d2(slot.month)}-${d2(slot.day)}', 'slot_ms': slot.millisecondsSinceEpoch};
+    }
+    if (p == '/register') body = {...?body, 'slot': ''};
+    final u = Uri.parse('${Api.base}$p');
+    final h = _h(body == null ? null : 'application/json');
+    final enc = body == null ? null : jsonEncode(body);
+    final t = const Duration(seconds: 25);
+    final r = switch (m) {
+      'GET' => await _c.get(u, headers: h).timeout(t),
+      'POST' => await _c.post(u, headers: h, body: enc).timeout(t),
+      'PATCH' => await _c.patch(u, headers: h, body: enc).timeout(t),
+      'DELETE' => await _c.delete(u, headers: h).timeout(t),
+      _ => throw ApiErr('not_found'),
+    };
+    final j = _out(r);
+    if ((p == '/login' || p == '/register') && j is Map && j['token'] is String) await Api.setSession(j['token'] as String);
+    if ((p == '/logout' && m == 'POST') || (p == '/me' && m == 'DELETE')) await Api.setSession(null);
+    return j;
+  }
+
+  static Future<dynamic> send(String m, String p, Uint8List b, String type) async {
+    final r = await _c.post(Uri.parse('${Api.base}$p'), headers: _h(type), body: b).timeout(const Duration(seconds: 60));
+    return _out(r);
+  }
+
+  static Future<Uint8List> fetch(String p) async {
+    final r = await _c.get(Uri.parse('${Api.base}$p'), headers: _h()).timeout(const Duration(seconds: 60));
+    if (r.statusCode != 200) throw ApiErr('network');
+    return r.bodyBytes;
+  }
 }
 
 String? mimeOf(Uint8List b) {
@@ -572,25 +660,25 @@ class U {
   final int age, audios, streak, days, taps;
   int followers, following;
   bool isFollowing;
-  final bool isMe;
+  final bool isMe, verified;
   U.from(Map j)
       : username = j['username'], name = j['name'], bio = j['bio'] ?? '', birth = j['birth'] ?? '', avatar = j['avatar'], cover = j['cover'],
         pvis = j['pvis'] ?? 'public', streak = j['streak'] ?? 0, days = j['days'] ?? 0, taps = j['taps'] ?? 0,
         age = j['age'] ?? 0, audios = j['audios'] ?? 0, followers = j['followers'] ?? 0, following = j['following'] ?? 0,
-        isFollowing = j['is_following'] == true, isMe = j['is_me'] == true;
+        isFollowing = j['is_following'] == true, isMe = j['is_me'] == true, verified = j['verified'] == true;
 }
 
 class A {
   final int id, secs, created;
   final String desc, url, vis, rand, owner, ownerName;
   final String? ownerAvatar;
-  final bool popup, pprof;
+  final bool popup, pprof, ownerVerified;
   int likes;
   bool liked;
   A.from(Map j)
       : id = j['id'], secs = j['secs'], created = j['created'] ?? 0, desc = j['desc'] ?? '', url = j['url'], vis = j['vis'] ?? 'public', rand = j['rand'] ?? 'public', owner = j['owner'],
-        ownerName = j['owner_name'], ownerAvatar = j['owner_avatar'], popup = j['popup'] == true, pprof = j['pprof'] != false, likes = j['likes'] ?? 0, liked = j['liked'] == true;
-  Map<String, dynamic> toJson() => {'id': id, 'secs': secs, 'created': created, 'desc': desc, 'url': url, 'vis': vis, 'rand': rand, 'owner': owner, 'owner_name': ownerName, 'owner_avatar': ownerAvatar, 'popup': popup, 'pprof': pprof, 'likes': likes, 'liked': liked};
+        ownerName = j['owner_name'], ownerAvatar = j['owner_avatar'], ownerVerified = j['owner_verified'] == true, popup = j['popup'] == true, pprof = j['pprof'] != false, likes = j['likes'] ?? 0, liked = j['liked'] == true;
+  Map<String, dynamic> toJson() => {'id': id, 'secs': secs, 'created': created, 'desc': desc, 'url': url, 'vis': vis, 'rand': rand, 'owner': owner, 'owner_name': ownerName, 'owner_avatar': ownerAvatar, 'owner_verified': ownerVerified, 'popup': popup, 'pprof': pprof, 'likes': likes, 'liked': liked};
 }
 
 String mmss(int s) => '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}';
@@ -658,6 +746,8 @@ class Store extends ChangeNotifier {
     filter = _sp.getString('filter') ?? 'public';
     if (!Local.filters.contains(filter)) filter = 'public';
     await Local.init(_sp);
+    await Api.init(_sp);
+    if (Api.remote) Timer.periodic(const Duration(seconds: 60), (_) => _poll());
     Local.onNotify = (to, type, actor, extra) {
       if (me?.username == to) { banner?.call('$actor ${notifText(type, extra)}'); refresh(); }
       Notifier.show(200 + (_nid++ % 50), 'Hulhup', '$actor ${notifText(type, extra)} · @$to', t('notif'));
@@ -670,7 +760,7 @@ class Store extends ChangeNotifier {
 
   Future<void> refresh() async {
     try {
-      if (Local.session != null) {
+      if (Api.hasSession) {
         final j = await Api.req('GET', '/me');
         me = U.from(j['user']);
         unread = j['unread'] ?? 0;
@@ -718,6 +808,20 @@ class Store extends ChangeNotifier {
     return fresh;
   }
 
+  /// Server tidak mendorong notifikasi; aplikasi menanyakan berkala saat terbuka.
+  Future<void> _poll() async {
+    if (me == null || _starting) return;
+    try {
+      await refresh();
+      if (unreadSocial > _pushed) {
+        final msg = t('push_unread').replaceAll('{n}', '$unreadSocial');
+        banner?.call(msg);
+        await Notifier.show(1, 'Hulhup', msg, t('notif'));
+      }
+      _pushed = unreadSocial;
+    } catch (_) {}
+  }
+
   /// Pengingat "Kamu lelah?" setiap hari jam 19.00, juga kalau aplikasi sudah dibuka hari itu. Dijadwal ulang tiap aplikasi dibuka.
   Future<void> syncReminders() async {
     await Notifier.cancelReminders();
@@ -732,7 +836,7 @@ class Store extends ChangeNotifier {
     if (v) { await Notifier.allow(); await _sp.setBool('asked', true); await syncReminders(); } else { await Notifier.cancelReminders(); }
   }
 
-  Future<void> _clear() async { await Local.setSession(null); me = null; unread = 0; unreadSocial = 0; _pushed = 0; }
+  Future<void> _clear() async { await Api.setSession(null); me = null; unread = 0; unreadSocial = 0; _pushed = 0; }
 
   Future<void> auth(String path, Map body) async {
     final j = await Api.req('POST', path, body: body);
@@ -812,7 +916,7 @@ class Store extends ChangeNotifier {
       await Local.delBlob('off${a.id}');
       offline.removeAt(i);
     } else {
-      final b = Local.bytes(a.url);
+      final b = await Api.bytes(a.url);
       if (b == null) throw ApiErr('server');
       await Local.putBlob('off${a.id}', b);
       final j = a.toJson();
@@ -834,7 +938,7 @@ class Store extends ChangeNotifier {
     notifyListeners();
     await _p.stop();
     await _p.setReleaseMode(loop ? ReleaseMode.loop : ReleaseMode.release);
-    final b = Local.bytes(a.url);
+    final b = await Api.bytes(a.url);
     await _p.play(b != null ? BytesSource(b, mimeType: mimeOf(b)) : UrlSource(a.url));
   }
 
@@ -870,7 +974,7 @@ const S = <String, List<String>>{
   'cancel': ['Batal', 'Cancel'], 'save': ['Simpan', 'Save'], 'saved': ['Tersimpan', 'Saved'], 'delete': ['Hapus', 'Delete'],
   'delete_audio_q': ['Hapus audio ini? Audio tidak bisa diedit, hanya dihapus.', 'Delete this audio? Audio cannot be edited, only deleted.'],
   'language': ['Bahasa', 'Language'], 'appearance': ['Tampilan', 'Appearance'], 'system': ['Sistem', 'System'], 'light': ['Cerah', 'Light'], 'dark': ['Gelap', 'Dark'],
-  'about': ['Tentang Hulhup', 'About Hulhup'], 'policy': ['Kebijakan', 'Policy'], 'privacy': ['Privasi', 'Privacy'],
+  'website': ['Situs web hulhup.my.id', 'Website hulhup.my.id'], 'about': ['Tentang Hulhup', 'About Hulhup'], 'policy': ['Kebijakan', 'Policy'], 'privacy': ['Privasi', 'Privacy'],
   'followers': ['Pengikut', 'Followers'], 'following': ['Mengikuti', 'Following'], 'audio': ['Audio', 'Audio'], 'liked': ['Disukai', 'Liked'],
   'upload': ['Unggah audio', 'Upload audio'], 'record': ['Rekam', 'Record'], 'stop': ['Berhenti', 'Stop'], 'pick': ['Pilih file', 'Pick file'],
   'desc': ['Deskripsi', 'Description'], 'bio': ['Bio', 'Bio'], 'popup': ['Tampilkan popup saat diketuk', 'Show popup on tap'],
@@ -903,6 +1007,8 @@ const S = <String, List<String>>{
   'nobody': ['Belum ada suara. Jadilah yang pertama.', 'No voices yet. Be the first.'], 'uploaded': ['Audio terunggah', 'Audio uploaded'],
   'welcome': ['Selamat datang', 'Welcome'], 'too_long': ['Maksimal 30 detik', 'Maximum 30 seconds'], 'mic_denied': ['Izin mikrofon ditolak', 'Microphone permission denied'],
   'preview': ['Dengar', 'Listen'], 'done': ['Selesai', 'Done'], 'retry': ['Coba lagi', 'Retry'], 'untitled': ['Audio tanpa deskripsi', 'Audio without description'],
+  'e_rate_limited': ['Terlalu sering, coba lagi sebentar lagi', 'Too many requests, try again shortly'],
+  'e_banned': ['Akun ini dibatasi', 'This account is restricted'],
   'e_network': ['Tidak terhubung ke server', 'Cannot reach the server'], 'e_server': ['Terjadi kesalahan', 'Something went wrong'],
   'e_unauthorized': ['Sesi berakhir, silakan masuk lagi', 'Session expired, please sign in again'],
   'e_username_taken': ['Nama pengguna sudah dipakai', 'Username is already taken'],
@@ -937,12 +1043,12 @@ const S = <String, List<String>>{
   'ago_now': ['baru saja', 'just now'], 'ago_m': ['mnt lalu', 'min ago'], 'ago_h': ['jam lalu', 'h ago'], 'ago_d': ['hari lalu', 'd ago'],
   'e_too_big_img': ['Foto terlalu besar (maks 3 MB)', 'Photo too large (max 3 MB)'],
   'about_t': [
-    'Hulhup adalah ruang suara yang sederhana. Ketuk satu tombol, dengarkan suara acak dari orang-orang di seluruh dunia, tanpa perlu masuk.\n\nMasuk hanya jika kamu ingin berbagi suaramu sendiri, menyukai audio, mengikuti akun lain, dan mencari audio lewat deskripsinya.\n\nKamu mengatur sendiri siapa yang bisa mendengar audiomu secara acak, dan lewat Pengaturan siapa yang bisa melihatnya di profilmu, termasuk pilihan hanya untuk saya.\n\nHulhup mengingatkanmu lewat notifikasi dan menghitung berapa hari berturut-turut kamu masuk.\n\nHulhup adalah produk dari Misyi.\n\nVersi 1.1.0',
-    'Hulhup is a simple home for voices. Tap one button and hear a random voice from people around the world, no sign-in needed.\n\nSign in only if you want to share your own voice, like audio, follow other accounts, and search audio by its description.\n\nYou choose who can hear your audio randomly, and in Settings who can see it on your profile, including an only-me option.\n\nHulhup reminds you with notifications and counts how many days in a row you sign in.\n\nHulhup is a product of Misyi.\n\nVersion 1.1.0'],
+    'Hulhup adalah ruang suara yang sederhana. Ketuk satu tombol, dengarkan suara acak dari orang-orang di seluruh dunia, tanpa perlu masuk.\n\nMasuk hanya jika kamu ingin berbagi suaramu sendiri, menyukai audio, mengikuti akun lain, dan mencari audio lewat deskripsinya.\n\nKamu mengatur sendiri siapa yang bisa mendengar audiomu secara acak, dan lewat Pengaturan siapa yang bisa melihatnya di profilmu, termasuk pilihan hanya untuk saya.\n\nHulhup mengingatkanmu lewat notifikasi dan menghitung berapa hari berturut-turut kamu masuk.\n\nHulhup tersedia di web (hulhup.my.id) dan sebagai aplikasi Android, dengan akun dan data yang sama.\n\nHulhup adalah produk dari Misyi.\n\nVersi 1.2.0',
+    'Hulhup is a simple home for voices. Tap one button and hear a random voice from people around the world, no sign-in needed.\n\nSign in only if you want to share your own voice, like audio, follow other accounts, and search audio by its description.\n\nYou choose who can hear your audio randomly, and in Settings who can see it on your profile, including an only-me option.\n\nHulhup reminds you with notifications and counts how many days in a row you sign in.\n\nHulhup is available on the web (hulhup.my.id) and as an Android app, with the same account and data.\n\nHulhup is a product of Misyi.\n\nVersion 1.2.0'],
   'policy_t': [
-    'Dengan memakai Hulhup kamu setuju pada aturan berikut.\n\n1. Audio yang kamu unggah berdurasi maksimal 30 detik, dengan deskripsi maksimal 200 karakter, dan harus milikmu atau kamu punya izin memakainya. Foto profil maksimal 3 MB.\n2. Dilarang mengunggah konten yang melecehkan, menebar kebencian, mengandung kekerasan atau seksual, melanggar hukum, atau meniru orang lain.\n3. Dilarang spam dan menyalahgunakan layanan.\n4. Untuk setiap audio kamu memilih siapa yang bisa mendengarnya secara acak: publik, pengikut, mengikuti, atau pengikut dan mengikuti. Audio publik dapat didengar siapa saja.\n5. Di Pengaturan kamu memilih siapa yang bisa melihat audiomu di profil dan di hasil pencarian: publik, pengikut, mengikuti, pengikut dan mengikuti, atau hanya untuk saya. Pilihan hanya untuk saya hanya berlaku untuk tampilan profil dan tidak memengaruhi pilihan acak.\n6. Audio tidak bisa diedit, hanya dihapus. Kamu bebas menghapus audio atau akunmu kapan saja.\n7. Kami dapat menghapus konten atau akun yang melanggar aturan ini.\n8. Hulhup disediakan apa adanya, aturan dapat diperbarui dan versi terbaru selalu ada di halaman ini.',
-    'By using Hulhup you agree to the following.\n\n1. Audio you upload is at most 30 seconds, with a description of at most 200 characters, and must be yours or you must have permission to use it. Profile photos are at most 3 MB.\n2. Do not upload content that harasses, spreads hate, contains violence or sexual material, breaks the law, or impersonates others.\n3. No spam or misuse of the service.\n4. For each audio you choose who can hear it randomly: public, followers, following, or followers and following. Public audio can be heard by anyone.\n5. In Settings you choose who can see your audio on your profile and in search results: public, followers, following, followers and following, or only me. Only me applies to the profile view only and does not affect the random setting.\n6. Audio cannot be edited, only deleted. You may delete audio or your account at any time.\n7. We may remove content or accounts that break these rules.\n8. Hulhup is provided as is. These rules may be updated and the latest version is always on this page.'],
+    'Dengan memakai Hulhup kamu setuju pada aturan berikut.\n\n1. Audio yang kamu unggah berdurasi maksimal 30 detik, dengan deskripsi maksimal 200 karakter, dan harus milikmu atau kamu punya izin memakainya. Foto profil maksimal 3 MB.\n2. Dilarang mengunggah konten yang melecehkan, menebar kebencian, mengandung kekerasan atau seksual, melanggar hukum, atau meniru orang lain.\n3. Dilarang spam dan menyalahgunakan layanan.\n4. Untuk setiap audio kamu memilih siapa yang bisa mendengarnya secara acak: publik, pengikut, mengikuti, atau pengikut dan mengikuti. Audio publik dapat didengar siapa saja.\n5. Di Pengaturan kamu memilih siapa yang bisa melihat audiomu di profil dan di hasil pencarian: publik, pengikut, mengikuti, pengikut dan mengikuti, atau hanya untuk saya. Pilihan hanya untuk saya hanya berlaku untuk tampilan profil dan tidak memengaruhi pilihan acak.\n6. Audio tidak bisa diedit, hanya dihapus. Kamu bebas menghapus audio atau akunmu kapan saja.\n7. Kami dapat menghapus konten, memberi tanda verifikasi, atau membatasi dan memblokir akun yang melanggar aturan ini.\n8. Hulhup disediakan apa adanya, aturan dapat diperbarui dan versi terbaru selalu ada di halaman ini.',
+    'By using Hulhup you agree to the following.\n\n1. Audio you upload is at most 30 seconds, with a description of at most 200 characters, and must be yours or you must have permission to use it. Profile photos are at most 3 MB.\n2. Do not upload content that harasses, spreads hate, contains violence or sexual material, breaks the law, or impersonates others.\n3. No spam or misuse of the service.\n4. For each audio you choose who can hear it randomly: public, followers, following, or followers and following. Public audio can be heard by anyone.\n5. In Settings you choose who can see your audio on your profile and in search results: public, followers, following, followers and following, or only me. Only me applies to the profile view only and does not affect the random setting.\n6. Audio cannot be edited, only deleted. You may delete audio or your account at any time.\n7. We may remove content, mark accounts as verified, or restrict and ban accounts that break these rules.\n8. Hulhup is provided as is. These rules may be updated and the latest version is always on this page.'],
   'privacy_t': [
-    'Data yang kami simpan: nama, nama pengguna, tanggal lahir, bio, foto profil, audio yang kamu unggah, suka, pengikut, serta jumlah hari kamu masuk. Tanggal lahir dan usiamu tidak ditampilkan ke pengguna lain.\n\nKata sandi disimpan dalam bentuk hash, tidak pernah dalam bentuk asli.\n\nNotifikasi: Hulhup meminta izin notifikasi untuk mengirim pengingat harian setiap jam 19.00, dan pemberitahuan suka dan pengikut baru. Pengingat dijadwalkan di perangkatmu sendiri. Kamu bisa mematikannya di Pengaturan atau di pengaturan sistem perangkat.\n\nMikrofon hanya dipakai saat kamu menekan tombol rekam. Galeri hanya dibuka saat kamu memilih foto.\n\nTanpa login, kamu hanya mendengar suara; kami tidak membuat profil tamu.\n\nAudio yang kamu jadikan offline disalin dan disimpan di perangkatmu supaya bisa diputar tanpa internet. Kamu bisa menghapusnya kapan saja dari menu Audio offline.\n\nKami tidak menjual datamu dan tidak menampilkan iklan. Untuk saat ini data hanya disimpan di perangkatmu.\n\nMenghapus audio atau akun akan menghapus file dan datanya secara permanen dari perangkat.',
-    'Data we store: name, username, date of birth, bio, profile photo, audio you upload, likes, followers, and the number of days you signed in. Your date of birth and age are never shown to other users.\n\nPasswords are stored as hashes, never in plain form.\n\nNotifications: Hulhup asks for notification permission to send a daily reminder every day at 7 PM, and alerts for new likes and followers. Reminders are scheduled on your own device. You can turn them off in Settings or in your device settings.\n\nThe microphone is used only when you press record. The gallery opens only when you pick a photo.\n\nWithout signing in you only listen; we do not create guest profiles.\n\nAudio you make available offline is copied and stored on your device so it can play without internet. You can remove it anytime from the Offline audio menu.\n\nWe do not sell your data and show no ads. For now data is stored only on your device.\n\nDeleting audio or your account permanently removes the files and data from the device.'],
+    'Data yang kami simpan: nama, nama pengguna, tanggal lahir, bio, foto profil, audio yang kamu unggah, suka, pengikut, serta jumlah hari kamu masuk. Tanggal lahir dan usiamu tidak ditampilkan ke pengguna lain.\n\nKata sandi disimpan dalam bentuk hash, tidak pernah dalam bentuk asli.\n\nNotifikasi: Hulhup meminta izin notifikasi untuk mengirim pengingat harian setiap jam 19.00, dan pemberitahuan suka dan pengikut baru. Pengingat dijadwalkan di perangkatmu sendiri. Kamu bisa mematikannya di Pengaturan atau di pengaturan sistem perangkat.\n\nMikrofon hanya dipakai saat kamu menekan tombol rekam. Galeri hanya dibuka saat kamu memilih foto.\n\nTanpa login, kamu hanya mendengar suara; kami tidak membuat profil tamu.\n\nAudio yang kamu jadikan offline disalin dan disimpan di perangkatmu supaya bisa diputar tanpa internet. Kamu bisa menghapusnya kapan saja dari menu Audio offline.\n\nPenyimpanan: akun, foto profil, dan data teksmu disimpan di server database kami; audio disimpan di layanan penyimpanan cloud terpisah (durasi pendek dan panjang di tempat berbeda). Koneksi ke server dienkripsi (HTTPS). Audio hanya bisa diputar oleh orang yang berhak sesuai pilihan privasimu. Moderasi (menghapus konten pelanggar, tanda verifikasi, pembatasan akun) dilakukan langsung oleh tim kami di server, tidak ada halaman admin publik.\n\nKami tidak menjual datamu dan tidak menampilkan iklan.\n\nMenghapus audio atau akun akan menghapus datanya secara permanen dari server.',
+    'Data we store: name, username, date of birth, bio, profile photo, audio you upload, likes, followers, and the number of days you signed in. Your date of birth and age are never shown to other users.\n\nPasswords are stored as hashes, never in plain form.\n\nNotifications: Hulhup asks for notification permission to send a daily reminder every day at 7 PM, and alerts for new likes and followers. Reminders are scheduled on your own device. You can turn them off in Settings or in your device settings.\n\nThe microphone is used only when you press record. The gallery opens only when you pick a photo.\n\nWithout signing in you only listen; we do not create guest profiles.\n\nAudio you make available offline is copied and stored on your device so it can play without internet. You can remove it anytime from the Offline audio menu.\n\nStorage: your account, profile photos and text data are kept in our server database; audio is kept in separate cloud storage (short and longer clips in different places). Connections to the server are encrypted (HTTPS). Audio can only be played by people allowed by your privacy choices. Moderation (removing violating content, verification marks, restricting accounts) is done directly by our team on the server; there is no public admin page.\n\nWe do not sell your data and show no ads.\n\nDeleting audio or your account permanently removes the data from the server.'],
 };
