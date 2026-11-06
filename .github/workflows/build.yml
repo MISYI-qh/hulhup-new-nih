@@ -17,7 +17,7 @@ jobs:
         run: bash tool/setup_android.sh
       - run: flutter pub get
       - run: dart run flutter_launcher_icons
-      - run: flutter build apk --release --dart-define=API_URL=$API_URL
+      - run: flutter build apk --release --dart-define=API_URL=$API_URL --dart-define=BUILD=${{ github.run_number }}
       - run: flutter build web --release --dart-define=API_URL=$API_URL
       - uses: actions/upload-artifact@v4
         with: { name: hulhup-apk, path: build/app/outputs/flutter-apk/app-release.apk }
@@ -28,4 +28,4 @@ jobs:
         run: |
           cp build/app/outputs/flutter-apk/app-release.apk hulhup.apk
           gh release delete latest --yes --cleanup-tag || true
-          gh release create latest hulhup.apk --title "Hulhup (terbaru)" --notes "APK Android terbaru." --latest
+          gh release create latest hulhup.apk --title "Hulhup (terbaru)" --notes "APK Android terbaru. build:${{ github.run_number }}" --latest

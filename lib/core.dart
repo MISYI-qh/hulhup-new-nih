@@ -5,10 +5,14 @@ import 'dart:typed_data';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'notify.dart';
+
+const kBuild = int.fromEnvironment('BUILD');
+const kApkUrl = 'https://github.com/MISYI-qh/hulhup-new-nih/releases/latest/download/hulhup.apk';
 
 class ApiErr implements Exception {
   final String code;
@@ -779,6 +783,7 @@ class Store extends ChangeNotifier {
     if (_starting) return null;
     _starting = true;
     int? fresh;
+    checkUpdate();
     try {
       await refresh();
       if (me != null) {
@@ -806,6 +811,24 @@ class Store extends ChangeNotifier {
       }
     } catch (_) {}
     return fresh;
+  }
+
+  bool updateReady = false;
+  DateTime? _updChecked;
+
+  /// Cek rilis APK terbaru di GitHub; bila build-nya lebih baru, tampilkan ajakan memperbarui (hanya Android).
+  Future<void> checkUpdate() async {
+    if (kIsWeb || kBuild == 0) return;
+    final n = DateTime.now();
+    if (_updChecked != null && n.difference(_updChecked!).inMinutes < 30) return;
+    _updChecked = n;
+    try {
+      final r = await http.get(Uri.parse('https://api.github.com/repos/MISYI-qh/hulhup-new-nih/releases/tags/latest')).timeout(const Duration(seconds: 15));
+      if (r.statusCode != 200) return;
+      final b = (jsonDecode(r.body) as Map)['body']?.toString() ?? '';
+      final m = RegExp(r'build:(\d+)').firstMatch(b);
+      if (m != null && int.parse(m[1]!) > kBuild) { updateReady = true; notifyListeners(); }
+    } catch (_) {}
   }
 
   /// Server tidak mendorong notifikasi; aplikasi menanyakan berkala saat terbuka.
@@ -974,6 +997,7 @@ const S = <String, List<String>>{
   'cancel': ['Batal', 'Cancel'], 'save': ['Simpan', 'Save'], 'saved': ['Tersimpan', 'Saved'], 'delete': ['Hapus', 'Delete'],
   'delete_audio_q': ['Hapus audio ini? Audio tidak bisa diedit, hanya dihapus.', 'Delete this audio? Audio cannot be edited, only deleted.'],
   'language': ['Bahasa', 'Language'], 'appearance': ['Tampilan', 'Appearance'], 'system': ['Sistem', 'System'], 'light': ['Cerah', 'Light'], 'dark': ['Gelap', 'Dark'],
+  'upd_title': ['Versi baru tersedia', 'New version available'], 'upd_btn': ['Perbarui', 'Update'],
   'get_app': ['Unduh aplikasi Android', 'Download Android app'], 'website': ['Situs web hulhup.my.id', 'Website hulhup.my.id'], 'about': ['Tentang Hulhup', 'About Hulhup'], 'policy': ['Kebijakan', 'Policy'], 'privacy': ['Privasi', 'Privacy'],
   'followers': ['Pengikut', 'Followers'], 'following': ['Mengikuti', 'Following'], 'audio': ['Audio', 'Audio'], 'liked': ['Disukai', 'Liked'],
   'upload': ['Unggah audio', 'Upload audio'], 'record': ['Rekam', 'Record'], 'stop': ['Berhenti', 'Stop'], 'pick': ['Pilih file', 'Pick file'],

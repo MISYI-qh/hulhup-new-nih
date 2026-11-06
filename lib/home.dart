@@ -55,6 +55,10 @@ class _HomeState extends State<HomePage> {
             center: const Brand(),
             actions: [IconBtn(Icons.search_rounded, () => go(context, const SearchPage())), ListenableBuilder(listenable: s, builder: (_, __) => IconBtn(Icons.person_outline_rounded, () => go(context, ProfilePage(s.me?.username)), dot: s.unread > 0))],
           ),
+          ListenableBuilder(listenable: s, builder: (_, __) => !s.updateReady ? const SizedBox() : Padding(padding: const EdgeInsets.fromLTRB(20, 4, 20, 0), child: Tap(onTap: () => launchUrl(Uri.parse(kApkUrl), mode: LaunchMode.externalApplication), scale: .98, child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(18)),
+            child: Row(children: [Icon(Icons.system_update_rounded, size: 20, color: ink(context)), const SizedBox(width: 12), Expanded(child: Text(s.t('upd_title'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14))), Text(s.t('upd_btn'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14))]),
+          )))),
           Expanded(child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
             TapButton(onTap: _tap),
             const SizedBox(height: 20),
@@ -167,7 +171,7 @@ class SideMenu extends StatelessWidget {
             if (s.me == null) PBtn(s.t('login'), () { close(); go(context, const AuthPage()); }, icon: Icons.login_rounded)
             else PBtn(s.t('logout'), () async { close(); await s.logout(); }, icon: Icons.logout_rounded, ghost: true, fgc: heart),
             const SizedBox(height: 14),
-            Center(child: Text('Misyi', style: TextStyle(color: sub(context), fontWeight: FontWeight.w700, letterSpacing: 1.2, fontSize: 12))),
+            Center(child: Text(kBuild > 0 ? 'Misyi · v1.2.0 ($kBuild)' : 'Misyi · v1.2.0', style: TextStyle(color: sub(context), fontWeight: FontWeight.w700, letterSpacing: 1.2, fontSize: 12))),
           ])))),
         ),
       ),
