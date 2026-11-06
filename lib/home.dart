@@ -301,20 +301,3 @@ class _UpdateBodyState extends State<_UpdateBody> {
 }
 
 
-/// Lembar pelaporan buatan sendiri: pilih alasan, laporan dikirim ke server.
-Future<void> reportSheet(BuildContext context, {int? audio, String? user}) => sheet(context, (ctx) {
-  final s = Store.i;
-  Future<void> send(String r) async {
-    Navigator.pop(ctx);
-    try {
-      await Api.req('POST', '/reports', body: {if (audio != null) 'audio': audio, if (user != null) 'user': user, 'reason': r});
-      toast(s.t('report_done'));
-    } catch (e) { toast(s.err(e), bad: true); }
-  }
-  return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-    Text(s.t('report_title'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20)),
-    const SizedBox(height: 8),
-    for (final r in ['abuse', 'sexual', 'violence', 'spam', 'impersonate', 'other'])
-      Tap(onTap: () => send(r), child: Padding(padding: const EdgeInsets.symmetric(vertical: 14), child: Row(children: [Expanded(child: Text(s.t('r_$r'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600))), Icon(Icons.chevron_right_rounded, color: sub(context))]))),
-  ]);
-});
