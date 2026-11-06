@@ -776,7 +776,7 @@ class _UploadState extends State<UploadPage> {
       await pv.stop();
       setState(() { recording = true; ms = 0; bytes = null; previewing = false; });
       final t0 = DateTime.now();
-      timer = Timer.periodic(const Duration(milliseconds: 100), (_) { setState(() => ms = min(30000, DateTime.now().difference(t0).inMilliseconds)); if (ms >= 30000) _stop(); });
+      timer = Timer.periodic(const Duration(milliseconds: 100), (_) { setState(() => ms = min(15000, DateTime.now().difference(t0).inMilliseconds)); if (ms >= 15000) _stop(); });
     } catch (_) { toast(s.t('e_server'), bad: true); }
   }
 
@@ -807,7 +807,7 @@ class _UploadState extends State<UploadPage> {
     } catch (_) {}
     await tp.dispose();
     if (secs == null) { toast(s.t('e_bad_file'), bad: true); return; }
-    if (secs > 30) { toast(s.t('too_long'), bad: true); return; }
+    if (secs > 15) { toast(s.t('too_long'), bad: true); return; }
     await pv.stop();
     setState(() { bytes = b; ext = (f.extension ?? 'm4a').toLowerCase(); ms = max(1, secs!) * 1000; previewing = false; });
   }
@@ -844,11 +844,11 @@ class _UploadState extends State<UploadPage> {
       TopBar(back: true, title: s.t('upload')),
       Expanded(child: ListView(padding: const EdgeInsets.fromLTRB(24, 0, 24, 40), children: [
         In(0, Center(child: SizedBox(width: 190, height: 190, child: Stack(alignment: Alignment.center, children: [
-          TweenAnimationBuilder<double>(tween: Tween(end: ms / 30000), duration: const Duration(milliseconds: 120), builder: (_, v, __) => CustomPaint(size: const Size(190, 190), painter: _Arc(v, p))),
+          TweenAnimationBuilder<double>(tween: Tween(end: ms / 15000), duration: const Duration(milliseconds: 120), builder: (_, v, __) => CustomPaint(size: const Size(190, 190), painter: _Arc(v, p))),
           Tap(onTap: _rec, child: AnimatedContainer(duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic, width: recording ? 92 : 128, height: recording ? 92 : 128, decoration: BoxDecoration(color: recording ? heart : green, borderRadius: BorderRadius.circular(recording ? 28 : 64), boxShadow: [BoxShadow(color: (recording ? heart : green).withValues(alpha: .3), blurRadius: 30, offset: const Offset(0, 12))]), child: Icon(recording ? Icons.stop_rounded : Icons.mic_rounded, color: cream, size: 44))),
         ])))),
         const SizedBox(height: 8),
-        Center(child: Text('${mmss((ms / 1000).floor())} / 0:30', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20))),
+        Center(child: Text('${mmss((ms / 1000).floor())} / 0:15', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20))),
         const SizedBox(height: 16),
         Row(children: [
           Expanded(child: PBtn(s.t('pick'), recording ? null : _pick, ghost: true, icon: Icons.audio_file_outlined)),

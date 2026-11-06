@@ -51,6 +51,16 @@ test('alur utama', async () => {
   assert.equal((await call('GET', '/notifications', { token: null })).error, 'unauthorized');
 });
 
+test('pengunggah ikut mendengar audio publiknya sendiri; maks 15 dtk', async () => {
+  const t = await reg('erin');
+  await call('POST', '/audios?secs=40&rand=public&desc=punyaku', { token: t, raw: mp3() });
+  let own = null;
+  for (let i = 0; i < 60 && !own; i++) { const r = await call('GET', '/random?f=public', { token: t }); if (r.audio && r.audio.owner === 'erin') own = r.audio; }
+  assert.ok(own, 'audio sendiri harus bisa muncul');
+  assert.equal(own.secs, 15);
+  assert.equal((await call('GET', '/random?f=friend', { token: t })).audio, null);
+});
+
 test('akun dibanned diblokir', async () => {
   const t = await reg('dave');
   const { q } = await import('../lib/db.js');

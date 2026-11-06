@@ -176,7 +176,7 @@ route('GET', /^\/random$/, async (c) => {
   await hit(`rnd:${c.me ? 'u' + c.me.id : c.ip}`, 120, 60);
   const f = FILTERS.includes(c.query.f) ? c.query.f : 'public';
   const vid = c.me ? c.me.id : 0, last = Number(c.query.last) || 0;
-  const base = `from audios a join users u on u.id=a.owner where not a.hidden and u.status='active' and a.owner<>$1 and ${audCond(f)}`;
+  const base = `from audios a join users u on u.id=a.owner where not a.hidden and u.status='active' and (${audCond(f)} or (a.owner=$1 and a.rand='public' and '${f}'='public'))`;
   let n = (await one(`select count(*)::int n ${base} and a.id<>$2`, [vid, last])).n;
   let excl = true;
   if (n === 0) { n = (await one(`select count(*)::int n ${base} and ($2=$2)`, [vid, last])).n; excl = false; }
@@ -375,7 +375,7 @@ route('POST', /^\/audios$/, async (c) => {
     to = us.map((r) => r.id);
     if (!to.length) throw new ApiErr('need_accounts');
   }
-  const secs = Math.min(30, Math.max(1, parseInt(f.secs, 10) || 30));
+  const secs = Math.min(15, Math.max(1, parseInt(f.secs, 10) || 15));
   const desc = String(f.desc ?? '').trim().slice(0, 200);
   const store = storeFor(secs);
   const key = await putAudio(store, body, mime);
