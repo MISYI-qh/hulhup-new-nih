@@ -881,7 +881,7 @@ class Store extends ChangeNotifier {
   /// Pengingat "Kamu lelah?" setiap hari jam 19.00, juga kalau aplikasi sudah dibuka hari itu. Dijadwal ulang tiap aplikasi dibuka.
   Future<void> syncReminders() async {
     await Notifier.cancelReminders();
-    if (!remind) return;
+    if (!remind || Push.active) return;
     await Notifier.daily(101, 19, 0, t('r_title'), t('r_body'), t('notif'));
   }
 
@@ -890,6 +890,7 @@ class Store extends ChangeNotifier {
     await _sp.setBool('remind', v);
     notifyListeners();
     if (v) { await Notifier.allow(); await _sp.setBool('asked', true); await syncReminders(); } else { await Notifier.cancelReminders(); }
+    if (me != null) Push.register(lang);
   }
 
   Future<void> _clear() async { await Api.setSession(null); me = null; unread = 0; unreadSocial = 0; _pushed = 0; _sp.setInt('pushed', 0); Notifier.watch(false); }

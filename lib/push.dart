@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'core.dart';
+import 'notify.dart';
 
 /// Notifikasi dorong lewat Firebase: sampai walau aplikasi ditutup. Konfigurasi di bawah bersifat publik (bukan rahasia).
 class Push {
@@ -14,6 +15,8 @@ class Push {
   );
   static bool _ready = false, _hooked = false;
   static String? _token;
+  /// true bila HP ini terdaftar di Firebase; pengingat harian kemudian dikirim server (bukan alarm lokal).
+  static bool active = false;
 
   static bool get supported => !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
@@ -37,12 +40,14 @@ class Push {
       final t = await m.getToken();
       if (t == null || t.isEmpty) return false;
       _token = t;
-      await Api.req('POST', '/me/push', body: {'token': t, 'lang': lang});
+      await Api.req('POST', '/me/push', body: {'token': t, 'lang': lang, 'remind': Store.i.remind});
+      active = true;
+      await Notifier.cancelReminders();
       if (!_hooked) {
         _hooked = true;
         m.onTokenRefresh.listen((n) async {
           _token = n;
-          try { await Api.req('POST', '/me/push', body: {'token': n, 'lang': Store.i.lang}); } catch (_) {}
+          try { await Api.req('POST', '/me/push', body: {'token': n, 'lang': Store.i.lang, 'remind': Store.i.remind}); } catch (_) {}
         });
       }
       return true;

@@ -4,7 +4,7 @@ import { q, one, many, tx } from './db.js';
 import { ApiErr, now, sha, token, hashPw, checkPw, dayStr, okBirth, ageOf, imageMime, audioMime, readBody } from './util.js';
 import { storeFor, putAudio, getAudio, delAudio } from './blobs.js';
 import { randomInt } from 'node:crypto';
-import { pushLater, pushDiag } from './push.js';
+import { pushLater, pushDiag, pushReminders } from './push.js';
 
 const MAX_IMG = 3 * 1024 * 1024, MAX_AUDIO = 3 * 1024 * 1024;
 const FILTERS = ['public', 'followers', 'following', 'both', 'friend', 'best', 'partner', 'family', 'relations', 'me'];
@@ -351,7 +351,7 @@ route('POST', /^\/me\/push$/, async (c) => {
   const t = String(c.body.token || '').slice(0, 400);
   if (!/^[\w:\-]{20,400}$/.test(t)) throw new ApiErr('bad_request');
   if (c.body.on === false) { await q('delete from push_tokens where token=$1 and user_id=$2', [t, u.id]); return { ok: true }; }
-  await q(`insert into push_tokens(token, user_id, lang, created) values ($1,$2,$3,$4) on conflict (token) do update set user_id=$2, lang=$3`, [t, u.id, c.body.lang === 'en' ? 'en' : 'id', now()]);
+  await q(`insert into push_tokens(token, user_id, lang, created, remind) values ($1,$2,$3,$4,$5) on conflict (token) do update set user_id=$2, lang=$3, remind=$5`, [t, u.id, c.body.lang === 'en' ? 'en' : 'id', now(), c.body.remind !== false]);
   return { ok: true };
 });
 
@@ -632,6 +632,11 @@ route('GET', /^\/users\/([a-z0-9_]+)\/follows$/, async (c, m) => {
 export async function handle(req, url) {
   const m0 = req.method;
   const path = url.pathname.replace(/\/+$/, '') || '/';
+  if (path === '/cron/reminder') {
+    const k = process.env.CRON_SECRET, got = String(req.headers.authorization || '').replace('Bearer ', '') || url.searchParams.get('key');
+    if (!k || got !== k) throw new ApiErr('unauthorized', 401);
+    return { ok: true, ...(await pushReminders()) };
+  }
   if (path === '/' || path === '/health') { if (url.searchParams.get('warm')) await one('select 1 as x'); if (url.searchParams.get('push')) return { ok: true, push: await pushDiag() }; return { ok: true, service: 'hulhup-api' }; }
   const me = await authUser(req);
   const ip = ipOf(req);

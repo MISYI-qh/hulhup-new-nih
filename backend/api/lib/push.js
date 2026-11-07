@@ -57,3 +57,21 @@ export async function pushFlush() {
 export async function pushDiag() {
   try { await accessToken(); return { ready: pushReady(), token: true }; } catch (e) { return { ready: pushReady(), token: false }; }
 }
+
+// Pengingat harian "Kamu lelah?" lewat Firebase (dipanggil cron Vercel jam 19.00 WIB), hanya untuk HP yang pengingatnya aktif.
+export async function pushReminders() {
+  if (!pushReady()) return { sent: 0, total: 0 };
+  const at = await accessToken();
+  const toks = await many('select token, lang from push_tokens where remind');
+  let sent = 0;
+  for (const t of toks) {
+    const en = t.lang === 'en';
+    const r = await fetch(`https://fcm.googleapis.com/v1/projects/${process.env.FCM_PROJECT}/messages:send`, {
+      method: 'POST', headers: { Authorization: `Bearer ${at}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: { token: t.token, notification: { title: en ? 'Feeling tired?' : 'Kamu lelah?', body: en ? 'Try listening to a few voices' : 'Coba lah untuk mendengarkan beberapa suara' }, data: { type: 'tired' }, android: { priority: 'HIGH', notification: { icon: 'ic_stat_hulhup', channel_id: 'hulhup_main' } } } }),
+    });
+    if (r.ok) sent++;
+    else if (r.status === 404) await q('delete from push_tokens where token=$1', [t.token]);
+  }
+  return { sent, total: toks.length };
+}

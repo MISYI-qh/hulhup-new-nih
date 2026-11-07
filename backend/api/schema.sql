@@ -163,3 +163,5 @@ CREATE TABLE IF NOT EXISTS push_tokens (
   created BIGINT
 );
 CREATE INDEX IF NOT EXISTS push_tokens_user ON push_tokens(user_id);
+
+ALTER TABLE push_tokens ADD COLUMN IF NOT EXISTS remind BOOLEAN DEFAULT TRUE;

@@ -1,5 +1,23 @@
 {
-  "regions": ["sin1"],
-  "functions": { "api/index.js": { "maxDuration": 20, "memory": 512 } },
-  "rewrites": [{ "source": "/(.*)", "destination": "/api/index.js" }]
+  "regions": [
+    "sin1"
+  ],
+  "functions": {
+    "api/index.js": {
+      "maxDuration": 20,
+      "memory": 512
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/api/index.js"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/cron/reminder",
+      "schedule": "0 12 * * *"
+    }
+  ]
 }
