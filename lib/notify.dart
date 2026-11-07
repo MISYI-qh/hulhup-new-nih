@@ -54,6 +54,9 @@ class Notifier {
       );
       await _n.initialize(s);
       _ok = true;
+      try {
+        await _n.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()?.createNotificationChannel(const AndroidNotificationChannel('hulhup_main', 'Notifikasi Hulhup', description: 'Pengingat dan notifikasi dari Hulhup', importance: Importance.high));
+      } catch (_) {}
       try { await Workmanager().initialize(bgDispatcher); } catch (_) {}
     } catch (e) { lastError = 'init: $e'; }
   }

@@ -21,6 +21,8 @@ dependencies:
   url_launcher: ^6.3.0
   ota_update: any
   workmanager: any
+  firebase_core: any
+  firebase_messaging: any
 dev_dependencies:
   flutter_launcher_icons: ^0.14.0
   flutter_test:

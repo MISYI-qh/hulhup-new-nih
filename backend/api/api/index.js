@@ -1,5 +1,6 @@
 import { handle } from '../lib/app.js';
 import { ApiErr } from '../lib/util.js';
+import { pushFlush } from '../lib/push.js';
 
 const ORIGINS = new Set(['https://hulhup.my.id', 'https://www.hulhup.my.id']);
 
@@ -23,6 +24,7 @@ export default async function handler(req, res) {
   try {
     const url = new URL(req.url, 'http://x');
     const r = await handle(req, url);
+    await pushFlush();
     if (r && r.binary) {
       res.statusCode = 200;
       res.setHeader('Content-Type', r.mime);

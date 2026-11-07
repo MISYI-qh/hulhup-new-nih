@@ -155,3 +155,11 @@ drop trigger if exists users_before_delete on users;
 create trigger users_before_delete before delete on users for each row execute function users_before_delete();
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS tapf JSONB NOT NULL DEFAULT '{}';
+
+CREATE TABLE IF NOT EXISTS push_tokens (
+  token   TEXT PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  lang    TEXT DEFAULT 'id',
+  created BIGINT
+);
+CREATE INDEX IF NOT EXISTS push_tokens_user ON push_tokens(user_id);

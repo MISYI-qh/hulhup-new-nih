@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, Tar
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'push.dart';
 import 'files_web.dart' if (dart.library.io) 'files_io.dart';
 import 'notify.dart';
 
@@ -823,7 +824,8 @@ class Store extends ChangeNotifier {
         }
         _pushed = unreadSocial;
         _sp.setInt('pushed', _pushed);
-        Notifier.watch(true);
+        final viaFcm = await Push.register(lang);
+        Notifier.watch(!viaFcm);
       }
     } catch (_) {
     } finally {
@@ -898,13 +900,14 @@ class Store extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    await Push.unregister();
     try { await Api.req('POST', '/logout'); } catch (_) {}
     await _clear();
     await refresh();
   }
 
   Future<void> deleteAccount() async { await Api.req('DELETE', '/me'); await _clear(); await refresh(); }
-  void setLang(String l) { lang = l; _sp.setString('lang', l); notifyListeners(); syncReminders(); }
+  void setLang(String l) { lang = l; _sp.setString('lang', l); notifyListeners(); syncReminders(); if (me != null) Push.register(l); }
   void setMode(ThemeMode m) { mode = m; _sp.setInt('mode', m.index); notifyListeners(); }
 
   /// Teks notifikasi sosial (suka, ikuti, hubungan).

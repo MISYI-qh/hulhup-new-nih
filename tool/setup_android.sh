@@ -38,7 +38,10 @@ rec = '''        <receiver android:exported="false" android:name="com.dexterous.
             </intent-filter>
         </receiver>
 '''
-s = s.replace('</application>', rec + '    </application>', 1)
+meta = '''        <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/ic_stat_hulhup"/>
+        <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="hulhup_main"/>
+'''
+s = s.replace('</application>', meta + rec + '    </application>', 1)
 open(m, 'w').write(s)
 g = glob.glob('android/app/build.gradle*')[0]
 t = open(g).read()

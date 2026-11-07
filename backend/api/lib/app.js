@@ -4,6 +4,7 @@ import { q, one, many, tx } from './db.js';
 import { ApiErr, now, sha, token, hashPw, checkPw, dayStr, okBirth, ageOf, imageMime, audioMime, readBody } from './util.js';
 import { storeFor, putAudio, getAudio, delAudio } from './blobs.js';
 import { randomInt } from 'node:crypto';
+import { pushLater, pushDiag } from './push.js';
 
 const MAX_IMG = 3 * 1024 * 1024, MAX_AUDIO = 3 * 1024 * 1024;
 const FILTERS = ['public', 'followers', 'following', 'both', 'friend', 'best', 'partner', 'family', 'relations', 'me'];
@@ -97,6 +98,7 @@ async function notify(c, to, type, actor, audio, extra = '') {
   const d = await c.query(`select 1 from notifs where to_user=$1 and type=$2 and actor=$3 and audio is not distinct from $4 and extra=$5`, [to, type, actor, audio, extra]);
   if (d.rows.length) return null;
   await c.query(`insert into notifs(to_user, type, actor, audio, extra, created) values ($1,$2,$3,$4,$5,$6)`, [to, type, actor, audio, extra, now()]);
+  pushLater(to, type, actor, extra);
 }
 
 // ---------- otentikasi ----------
@@ -339,6 +341,17 @@ route('DELETE', /^\/me\/sessions\/([0-9a-f]{16})$/, async (c, m) => {
   const cur = sha((c.req.headers.authorization || '').slice(7));
   const d = await q('delete from sessions where user_id=$1 and left(token_hash,16)=$2 and token_hash<>$3', [u.id, m[1], cur]);
   if (!d.rowCount) throw new ApiErr('not_found', 404);
+  return { ok: true };
+});
+
+// ---------- notifikasi dorong ----------
+route('POST', /^\/me\/push$/, async (c) => {
+  const u = c.need();
+  await hit(`push:${u.id}`, 30, 600);
+  const t = String(c.body.token || '').slice(0, 400);
+  if (!/^[\w:\-]{20,400}$/.test(t)) throw new ApiErr('bad_request');
+  if (c.body.on === false) { await q('delete from push_tokens where token=$1 and user_id=$2', [t, u.id]); return { ok: true }; }
+  await q(`insert into push_tokens(token, user_id, lang, created) values ($1,$2,$3,$4) on conflict (token) do update set user_id=$2, lang=$3`, [t, u.id, c.body.lang === 'en' ? 'en' : 'id', now()]);
   return { ok: true };
 });
 
@@ -619,7 +632,7 @@ route('GET', /^\/users\/([a-z0-9_]+)\/follows$/, async (c, m) => {
 export async function handle(req, url) {
   const m0 = req.method;
   const path = url.pathname.replace(/\/+$/, '') || '/';
-  if (path === '/' || path === '/health') { if (url.searchParams.get('warm')) await one('select 1 as x'); return { ok: true, service: 'hulhup-api' }; }
+  if (path === '/' || path === '/health') { if (url.searchParams.get('warm')) await one('select 1 as x'); if (url.searchParams.get('push')) return { ok: true, push: await pushDiag() }; return { ok: true, service: 'hulhup-api' }; }
   const me = await authUser(req);
   const ip = ipOf(req);
   await hit(`ip:${ip}`, 600, 60);
