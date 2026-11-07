@@ -265,7 +265,7 @@ class _ProfileState extends State<ProfilePage> {
       if (mine) Padding(padding: const EdgeInsets.symmetric(horizontal: 24), child: Seg<int>([(0, s.t('audio')), (1, s.t('liked'))], tab, (v) => setState(() => tab = v))),
       const SizedBox(height: 14),
       if (locked && !mine) Empty(Icons.lock_outline_rounded, s.t('locked'))
-      else if (shown.isEmpty) Empty(tab == 1 ? Icons.favorite_border_rounded : Icons.graphic_eq_rounded, tab == 1 ? s.t('empty_liked') : s.t('empty_audio'))
+      else if (shown.isEmpty) Empty(tab == 1 ? Icons.auto_awesome_outlined : Icons.graphic_eq_rounded, tab == 1 ? s.t('empty_liked') : s.t('empty_audio'))
       else Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Column(children: [for (var i = 0; i < shown.length; i++) In(i, AudioRow(shown[i], key: ValueKey('${tab}_${shown[i].id}'), scope: this, mine: mine && tab == 0, showOwner: tab == 1, onDelete: mine && tab == 0 ? () => _del(shown[i]) : null))])),
     ]));
   }
@@ -722,7 +722,7 @@ class _NotifState extends State<NotifPage> {
       ])));
     }
     return In(i, Tap(onTap: () => go(context, ProfilePage(n['username'])), child: Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(26)), child: Row(children: [
-      Stack(clipBehavior: Clip.none, children: [Avatar(n['avatar'], n['name'], 46), Positioned(right: -4, bottom: -4, child: Container(width: 22, height: 22, decoration: BoxDecoration(color: like ? heart : green, shape: BoxShape.circle, border: Border.all(color: bgOf(context), width: 2)), child: Icon(like ? Icons.favorite_rounded : relk ? Icons.diversity_3_rounded : Icons.person_add_alt_1_rounded, size: 11, color: cream)))]),
+      Stack(clipBehavior: Clip.none, children: [Avatar(n['avatar'], n['name'], 46), Positioned(right: -4, bottom: -4, child: Container(width: 22, height: 22, decoration: BoxDecoration(color: like ? sorot : green, shape: BoxShape.circle, border: Border.all(color: bgOf(context), width: 2)), child: like ? const SorotIcon(filled: true, size: 13, color: cream) : Icon(relk ? Icons.diversity_3_rounded : Icons.person_add_alt_1_rounded, size: 11, color: cream)))]),
       const SizedBox(width: 14),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text.rich(TextSpan(children: [TextSpan(text: n['name'], style: const TextStyle(fontWeight: FontWeight.w800)), TextSpan(text: '  ${s.notifText(k, '${n['extra'] ?? ''}')}')]), style: const TextStyle(fontSize: 15, height: 1.4)),

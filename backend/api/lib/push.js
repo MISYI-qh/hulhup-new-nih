@@ -27,8 +27,8 @@ async function accessToken() {
 }
 
 const TXT = {
-  id: { like: 'menyukai audiomu', follow: 'mulai mengikutimu', rel_req: 'mengajakmu menjalin hubungan', rel_ok: 'menerima hubunganmu' },
-  en: { like: 'liked your audio', follow: 'started following you', rel_req: 'invited you to a relationship', rel_ok: 'accepted your relationship' },
+  id: { like: 'menyorot audiomu', follow: 'mulai mengikutimu', rel_req: 'mengajakmu menjalin hubungan', rel_ok: 'menerima hubunganmu' },
+  en: { like: 'spotlighted your audio', follow: 'started following you', rel_req: 'invited you to a relationship', rel_ok: 'accepted your relationship' },
 };
 
 export async function pushFlush() {

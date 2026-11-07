@@ -7,6 +7,7 @@ import 'core.dart';
 const green = Color(0xFF163F2B);
 const cream = Color(0xFFFBF6E9);
 const heart = Color(0xFFE0524A);
+const sorot = Color(0xFFD9962B);
 final navKey = GlobalKey<NavigatorState>();
 
 bool isDark(BuildContext c) => Theme.of(c).brightness == Brightness.dark;
@@ -350,6 +351,52 @@ class Empty extends StatelessWidget {
       ]))));
 }
 
+/// Ikon Sorot: kilau empat sudut yang ramping dengan satu kilau kecil. Garis tipis saat belum, penuh dengan cahaya lembut saat sudah.
+class SorotIcon extends StatelessWidget {
+  final bool filled;
+  final double size;
+  final Color color;
+  const SorotIcon({super.key, this.filled = false, this.size = 24, required this.color});
+  @override
+  Widget build(BuildContext context) => SizedBox(width: size, height: size, child: CustomPaint(painter: _SorotPainter(filled, color)));
+}
+
+class _SorotPainter extends CustomPainter {
+  final bool filled;
+  final Color color;
+  _SorotPainter(this.filled, this.color);
+  Path _star(Offset c, double r) {
+    final k = r * .16;
+    return Path()
+      ..moveTo(c.dx, c.dy - r)
+      ..quadraticBezierTo(c.dx + k, c.dy - k, c.dx + r, c.dy)
+      ..quadraticBezierTo(c.dx + k, c.dy + k, c.dx, c.dy + r)
+      ..quadraticBezierTo(c.dx - k, c.dy + k, c.dx - r, c.dy)
+      ..quadraticBezierTo(c.dx - k, c.dy - k, c.dx, c.dy - r)
+      ..close();
+  }
+
+  @override
+  void paint(Canvas canvas, Size sz) {
+    final u = sz.width / 24;
+    canvas.scale(u);
+    final big = _star(const Offset(10.5, 13.5), 9.2), small = _star(const Offset(19, 5), 3.6);
+    if (filled) {
+      canvas.drawCircle(const Offset(10.5, 13.5), 9, Paint()..color = color.withValues(alpha: .28)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.2));
+      final f = Paint()..color = color..style = PaintingStyle.fill..isAntiAlias = true;
+      canvas.drawPath(big, f);
+      canvas.drawPath(small, f);
+    } else {
+      final st = Paint()..color = color..style = PaintingStyle.stroke..strokeWidth = 1.6..strokeJoin = StrokeJoin.round..isAntiAlias = true;
+      canvas.drawPath(big, st);
+      canvas.drawPath(small, st);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_SorotPainter o) => o.filled != filled || o.color != color;
+}
+
 class LikeBtn extends StatelessWidget {
   final bool liked;
   final int count;
@@ -359,7 +406,7 @@ class LikeBtn extends StatelessWidget {
   Widget build(BuildContext context) => Tap(
         onTap: onTap,
         child: Padding(padding: const EdgeInsets.all(8), child: Row(mainAxisSize: MainAxisSize.min, children: [
-          TweenAnimationBuilder<double>(key: ValueKey(liked), tween: Tween(begin: liked ? .5 : 1, end: 1), duration: const Duration(milliseconds: 450), curve: Curves.elasticOut, builder: (_, v, c) => Transform.scale(scale: v, child: c), child: Icon(liked ? Icons.favorite_rounded : Icons.favorite_border_rounded, size: 24, color: liked ? heart : sub(context))),
+          TweenAnimationBuilder<double>(key: ValueKey(liked), tween: Tween(begin: liked ? .5 : 1, end: 1), duration: const Duration(milliseconds: 450), curve: Curves.elasticOut, builder: (_, v, c) => Transform.scale(scale: v, child: c), child: SorotIcon(filled: liked, size: 26, color: liked ? sorot : sub(context))),
           const SizedBox(width: 6),
           AnimatedSwitcher(duration: const Duration(milliseconds: 250), transitionBuilder: (w, a) => FadeTransition(opacity: a, child: ScaleTransition(scale: a, child: w)), child: Text('$count', key: ValueKey(count), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: sub(context)))),
         ])),

@@ -19,12 +19,12 @@ dependencies:
   connectivity_plus: ^6.1.0
   http: ^1.2.2
   url_launcher: ^6.3.0
-  ota_update: any
   workmanager: any
   firebase_core: any
   firebase_messaging: any
 dev_dependencies:
   flutter_launcher_icons: ^0.14.0
+  flutter_native_splash: ^2.4.6
   flutter_test:
     sdk: flutter
 flutter:
@@ -36,6 +36,23 @@ flutter:
           weight: 400
         - asset: assets/fonts/Outfit-Bold.ttf
           weight: 700
+flutter_native_splash:
+  color: "#FEFDF9"
+  color_dark: "#0E1511"
+  image: assets/splash/logo.png
+  image_dark: assets/splash/logo_dark.png
+  branding: assets/splash/brand.png
+  branding_dark: assets/splash/brand_dark.png
+  branding_bottom_padding: 56
+  android_12:
+    color: "#FEFDF9"
+    color_dark: "#0E1511"
+    image: assets/splash/logo12.png
+    image_dark: assets/splash/logo12_dark.png
+    branding: assets/splash/brand.png
+    branding_dark: assets/splash/brand_dark.png
+  web: false
+
 flutter_launcher_icons:
   android: true
   ios: true

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
-import 'package:ota_update/ota_update.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'core.dart';
 import 'ui.dart';
@@ -261,61 +260,33 @@ class SpeedRow extends StatelessWidget {
   }
 }
 
-/// Pembaruan di dalam aplikasi: unduh dengan tampilan sendiri, lalu buka pemasang Android.
+/// Pembaruan: tampilkan caranya (unduh ulang dari situs lalu pasang), tanpa unduhan tersembunyi di dalam aplikasi.
 Future<void> showUpdate(BuildContext context) => sheet(context, (_) => const _UpdateBody());
 
-class _UpdateBody extends StatefulWidget {
+class _UpdateBody extends StatelessWidget {
   const _UpdateBody();
-  @override
-  State<_UpdateBody> createState() => _UpdateBodyState();
-}
-
-class _UpdateBodyState extends State<_UpdateBody> {
-  String step = 'idle'; // idle | down | inst | fail
-  double pct = 0;
-
-  void _go() {
-    setState(() { step = 'down'; pct = 0; });
-    try {
-      OtaUpdate().execute(kApkUrl, destinationFilename: 'hulhup.apk').listen((e) {
-        if (!mounted) return;
-        setState(() {
-          switch (e.status) {
-            case OtaStatus.DOWNLOADING: step = 'down'; pct = ((double.tryParse(e.value ?? '') ?? 0) / 100).clamp(0.0, 1.0); break;
-            case OtaStatus.INSTALLING: step = 'inst'; pct = 1; break;
-            case OtaStatus.INSTALLATION_DONE: break;
-            default: step = 'fail';
-          }
-        });
-      }, onError: (_) { if (mounted) setState(() => step = 'fail'); });
-    } catch (_) { setState(() => step = 'fail'); }
-  }
-
   @override
   Widget build(BuildContext context) {
     final s = Store.i;
-    final busy = step == 'down' || step == 'inst';
-    return Column(mainAxisSize: MainAxisSize.min, children: [
-      Icon(Icons.system_update_rounded, size: 40, color: ink(context)),
+    Widget step(int n, String k) => Padding(padding: const EdgeInsets.only(bottom: 10), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(width: 24, height: 24, alignment: Alignment.center, decoration: BoxDecoration(color: ink(context), shape: BoxShape.circle), child: Text('$n', style: TextStyle(color: bgOf(context), fontWeight: FontWeight.w800, fontSize: 12))),
+          const SizedBox(width: 12),
+          Expanded(child: Padding(padding: const EdgeInsets.only(top: 2), child: Text(s.t(k), style: const TextStyle(fontSize: 14, height: 1.35)))),
+        ]));
+    return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Center(child: Icon(Icons.system_update_rounded, size: 40, color: ink(context))),
       const SizedBox(height: 12),
-      Text(s.t('upd_title'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20)),
+      Center(child: Text(s.t('upd_title'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20))),
       const SizedBox(height: 8),
-      Text(step == 'fail' ? s.t('upd_fail') : step == 'down' ? s.t('upd_down') : step == 'inst' ? s.t('upd_inst') : s.t('upd_note'), textAlign: TextAlign.center, style: TextStyle(color: sub(context), fontSize: 14, height: 1.4)),
-      if (busy) ...[
-        const SizedBox(height: 18),
-        ClipRRect(borderRadius: BorderRadius.circular(5), child: LinearProgressIndicator(value: step == 'inst' ? 1 : (pct > 0 ? pct : null), minHeight: 8, backgroundColor: ink(context).withValues(alpha: .12), color: ink(context))),
-        const SizedBox(height: 8),
-        Text(step == 'down' && pct > 0 ? '${(pct * 100).round()}%' : '', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
-      ],
+      Text(s.t('upd_note'), textAlign: TextAlign.center, style: TextStyle(color: sub(context), fontSize: 14, height: 1.4)),
       const SizedBox(height: 18),
-      if (!busy) PBtn(step == 'fail' ? s.t('retry') : s.t('upd_now'), _go, icon: Icons.download_rounded),
-      if (step == 'fail') ...[const SizedBox(height: 10), PBtn(s.t('upd_browser'), () => launchUrl(Uri.parse(kApkUrl), mode: LaunchMode.externalApplication), ghost: true, icon: Icons.open_in_browser_rounded)],
+      step(1, 'upd_s1'), step(2, 'upd_s2'), step(3, 'upd_s3'), step(4, 'upd_s4'),
+      Text(s.t('upd_fail'), style: TextStyle(color: sub(context), fontSize: 12.5, height: 1.4)),
+      const SizedBox(height: 16),
+      PBtn(s.t('upd_dl'), () => launchUrl(Uri.parse(kApkUrl), mode: LaunchMode.externalApplication), icon: Icons.download_rounded),
     ]);
   }
 }
-
-
-
 
 /// Halaman unduh aplikasi Android di web, dengan tampilan sendiri.
 Future<void> showGetApp(BuildContext context) => go(context, const GetAppPage());
