@@ -146,12 +146,19 @@ class _Rings extends CustomPainter {
   bool shouldRepaint(_Rings o) => true;
 }
 
-class SideMenu extends StatelessWidget {
+class SideMenu extends StatefulWidget {
   final bool open;
   final VoidCallback close;
   const SideMenu({super.key, required this.open, required this.close});
   @override
+  State<SideMenu> createState() => _SideMenuState();
+}
+
+class _SideMenuState extends State<SideMenu> {
+  bool more = false;
+  @override
   Widget build(BuildContext context) {
+    final open = widget.open, close = widget.close;
     final s = Store.i;
     Widget item(IconData i, String k, Widget Function() p) => Tap(onTap: () { close(); go(context, p()); }, child: Padding(padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8), child: Row(children: [Icon(i, size: 24, color: ink(context)), const SizedBox(width: 16), Text(s.t(k), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600))])));
     return Stack(children: [
@@ -165,12 +172,15 @@ class SideMenu extends StatelessWidget {
             const SizedBox(height: 28),
             item(Icons.tune_rounded, 'settings', () => const SettingsPage()),
             item(Icons.download_done_rounded, 'offline_t', () => const OfflinePage()),
-            item(Icons.info_outline_rounded, 'about', () => TextPage(s.t('about'), s.t('about_t'))),
-            item(Icons.rule_rounded, 'policy', () => TextPage(s.t('policy'), s.t('policy_t'))),
-            item(Icons.lock_outline_rounded, 'privacy', () => TextPage(s.t('privacy'), s.t('privacy_t'))),
+            Tap(onTap: () => setState(() => more = !more), child: Padding(padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8), child: Row(children: [Icon(Icons.more_horiz_rounded, size: 24, color: ink(context)), const SizedBox(width: 16), Expanded(child: Text(s.t('more'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600))), AnimatedRotation(turns: more ? .5 : 0, duration: const Duration(milliseconds: 200), child: Icon(Icons.expand_more_rounded, size: 24, color: sub(context)))]))),
+            AnimatedSize(duration: const Duration(milliseconds: 220), curve: Curves.easeOutCubic, alignment: Alignment.topCenter, child: more ? Padding(padding: const EdgeInsets.only(left: 16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              item(Icons.info_outline_rounded, 'about', () => TextPage(s.t('about'), s.t('about_t'))),
+              item(Icons.rule_rounded, 'policy', () => TextPage(s.t('policy'), s.t('policy_t'))),
+              item(Icons.lock_outline_rounded, 'privacy', () => TextPage(s.t('privacy'), s.t('privacy_t'))),
+              if (kIsWeb) item(Icons.android_rounded, 'get_app', () => const GetAppPage()),
+            ])) : const SizedBox(width: double.infinity)),
             if (!kIsWeb) Tap(onTap: () { close(); launchUrl(Uri.parse('https://hulhup.my.id'), mode: LaunchMode.externalApplication); }, child: Padding(padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8), child: Row(children: [Icon(Icons.language_rounded, size: 24, color: ink(context)), const SizedBox(width: 16), Text(s.t('website'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600))]))),
             if (!kIsWeb) Tap(onTap: () { close(); () async { final up = await s.checkUpdate(force: true); if (up) { showUpdate(context); } else { toast(s.t('upd_none')); } }(); }, child: Padding(padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8), child: Row(children: [Icon(Icons.system_update_rounded, size: 24, color: ink(context)), const SizedBox(width: 16), Text(s.t('upd_menu'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600))]))),
-            if (kIsWeb) Tap(onTap: () { close(); showGetApp(context); }, child: Padding(padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8), child: Row(children: [Icon(Icons.android_rounded, size: 24, color: ink(context)), const SizedBox(width: 16), Text(s.t('get_app'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600))]))),
             const Spacer(),
             if (s.me == null) PBtn(s.t('login'), () { close(); go(context, const AuthPage()); }, icon: Icons.login_rounded)
             else PBtn(s.t('logout'), () async { close(); await s.logout(); }, icon: Icons.logout_rounded, ghost: true, fgc: heart),
@@ -307,7 +317,16 @@ class _UpdateBodyState extends State<_UpdateBody> {
 
 
 /// Halaman unduh aplikasi Android di web, dengan tampilan sendiri.
-Future<void> showGetApp(BuildContext context) => sheet(context, (_) => const _GetAppBody());
+Future<void> showGetApp(BuildContext context) => go(context, const GetAppPage());
+
+class GetAppPage extends StatelessWidget {
+  const GetAppPage({super.key});
+  @override
+  Widget build(BuildContext context) => Scaffold(body: Column(children: [
+        TopBar(back: true, title: Store.i.t('get_app')),
+        const Expanded(child: SingleChildScrollView(padding: EdgeInsets.fromLTRB(24, 8, 24, 40), child: _GetAppBody())),
+      ]));
+}
 
 class _GetAppBody extends StatefulWidget {
   const _GetAppBody();
@@ -333,7 +352,7 @@ class _GetAppState extends State<_GetAppBody> {
   Widget _step(int n, String t) => Padding(padding: const EdgeInsets.only(bottom: 10), child: Row(children: [
         Container(width: 26, height: 26, alignment: Alignment.center, decoration: BoxDecoration(color: soft(context), shape: BoxShape.circle), child: Text('$n', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13))),
         const SizedBox(width: 12),
-        Expanded(child: Text(t, style: const TextStyle(fontSize: 14.5, height: 1.35))),
+        Expanded(child: Text(t, style: const TextStyle(fontSize: 14.5, height: 1.4))),
       ]));
 
   @override
@@ -347,9 +366,11 @@ class _GetAppState extends State<_GetAppBody> {
       Text(s.t('ga_note'), textAlign: TextAlign.center, style: TextStyle(color: sub(context), fontSize: 14, height: 1.4)),
       if (ver.isNotEmpty || size.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 12), child: Center(child: Text([if (ver.isNotEmpty) '${s.t('ga_ver')} $ver', if (size.isNotEmpty) '${s.t('ga_size')} $size'].join(' · '), style: TextStyle(color: sub(context), fontWeight: FontWeight.w700, fontSize: 13)))),
       const SizedBox(height: 18),
-      _step(1, s.t('ga_s1')), _step(2, s.t('ga_s2')), _step(3, s.t('ga_s3')),
+      _step(1, s.t('ga_s1')), _step(2, s.t('ga_s2')), _step(3, s.t('ga_s3')), _step(4, s.t('ga_s4')), _step(5, s.t('ga_s5')),
       const SizedBox(height: 8),
       PBtn(s.t('ga_btn'), () => launchUrl(Uri.parse(kApkUrl), mode: LaunchMode.externalApplication), icon: Icons.download_rounded),
+      const SizedBox(height: 14),
+      Text(s.t('ga_tip'), style: TextStyle(color: sub(context), fontSize: 13, height: 1.4)),
     ]);
   }
 }
