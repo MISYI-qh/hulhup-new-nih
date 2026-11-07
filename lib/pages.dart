@@ -235,7 +235,7 @@ class _ProfileState extends State<ProfilePage> {
     return Scaffold(body: Column(children: [
       TopBar(back: true, actions: mine ? [
         ListenableBuilder(listenable: s, builder: (_, __) => IconBtn(Icons.notifications_none_rounded, () async { await go(context, const NotifPage()); s.refresh(); }, dot: s.unread > 0)),
-        IconBtn(Icons.tune_rounded, () => go(context, const SettingsPage())),
+        IconBtn(Icons.edit_outlined, _edit),
       ] : []),
       Expanded(child: loading ? const Loader() : error != null ? Empty(Icons.cloud_off_rounded, error!, action: SizedBox(width: 160, child: PBtn(s.t('retry'), () { setState(() => loading = true); _load(); }))) : _body(context, s)),
     ]));
@@ -257,7 +257,7 @@ class _ProfileState extends State<ProfilePage> {
           Tap(onTap: () async { await go(context, RelationsPage(widget.u!)); if (mounted) _load(); }, child: Row(mainAxisSize: MainAxisSize.min, children: [Text(fmt(rels.length), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17)), const SizedBox(width: 6), Text(s.t('rel_title'), style: TextStyle(color: sub(context), fontSize: 14)), if (mine && relIn.isNotEmpty) Container(margin: const EdgeInsets.only(left: 6), width: 8, height: 8, decoration: const BoxDecoration(color: heart, shape: BoxShape.circle))]))]),
         if (mine && (u.streak > 0 || u.days > 0)) Padding(padding: const EdgeInsets.only(top: 14), child: StreakChip(u.streak, u.days, open: true)),
         const SizedBox(height: 18),
-        if (mine) Row(children: [Expanded(child: PBtn(s.t('edit_profile'), _edit, ghost: true, icon: Icons.edit_outlined)), const SizedBox(width: 10), Expanded(child: PBtn(s.t('upload'), () async { await go(context, const UploadPage()); _load(); }, icon: Icons.add_rounded))])
+        if (mine) const SizedBox.shrink()
         else if (s.me != null) ...[PBtn(u.isFollowing ? s.t('unfollow') : s.t('follow'), _follow, loading: busy, ghost: u.isFollowing, icon: u.isFollowing ? Icons.check_rounded : Icons.person_add_alt_1_rounded), const SizedBox(height: 10), _relBtns(s), const SizedBox(height: 6), Center(child: Tap(onTap: () => reportSheet(context, user: u.username), child: Padding(padding: const EdgeInsets.all(10), child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.flag_outlined, size: 16, color: sub(context)), const SizedBox(width: 6), Text(s.t('report'), style: TextStyle(color: sub(context), fontSize: 13, fontWeight: FontWeight.w600))]))))],
       ]))),
       const SizedBox(height: 22),
