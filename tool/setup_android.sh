@@ -78,7 +78,7 @@ if 'hulhup.p12' not in t:
     }
     buildTypes {'''
         t = re.sub(r'buildTypes\s*\{', lambda m: sc, t, 1)
-        t = re.sub(r'signingConfig\s*=\s*signingConfigs\.getByName\("debug"\)', 'signingConfig = if (System.getenv("KEYSTORE_PASSWORD") != null) signingConfigs.getByName("hulhup") else signingConfigs.getByName("debug")', t)
+        t = re.sub(r'signingConfig\s*=\s*signingConfigs\.getByName\("debug"\)', 'signingConfig = if (!System.getenv("KEYSTORE_PASSWORD").isNullOrEmpty()) signingConfigs.getByName("hulhup") else signingConfigs.getByName("debug")', t)
     else:
         sc = '''    signingConfigs {
         hulhup {
