@@ -719,7 +719,9 @@ class Store extends ChangeNotifier {
   static final i = Store._();
   Store._();
   U? me;
-  int taps = 0, unread = 0, unreadSocial = 0;
+  int unread = 0, unreadSocial = 0;
+  Map<String, int> tapf = {};
+  int get taps => tapf[filter] ?? 0; // hitungan per filter
   String lang = 'id';
   ThemeMode mode = ThemeMode.system;
   bool remind = true, fromOffline = false;
@@ -792,7 +794,8 @@ class Store extends ChangeNotifier {
         unreadSocial = j['unread_social'] ?? 0;
         if (unreadSocial < _pushed) { _pushed = unreadSocial; _sp.setInt('pushed', _pushed); }
       }
-      taps = (await Api.req('GET', '/stats'))['taps'] ?? taps;
+      final st = await Api.req('GET', '/stats');
+      if (st['tapf'] is Map) tapf = {for (final e in (st['tapf'] as Map).entries) '${e.key}': (e.value as num).toInt()};
     } on ApiErr catch (e) {
       if (e.code == 'unauthorized') await _clear();
     }
@@ -890,7 +893,6 @@ class Store extends ChangeNotifier {
   Future<void> auth(String path, Map body) async {
     final j = await Api.req('POST', path, body: body);
     me = U.from(j['user']);
-    taps = me!.taps;
     notifyListeners();
     start();
   }
@@ -945,8 +947,9 @@ class Store extends ChangeNotifier {
     fromOffline = false;
     if (!await _online()) { fromOffline = true; return _pickOffline(); }
     try {
-      final j = await Api.req('GET', '/random?f=${me == null ? 'public' : filter}');
-      taps = j['taps'] ?? taps;
+      final f = me == null ? 'public' : filter;
+      final j = await Api.req('GET', '/random?f=$f');
+      if (me != null && j['taps'] != null) tapf[f] = (j['taps'] as num).toInt();
       notifyListeners();
       return j['audio'] == null ? null : A.from(j['audio']);
     } on ApiErr {

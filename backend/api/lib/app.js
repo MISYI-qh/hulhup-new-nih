@@ -181,7 +181,7 @@ route('POST', /^\/logout$/, async (c) => {
   return { ok: true };
 });
 
-route('GET', /^\/stats$/, async (c) => ({ taps: c.me ? Number(c.me.taps) : 0 }));
+route('GET', /^\/stats$/, async (c) => ({ taps: c.me ? Number(c.me.taps) : 0, tapf: c.me ? (c.me.tapf || {}) : {} }));
 
 route('GET', /^\/random$/, async (c) => {
   await hit(`rnd:${c.me ? 'u' + c.me.id : c.ip}`, 120, 60);
@@ -191,12 +191,15 @@ route('GET', /^\/random$/, async (c) => {
   let n = (await one(`select count(*)::int n ${base} and a.id<>$2`, [vid, last])).n;
   let excl = true;
   if (n === 0) { n = (await one(`select count(*)::int n ${base} and ($2=$2)`, [vid, last])).n; excl = false; }
-  let taps = 0;
-  if (c.me) taps = Number((await one('update users set taps=taps+1 where id=$1 returning taps', [c.me.id])).taps);
-  if (n === 0) return { taps, audio: null };
+  let taps = c.me ? Number((c.me.tapf || {})[f] || 0) : 0;
+  if (n === 0) return { taps, audio: null }; // belum ada audio: angka tidak bertambah
   const off = randomInt(n); // acak sungguhan (CSPRNG), peluang sama
   const row = await one(`select a.id ${base} and ${excl ? 'a.id<>$2' : '$2=$2'} order by a.id offset ${off} limit 1`, [vid, last]);
   const a = await one(`${AUD_SQL} where a.id=$2`, [vid, row.id]);
+  if (c.me) {
+    const r = await one(`update users set taps=taps+1, tapf=jsonb_set(tapf, array[$2::text], to_jsonb(coalesce((tapf->>$2::text)::int,0)+1), true) where id=$1 returning tapf`, [c.me.id, f]);
+    taps = Number(r.tapf[f]);
+  }
   return { taps, audio: av(a) };
 });
 

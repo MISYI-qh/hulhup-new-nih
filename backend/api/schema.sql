@@ -153,3 +153,5 @@ begin
 end $$;
 drop trigger if exists users_before_delete on users;
 create trigger users_before_delete before delete on users for each row execute function users_before_delete();
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS tapf JSONB NOT NULL DEFAULT '{}';
