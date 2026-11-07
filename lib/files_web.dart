@@ -4,3 +4,5 @@ import 'dart:typed_data';
 Future<bool> saveOffline(String name, Uint8List b) async => false;
 Future<Uint8List?> readOffline(String name) async => null;
 Future<void> deleteOffline(String name) async {}
+
+String abiName() => '';

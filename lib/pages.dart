@@ -255,7 +255,8 @@ class _ProfileState extends State<ProfilePage> {
         const SizedBox(height: 16),
         Wrap(spacing: 22, runSpacing: 8, children: [_stat(u.followers, s.t('followers'), 'followers'), _stat(u.following, s.t('following'), 'following'),
           Tap(onTap: () async { await go(context, RelationsPage(widget.u!)); if (mounted) _load(); }, child: Row(mainAxisSize: MainAxisSize.min, children: [Text(fmt(rels.length), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17)), const SizedBox(width: 6), Text(s.t('rel_title'), style: TextStyle(color: sub(context), fontSize: 14)), if (mine && relIn.isNotEmpty) Container(margin: const EdgeInsets.only(left: 6), width: 8, height: 8, decoration: const BoxDecoration(color: heart, shape: BoxShape.circle))]))]),
-        if (mine && (u.streak > 0 || u.days > 0)) Padding(padding: const EdgeInsets.only(top: 14), child: StreakChip(u.streak, u.days, open: true)),
+        if (mine && (u.streak > 0 || u.days > 0)) Padding(padding: const EdgeInsets.only(top: 14), child: StreakChip(u.streak, u.days, open: true))
+        else if (!mine && u.streak > 0) Padding(padding: const EdgeInsets.only(top: 14), child: StreakChip(u.streak, 0)),
         const SizedBox(height: 18),
         if (mine) const SizedBox.shrink()
         else if (s.me != null) ...[PBtn(u.isFollowing ? s.t('unfollow') : s.t('follow'), _follow, loading: busy, ghost: u.isFollowing, icon: u.isFollowing ? Icons.check_rounded : Icons.person_add_alt_1_rounded), const SizedBox(height: 10), _relBtns(s), const SizedBox(height: 6), Center(child: Tap(onTap: () => reportSheet(context, user: u.username), child: Padding(padding: const EdgeInsets.all(10), child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.flag_outlined, size: 16, color: sub(context)), const SizedBox(width: 6), Text(s.t('report'), style: TextStyle(color: sub(context), fontSize: 13, fontWeight: FontWeight.w600))]))))],
@@ -345,7 +346,7 @@ class StreakChip extends StatelessWidget {
         const SizedBox(width: 10),
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(s.t('streak_t').replaceAll('{n}', '$streak'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-          Text(s.t('days_total').replaceAll('{n}', '$days'), style: TextStyle(color: sub(context), fontSize: 12.5)),
+          if (days > 0) Text(s.t('days_total').replaceAll('{n}', '$days'), style: TextStyle(color: sub(context), fontSize: 12.5)),
         ]),
         if (open) ...[const SizedBox(width: 10), Icon(Icons.calendar_month_rounded, size: 20, color: sub(context))],
       ]),

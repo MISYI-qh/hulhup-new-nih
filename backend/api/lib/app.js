@@ -76,7 +76,7 @@ async function uv(u, me, today) {
   return {
     username: u.username, name: u.name, bio: u.bio, age: mine ? ageOf(u.birth) : 0, birth: mine ? u.birth : '',
     avatar: avUrl(u), cover: cvUrl(u), taps: mine ? Number(u.taps) : 0, pvis: mine ? u.pvis : '',
-    streak: mine ? streakOf(u, today) : 0, days: mine ? u.days : 0,
+    streak: streakOf(u, today), days: mine ? u.days : 0,
     followers: u.followers, following: u.following, audios: r.audios, is_following: r.isf, is_me: mine, verified: u.verified,
   };
 }

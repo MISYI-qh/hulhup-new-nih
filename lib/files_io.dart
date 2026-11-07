@@ -28,3 +28,6 @@ Future<void> deleteOffline(String name) async {
     if (await f.exists()) await f.delete();
   } catch (_) {}
 }
+
+/// Nama arsitektur CPU (mis. android_arm64) untuk memilih berkas APK yang cocok.
+String abiName() => Platform.version;

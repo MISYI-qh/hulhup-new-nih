@@ -336,16 +336,17 @@ class _GetAppBody extends StatefulWidget {
 }
 
 class _GetAppState extends State<_GetAppBody> {
-  String ver = '', size = '';
+  String ver = '', size = '', size32 = '';
   @override
   void initState() { super.initState(); _info(); }
   Future<void> _info() async {
     try {
       final r = await http.get(Uri.parse('https://hulhup.my.id/version.json')).timeout(const Duration(seconds: 8));
-      ver = '${(jsonDecode(r.body) as Map)['version'] ?? ''}';
-      final h = await http.head(Uri.parse(kApkUrl)).timeout(const Duration(seconds: 8));
-      final n = int.tryParse(h.headers['content-length'] ?? '');
-      if (n != null) size = '${(n / 1048576).round()} MB';
+      final j = jsonDecode(r.body) as Map;
+      ver = '${j['version'] ?? ''}';
+      String mb(dynamic v) { final n = int.tryParse('$v'); return n == null || n <= 0 ? '' : '${(n / 1000000).toStringAsFixed(1)} MB'; }
+      size = mb(j['size']);
+      size32 = mb(j['size32']);
     } catch (_) {}
     if (mounted) setState(() {});
   }
@@ -370,7 +371,8 @@ class _GetAppState extends State<_GetAppBody> {
       _step(1, s.t('ga_s1')), _step(2, s.t('ga_s2')), _step(3, s.t('ga_s3')), _step(4, s.t('ga_s4')), _step(5, s.t('ga_s5')),
       const SizedBox(height: 8),
       PBtn(s.t('ga_btn'), () => launchUrl(Uri.parse(kApkUrl), mode: LaunchMode.externalApplication), icon: Icons.download_rounded),
-      const SizedBox(height: 14),
+      if (size32.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: Center(child: Tap(onTap: () => launchUrl(Uri.parse(kApkUrl32), mode: LaunchMode.externalApplication), child: Padding(padding: const EdgeInsets.all(8), child: Text('${s.t('ga_32')} ($size32)', textAlign: TextAlign.center, style: TextStyle(color: sub(context), fontSize: 13, fontWeight: FontWeight.w600, decoration: TextDecoration.underline)))))),
+      const SizedBox(height: 10),
       Text(s.t('ga_tip'), style: TextStyle(color: sub(context), fontSize: 13, height: 1.4)),
     ]);
   }
