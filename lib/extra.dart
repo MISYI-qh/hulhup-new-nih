@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'core.dart';
+import 'hups.dart';
 import 'routes.dart';
 import 'ui.dart';
 
@@ -223,6 +224,57 @@ class FaqPage extends StatelessWidget {
           )),
         ),
       ])),
+    ]));
+  }
+}
+
+// ---------- Terkirim: siapa saja yang pernah kamu kirimi ----------
+class SentPage extends StatefulWidget {
+  final String? to;
+  const SentPage({super.key, this.to});
+  @override
+  State<SentPage> createState() => _SentState();
+}
+
+class _SentState extends State<SentPage> {
+  List? people;
+  List<A> posts = [];
+  String? error;
+  @override
+  void initState() { super.initState(); _load(); }
+  Future<void> _load() async {
+    try {
+      if (widget.to == null) {
+        people = (await Api.req('GET', '/me/sent'))['people'] as List;
+      } else {
+        posts = [for (final e in (await Api.req('GET', '/me/sent?to=${Uri.encodeQueryComponent(widget.to!)}'))['audios'] as List) A.from(e)];
+      }
+    } catch (e) { error = Store.i.err(e); }
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = Store.i;
+    final loading = widget.to == null ? people == null : false;
+    return Scaffold(body: Column(children: [
+      TopBar(back: true, title: widget.to == null ? s.t('sent_title') : '${s.t('sent_title')} · ${widget.to}'),
+      Expanded(child: error != null ? Empty(Icons.cloud_off_rounded, error!) : loading ? const Loader() : widget.to == null
+          ? (people!.isEmpty ? Empty(Icons.send_outlined, s.t('sent_none')) : ListView(padding: const EdgeInsets.fromLTRB(20, 4, 20, 40), children: [
+              Padding(padding: const EdgeInsets.only(left: 6, bottom: 10), child: Text(s.t('sent_hint'), style: TextStyle(color: sub(context), fontSize: 13))),
+              for (var i = 0; i < people!.length; i++) Builder(builder: (_) {
+                final u = people![i] as Map;
+                return In(i, Tap(onTap: () => go(context, SentPage(to: '${u['username']}')), scale: .98, child: Container(
+                  margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.fromLTRB(12, 10, 16, 10), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(24)),
+                  child: Row(children: [
+                    Avatar(u['avatar'], '${u['name']}', 44), const SizedBox(width: 12),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('${u['name']}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15.5)), Text(s.t('sent_n').replaceAll('{n}', '${u['n']}'), style: TextStyle(color: sub(context), fontSize: 13))])),
+                    Icon(Icons.chevron_right_rounded, color: sub(context)),
+                  ]),
+                )));
+              }),
+            ]))
+          : (posts.isEmpty ? Empty(Icons.send_outlined, s.t('sent_none')) : ListView(padding: const EdgeInsets.fromLTRB(20, 4, 20, 40), children: [for (var i = 0; i < posts.length; i++) PostCard(posts[i], key: ValueKey('t${posts[i].id}'), scope: this)]))),
     ]));
   }
 }

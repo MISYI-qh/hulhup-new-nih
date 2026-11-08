@@ -25,6 +25,7 @@ String? pathOf(Widget w) {
   if (w is AuthPage) return '/login';
   if (w is RecoverPage) return '/recover';
   if (w is FaqPage) return '/faq';
+  if (w is SentPage) return w.to == null ? '/sent' : '/sent/${w.to}';
   if (w is TextPage && w.slug != null) return '/${w.slug}';
   return null;
 }
@@ -58,6 +59,7 @@ Widget? pageFor(String name) {
     case 'login': return const AuthPage();
     case 'recover': return const RecoverPage();
     case 'faq': return const FaqPage();
+    case 'sent': return SentPage(to: seg.length > 1 ? seg[1] : null);
     case 'about': return TextPage(s.t('about'), s.t('about_t'), slug: 'about');
     case 'policy': return TextPage(s.t('policy'), s.t('policy_t'), slug: 'policy');
     case 'privacy': return TextPage(s.t('privacy'), s.t('privacy_t'), slug: 'privacy');

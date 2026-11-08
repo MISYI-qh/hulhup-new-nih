@@ -208,6 +208,7 @@ class _SideMenuState extends State<SideMenu> {
             const SizedBox(height: 28),
             Padding(padding: const EdgeInsets.only(bottom: 8), child: PBtn(s.t('create'), () { close(); go(context, s.me == null ? const AuthPage() : const ComposePage()); }, icon: Icons.add_rounded)),
             item(Icons.tune_rounded, 'settings', () => const SettingsPage()),
+            if (s.me != null) item(Icons.send_outlined, 'sent_title', () => const SentPage()),
             item(Icons.download_done_rounded, 'offline_t', () => const OfflinePage()),
             Tap(onTap: () => setState(() => more = !more), child: Padding(padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8), child: Row(children: [Icon(Icons.more_horiz_rounded, size: 24, color: ink(context)), const SizedBox(width: 16), Expanded(child: Text(s.t('more'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600))), AnimatedRotation(turns: more ? .5 : 0, duration: const Duration(milliseconds: 200), child: Icon(Icons.expand_more_rounded, size: 24, color: sub(context)))]))),
             AnimatedSize(duration: const Duration(milliseconds: 220), curve: Curves.easeOutCubic, alignment: Alignment.topCenter, child: more ? Padding(padding: const EdgeInsets.only(left: 16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

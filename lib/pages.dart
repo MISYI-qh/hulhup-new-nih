@@ -95,7 +95,7 @@ class AudioRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = Store.i;
-    final vis = audIcon(a.rand);
+    final vis = audIcon(audSplit(a.rand).first);
     return ListenableBuilder(listenable: s, builder: (_, __) {
       final on = s.playing == a.id;
       return Tap(onTap: () => openPost(context, a), scale: .99, child: Container(
@@ -257,7 +257,7 @@ class _ProfileState extends State<ProfilePage> {
         if (u.bio.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 12), child: MentionText(u.bio, style: const TextStyle(fontSize: 15, height: 1.45))),
         const SizedBox(height: 16),
         Wrap(spacing: 22, runSpacing: 8, children: [_stat(u.followers, s.t('followers'), 'followers'), _stat(u.following, s.t('following'), 'following'),
-          Tap(onTap: () async { await go(context, RelationsPage(widget.u!)); if (mounted) _load(); }, child: Row(mainAxisSize: MainAxisSize.min, children: [Text(fmt(rels.length), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17)), const SizedBox(width: 6), Text(s.t('rel_title'), style: TextStyle(color: sub(context), fontSize: 14)), if (mine && relIn.isNotEmpty) Container(margin: const EdgeInsets.only(left: 6), width: 8, height: 8, decoration: const BoxDecoration(color: heart, shape: BoxShape.circle))]))]),
+          if (mine || u.rels >= 0) Tap(onTap: () async { await go(context, RelationsPage(widget.u!)); if (mounted) _load(); }, child: Row(mainAxisSize: MainAxisSize.min, children: [Text(fmt(rels.length), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17)), const SizedBox(width: 6), Text(s.t('rel_title'), style: TextStyle(color: sub(context), fontSize: 14)), if (mine && relIn.isNotEmpty) Container(margin: const EdgeInsets.only(left: 6), width: 8, height: 8, decoration: const BoxDecoration(color: heart, shape: BoxShape.circle))]))]),
         if (mine && (u.streak > 0 || u.days > 0)) Padding(padding: const EdgeInsets.only(top: 14), child: StreakChip(u.streak, u.days, open: true))
         else if (!mine && u.streak > 0) Padding(padding: const EdgeInsets.only(top: 14), child: StreakChip(u.streak, 0)),
         const SizedBox(height: 18),
@@ -683,7 +683,7 @@ class _SearchState extends State<SearchPage> {
     if (us.isEmpty && au.isEmpty) return Empty(Icons.search_off_rounded, s.t('empty_search'));
     return ListView(padding: const EdgeInsets.fromLTRB(20, 0, 20, 40), children: [
       if (us.isNotEmpty) ...[_sec(s.t('sec_acc')), for (var i = 0; i < us.length; i++) UserTile(us[i], i)],
-      if (au.isNotEmpty) ...[_sec(s.t('sec_audio')), for (var i = 0; i < au.length; i++) In(i, AudioRow(au[i], key: ValueKey('s${au[i].id}'), showOwner: true, scope: this))],
+      if (au.isNotEmpty) ...[_sec(s.t('sec_audio')), for (var i = 0; i < au.length; i++) In(i, au[i].inHups || au[i].files.isEmpty ? PostCard(au[i], key: ValueKey('s${au[i].id}'), scope: this) : AudioRow(au[i], key: ValueKey('s${au[i].id}'), showOwner: true, scope: this))],
     ]);
   }
 
