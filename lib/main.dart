@@ -3,8 +3,6 @@ import 'package:flutter_web_plugins/url_strategy.dart';
  import 'routes.dart';
 import 'package:flutter/services.dart';
 import 'core.dart';
-import 'home.dart';
-import 'hups.dart';
 import 'notify.dart';
 import 'ui.dart';
 

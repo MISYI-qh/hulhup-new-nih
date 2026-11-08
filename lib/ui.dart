@@ -684,7 +684,6 @@ class Pick extends StatelessWidget {
   const Pick(this.label, this.value, this.on, {super.key, this.opts = audiences});
   @override
   Widget build(BuildContext context) {
-    final s = Store.i;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Padding(padding: const EdgeInsets.only(left: 6, bottom: 6), child: Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: sub(context)))),
       Tap(
