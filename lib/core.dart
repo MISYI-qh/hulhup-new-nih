@@ -681,7 +681,7 @@ class Local {
 }
 
 class U {
-  final String username, name, bio, birth, pvis;
+  final String username, name, bio, birth, pvis, rvis;
   final String? avatar, cover;
   final int age, audios, streak, days, taps;
   int followers, following;
@@ -689,22 +689,25 @@ class U {
   final bool isMe, verified;
   U.from(Map j)
       : username = j['username'], name = j['name'], bio = j['bio'] ?? '', birth = j['birth'] ?? '', avatar = j['avatar'], cover = j['cover'],
-        pvis = j['pvis'] ?? 'public', streak = j['streak'] ?? 0, days = j['days'] ?? 0, taps = j['taps'] ?? 0,
+        pvis = j['pvis'] ?? 'public', rvis = j['rvis'] ?? 'public', streak = j['streak'] ?? 0, days = j['days'] ?? 0, taps = j['taps'] ?? 0,
         age = j['age'] ?? 0, audios = j['audios'] ?? 0, followers = j['followers'] ?? 0, following = j['following'] ?? 0,
         isFollowing = j['is_following'] == true, isMe = j['is_me'] == true, verified = j['verified'] == true;
 }
 
 class A {
-  final int id, secs, created;
+  final int id, secs, created, comments;
   final String desc, url, vis, rand, owner, ownerName;
   final String? ownerAvatar;
-  final bool popup, pprof, ownerVerified;
+  final bool popup, pprof, ownerVerified, long, inRand, inHups;
+  final List<Map> files;
   int likes;
-  bool liked;
+  bool liked, saved;
   A.from(Map j)
-      : id = j['id'], secs = j['secs'], created = j['created'] ?? 0, desc = j['desc'] ?? '', url = j['url'], vis = j['vis'] ?? 'public', rand = j['rand'] ?? 'public', owner = j['owner'],
-        ownerName = j['owner_name'], ownerAvatar = j['owner_avatar'], ownerVerified = j['owner_verified'] == true, popup = j['popup'] == true, pprof = j['pprof'] != false, likes = j['likes'] ?? 0, liked = j['liked'] == true;
-  Map<String, dynamic> toJson() => {'id': id, 'secs': secs, 'created': created, 'desc': desc, 'url': url, 'vis': vis, 'rand': rand, 'owner': owner, 'owner_name': ownerName, 'owner_avatar': ownerAvatar, 'owner_verified': ownerVerified, 'popup': popup, 'pprof': pprof, 'likes': likes, 'liked': liked};
+      : id = j['id'], secs = j['secs'] ?? 0, created = j['created'] ?? 0, desc = j['desc'] ?? '', url = j['url'] ?? '', vis = j['vis'] ?? 'public', rand = j['rand'] ?? 'public', owner = j['owner'],
+        ownerName = j['owner_name'], ownerAvatar = j['owner_avatar'], ownerVerified = j['owner_verified'] == true, popup = j['popup'] == true, pprof = j['pprof'] != false, likes = j['likes'] ?? 0, liked = j['liked'] == true,
+        long = j['long'] == true, inRand = j['in_rand'] != false, inHups = j['in_hups'] == true, comments = j['comments'] ?? 0, saved = j['saved'] == true,
+        files = (j['files'] is List) ? [for (final f in j['files']) Map.from(f as Map)] : ((j['url'] ?? '') == '' ? <Map>[] : <Map>[{'url': j['url'], 'secs': j['secs'] ?? 0}]);
+  Map<String, dynamic> toJson() => {'id': id, 'secs': secs, 'created': created, 'desc': desc, 'url': url, 'vis': vis, 'rand': rand, 'owner': owner, 'owner_name': ownerName, 'owner_avatar': ownerAvatar, 'owner_verified': ownerVerified, 'popup': popup, 'pprof': pprof, 'likes': likes, 'liked': liked, 'long': long, 'in_rand': inRand, 'in_hups': inHups, 'comments': comments, 'saved': saved, 'files': files};
 }
 
 String mmss(int s) => '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}';
@@ -917,6 +920,8 @@ class Store extends ChangeNotifier {
   String notifText(String type, String extra) {
     switch (type) {
       case 'like': return t('n_like');
+      case 'comment': return t('n_comment');
+      case 'reply': return t('n_reply');
       case 'rel_req': return t('n_rel_req').replaceAll('{r}', t('a_$extra').toLowerCase());
       case 'rel_ok': return t('n_rel_ok').replaceAll('{r}', t('a_$extra').toLowerCase());
       default: return t('n_follow');
@@ -926,6 +931,14 @@ class Store extends ChangeNotifier {
   Future<void> setFilter(String v) async {
     filter = v;
     await _sp.setString('filter', v);
+    notifyListeners();
+  }
+
+  void poke() => notifyListeners();
+
+  Future<void> setRvis(String v) async {
+    final j = await Api.req('PATCH', '/me/settings', body: {'rvis': v});
+    me = U.from(j['user']);
     notifyListeners();
   }
 
@@ -1002,17 +1015,21 @@ class Store extends ChangeNotifier {
     await _sp.setDouble('rate', r);
   }
 
-  Future<void> play(A a, {bool force = false, bool loop = true, Object? scope}) async {
-    if (!force && playing == a.id) { await stop(); return; }
-    playing = a.id;
+  Future<void> play(A a, {bool force = false, bool loop = true, Object? scope}) => playUrl(a.id, a.url, force: force, loop: loop, scope: scope);
+
+  /// Putar satu berkas audio; [key] membedakan pemutar (audio post, audio ke-n, audio komentar).
+  Future<void> playUrl(int key, String url, {bool force = false, bool loop = true, Object? scope}) async {
+    if (url.isEmpty) return;
+    if (!force && playing == key) { await stop(); return; }
+    playing = key;
     _scope = scope;
     pos.value = 0;
     dur = 0;
     notifyListeners();
     await _p.stop();
     await _p.setReleaseMode(loop ? ReleaseMode.loop : ReleaseMode.release);
-    final b = await Api.bytes(a.url);
-    await _p.play(b != null ? BytesSource(b, mimeType: mimeOf(b)) : UrlSource(a.url));
+    final b = await Api.bytes(url);
+    await _p.play(b != null ? BytesSource(b, mimeType: mimeOf(b)) : UrlSource(url));
     try { await _p.setPlaybackRate(rate); } catch (_) {}
   }
 
@@ -1081,6 +1098,19 @@ const S = <String, List<String>>{
   'pick_acc': ['Pilih akun', 'Choose accounts'], 'pick_acc_n': ['{n} akun dipilih', '{n} accounts chosen'], 'search_acc': ['Cari akun', 'Search accounts'], 'pick_acc_hint': ['Ketik nama untuk mencari akun', 'Type a name to find accounts'],
   'test_notif': ['Tes notifikasi', 'Test notification'], 'test_notif_sub': ['Kirim notifikasi percobaan ke HP ini', 'Send a test notification to this phone'],
   'notif_off': ['Notifikasi dimatikan di HP. Aktifkan lewat pengaturan aplikasi.', 'Notifications are off on this phone. Turn them on in app settings.'], 'test_sent': ['Notifikasi percobaan dikirim', 'Test notification sent'], 'n_like': ['menyorot audiomu', 'spotlighted your audio'],
+  'hups': ['Hups', 'Hups'], 'rand_tab': ['Acak', 'Random'], 'sorot_tab': ['Sorot', 'Spotlight'], 'saved_tab': ['Simpan', 'Saved'], 'comments': ['Komentar', 'Comments'],
+  'comment_ph': ['Tulis komentar…', 'Write a comment…'], 'reply': ['Balas', 'Reply'], 'replying': ['Membalas {n}', 'Replying to {n}'], 'send': ['Kirim', 'Send'], 'login_comment': ['Masuk untuk ikut berkomentar', 'Sign in to join the conversation'],
+  'write_hups': ['Tulis sesuatu… tanpa batas panjang', 'Write something… no length limit'], 'add_audio': ['Tambah audio', 'Add audio'], 'audio_n': ['Audio ({n}/10)', 'Audio ({n}/10)'],
+  'in_rand': ['Tampil di Acak', 'Show in Random'], 'in_hups': ['Tampil di Hups', 'Show in Hups'], 'multi_no_rand': ['Lebih dari satu audio hanya tampil di Hups.', 'More than one audio only appears in Hups.'],
+  'e_pick_place': ['Pilih tampil di Acak, Hups, atau keduanya', 'Choose Random, Hups, or both'], 'e_empty': ['Tulis sesuatu atau tambah audio', 'Write something or add audio'], 'e_too_long': ['Tulisan terlalu panjang', 'Text is too long'],
+  'read_more': ['Selengkapnya', 'Read more'], 'share': ['Bagikan', 'Share'], 'saved_post': ['Disimpan', 'Saved'], 'unsaved_post': ['Dihapus dari simpanan', 'Removed from saved'],
+  'no_hups': ['Belum ada Hups di sini', 'No Hups here yet'], 'empty_saved': ['Belum ada yang disimpan', 'Nothing saved yet'], 'empty_cmt': ['Belum ada komentar. Jadilah yang pertama.', 'No comments yet. Be the first.'],
+  'n_comment': ['mengomentari postinganmu', 'commented on your post'], 'n_reply': ['membalas komentarmu', 'replied to your comment'],
+  'rel_vis': ['Siapa yang bisa melihat hubunganmu', 'Who can see your relationships'], 'rel_locked': ['Daftar hubungan ini privat', 'This relationship list is private'],
+  'link_copied': ['Tautan disalin', 'Link copied'], 'rec_title': ['Rekam audio', 'Record audio'], 'rec_hint': ['Ketuk untuk merekam, maksimal 15 detik', 'Tap to record, up to 15 seconds'], 'use_audio': ['Pakai audio ini', 'Use this audio'],
+  'delete_cmt_q': ['Hapus komentar ini beserta balasannya?', 'Delete this comment and its replies?'], 'post_gone': ['Post tidak ditemukan atau tidak bisa kamu lihat', 'Post not found or not visible to you'],
+  'posting': ['Memposting…', 'Posting…'], 'posted': ['Terkirim', 'Posted'], 'new_post': ['Buat post', 'New post'], 'text_audio': ['Teks dan audio', 'Text and audio'], 'who_see': ['Siapa yang bisa melihat', 'Who can see it'],
+  'one_audio_cmt': ['Satu audio per komentar', 'One audio per comment'], 'post_audio_max': ['Maksimal 10 audio per post', 'Up to 10 audios per post'], 'text_only': ['Hanya teks', 'Text only'],
   'empty_audio': ['Belum ada audio', 'No audio yet'], 'empty_liked': ['Belum ada yang disorot', 'Nothing spotlighted yet'],
   'empty_notif': ['Belum ada notifikasi', 'No notifications yet'], 'empty_search': ['Tidak ada hasil', 'No results'], 'empty_list': ['Belum ada akun', 'No accounts yet'],
   'follow': ['Ikuti', 'Follow'], 'unfollow': ['Mengikuti', 'Following'], 'photo': ['Foto profil', 'Profile photo'], 'cover': ['Latar profil', 'Cover'],

@@ -1,13 +1,9 @@
 import 'dart:async';
-import 'dart:math';
-import 'package:audioplayers/audioplayers.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:record/record.dart';
 import 'core.dart';
+import 'hups.dart';
 import 'notify.dart';
 import 'ui.dart';
 
@@ -98,18 +94,18 @@ class AudioRow extends StatelessWidget {
     final vis = audIcon(a.rand);
     return ListenableBuilder(listenable: s, builder: (_, __) {
       final on = s.playing == a.id;
-      return Container(
+      return Tap(onTap: () => openPost(context, a), scale: .99, child: Container(
         margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.fromLTRB(12, 12, 6, 12),
         decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(26)),
         child: Row(children: [
-          Tap(onTap: () => s.play(a, scope: scope).catchError((_) => toast(s.t('e_server'), bad: true)), child: AnimatedContainer(duration: const Duration(milliseconds: 250), width: 46, height: 46, decoration: BoxDecoration(color: on ? ink(context) : green, shape: BoxShape.circle), child: AnimatedSwitcher(duration: const Duration(milliseconds: 200), child: Icon(on ? Icons.pause_rounded : Icons.play_arrow_rounded, key: ValueKey(on), color: on ? bgOf(context) : cream, size: 26)))),
+          if (a.url.isEmpty) Container(width: 46, height: 46, decoration: BoxDecoration(color: ink(context).withValues(alpha: .1), shape: BoxShape.circle), child: Center(child: HIcon(HK.hups, size: 22, color: ink(context)))) else Tap(onTap: () => s.play(a, scope: scope).catchError((_) => toast(s.t('e_server'), bad: true)), child: AnimatedContainer(duration: const Duration(milliseconds: 250), width: 46, height: 46, decoration: BoxDecoration(color: on ? ink(context) : green, shape: BoxShape.circle), child: AnimatedSwitcher(duration: const Duration(milliseconds: 200), child: Icon(on ? Icons.pause_rounded : Icons.play_arrow_rounded, key: ValueKey(on), color: on ? bgOf(context) : cream, size: 26)))),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(a.desc.trim().isEmpty ? s.t('untitled') : a.desc.trim(), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: a.desc.trim().isEmpty ? sub(context) : null)),
+            Text(a.desc.trim().isEmpty ? s.t('untitled') : a.desc.trim(), maxLines: 3, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: a.desc.trim().isEmpty ? sub(context) : null)),
             const SizedBox(height: 4),
             if (a.created > 0) Padding(padding: const EdgeInsets.only(bottom: 3), child: Text(s.when(a.created), style: TextStyle(color: sub(context), fontSize: 12.5))),
             Row(children: [
-              ValueListenableBuilder<int>(valueListenable: s.pos, builder: (_, ms, __) => Text(on ? '${mmss(ms ~/ 1000)} / ${mmss(a.secs)}' : mmss(a.secs), style: TextStyle(color: on ? ink(context) : sub(context), fontSize: 13, fontWeight: FontWeight.w700))),
+              if (a.url.isNotEmpty) ValueListenableBuilder<int>(valueListenable: s.pos, builder: (_, ms, __) => Text(on ? '${mmss(ms ~/ 1000)} / ${mmss(a.secs)}' : mmss(a.secs), style: TextStyle(color: on ? ink(context) : sub(context), fontSize: 13, fontWeight: FontWeight.w700))),
               if (mine) ...[const SizedBox(width: 10), Icon(vis, size: 15, color: sub(context))],
               if (showOwner) ...[const SizedBox(width: 10), Flexible(child: Text(a.ownerName, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: sub(context), fontSize: 13)))],
               const SizedBox(width: 6),
@@ -120,7 +116,7 @@ class AudioRow extends StatelessWidget {
           LikeBtn(a.liked, a.likes, () => likeAudio(a)),
           if (onDelete != null) IconBtn(Icons.delete_outline_rounded, onDelete!, color: sub(context)),
         ]),
-      );
+      ));
     });
   }
 }
@@ -134,7 +130,7 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfileState extends State<ProfilePage> {
   U? user;
-  List<A> list = [], likedList = [];
+  List<A> list = [], likedList = [], savedList = [];
   bool loading = true, busy = false, locked = false;
   String? error;
   int tab = 0;
@@ -161,7 +157,10 @@ class _ProfileState extends State<ProfilePage> {
         rels = (await Api.req('GET', '/users/${widget.u}/relations'))['items'];
         relIn = []; relOut = [];
       }
-      if (mine) likedList = ((await Api.req('GET', '/me/liked'))['audios'] as List).map((e) => A.from(e)).toList();
+      if (mine) {
+        likedList = ((await Api.req('GET', '/me/liked'))['audios'] as List).map((e) => A.from(e)).toList();
+        savedList = ((await Api.req('GET', '/me/saved'))['audios'] as List).map((e) => A.from(e)).toList();
+      }
       error = null;
     } catch (e) { error = Store.i.err(e); }
     if (mounted) setState(() => loading = false);
@@ -211,7 +210,7 @@ class _ProfileState extends State<ProfilePage> {
   Future<void> _del(A a) async {
     final s = Store.i;
     if (!await confirm(context, s.t('delete'), s.t('delete_audio_q'), s.t('delete'), danger: true)) return;
-    try { await Api.req('DELETE', '/audios/${a.id}'); setState(() { list.remove(a); likedList.remove(a); }); } catch (e) { toast(s.err(e), bad: true); }
+    try { await Api.req('DELETE', '/audios/${a.id}'); setState(() { list.remove(a); likedList.remove(a); savedList.remove(a); }); } catch (e) { toast(s.err(e), bad: true); }
   }
 
   Future<void> _edit() async {
@@ -242,7 +241,7 @@ class _ProfileState extends State<ProfilePage> {
   }
 
   Widget _body(BuildContext context, Store s) {
-    final u = user!, shown = tab == 1 ? likedList : list;
+    final u = user!, shown = switch (tab) { 1 => list.where((e) => e.inHups).toList(), 2 => likedList, 3 => savedList, _ => list.where((e) => e.inRand).toList() };
     return RefreshIndicator(color: ink(context), backgroundColor: card(context), onRefresh: _load, child: ListView(padding: const EdgeInsets.only(bottom: 40), children: [
       const SizedBox(height: 10),
       In(0, Padding(padding: const EdgeInsets.symmetric(horizontal: 24), child: Align(alignment: Alignment.centerLeft, child: Container(padding: const EdgeInsets.all(5), decoration: BoxDecoration(color: bgOf(context), shape: BoxShape.circle, boxShadow: [BoxShadow(color: green.withValues(alpha: .16), blurRadius: 28, offset: const Offset(0, 10))]), child: Tap(onTap: u.avatar == null ? null : () => go(context, ImageViewer(u.avatar!, u.name)), scale: .96, child: Avatar(u.avatar, u.name, 96)))))),
@@ -262,11 +261,11 @@ class _ProfileState extends State<ProfilePage> {
         else if (s.me != null) ...[PBtn(u.isFollowing ? s.t('unfollow') : s.t('follow'), _follow, loading: busy, ghost: u.isFollowing, icon: u.isFollowing ? Icons.check_rounded : Icons.person_add_alt_1_rounded), const SizedBox(height: 10), _relBtns(s), const SizedBox(height: 6), Center(child: Tap(onTap: () => reportSheet(context, user: u.username), child: Padding(padding: const EdgeInsets.all(10), child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.flag_outlined, size: 16, color: sub(context)), const SizedBox(width: 6), Text(s.t('report'), style: TextStyle(color: sub(context), fontSize: 13, fontWeight: FontWeight.w600))]))))],
       ]))),
       const SizedBox(height: 22),
-      if (mine) Padding(padding: const EdgeInsets.symmetric(horizontal: 24), child: Seg<int>([(0, s.t('audio')), (1, s.t('liked'))], tab, (v) => setState(() => tab = v))),
+      Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Seg<int>([(0, s.t('rand_tab')), (1, s.t('hups')), if (mine) (2, s.t('sorot_tab')), if (mine) (3, s.t('saved_tab'))], tab, (v) => setState(() => tab = v))),
       const SizedBox(height: 14),
       if (locked && !mine) Empty(Icons.lock_outline_rounded, s.t('locked'))
-      else if (shown.isEmpty) Empty(tab == 1 ? Icons.auto_awesome_outlined : Icons.graphic_eq_rounded, tab == 1 ? s.t('empty_liked') : s.t('empty_audio'))
-      else Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Column(children: [for (var i = 0; i < shown.length; i++) In(i, AudioRow(shown[i], key: ValueKey('${tab}_${shown[i].id}'), scope: this, mine: mine && tab == 0, showOwner: tab == 1, onDelete: mine && tab == 0 ? () => _del(shown[i]) : null))])),
+      else if (shown.isEmpty) Empty(Icons.graphic_eq_rounded, tab == 2 ? s.t('empty_liked') : tab == 3 ? s.t('empty_saved') : tab == 1 ? s.t('no_hups') : s.t('empty_audio'), custom: tab == 2 ? HIcon(HK.sorot, size: 30, color: sub(context)) : tab == 3 ? HIcon(HK.save, size: 30, color: sub(context)) : tab == 1 ? HIcon(HK.hups, size: 30, color: sub(context)) : HIcon(HK.acak, size: 30, color: sub(context)))
+      else Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Column(children: [for (var i = 0; i < shown.length; i++) In(i < 8 ? i : 0, tab == 0 ? AudioRow(shown[i], key: ValueKey('0_${shown[i].id}'), scope: this, mine: mine, onDelete: mine ? () => _del(shown[i]) : null) : PostCard(shown[i], key: ValueKey('${tab}_${shown[i].id}'), scope: this, onDeleted: () => setState(() { list.removeWhere((e) => e.id == shown[i].id); likedList.removeWhere((e) => e.id == shown[i].id); savedList.removeWhere((e) => e.id == shown[i].id); })))])),
     ]));
   }
 }
@@ -583,6 +582,8 @@ class SettingsPage extends StatelessWidget {
           row(Icons.key_rounded, s.t('change_pw'), () => sheet(context, (_) => const PwSheet())),
           const SizedBox(height: 6),
           Pick(s.t('pvis'), s.me!.pvis, (v) async { try { await s.setPvis(v); toast(s.t('saved')); } catch (e) { toast(s.err(e), bad: true); } }, opts: profileAud),
+          const SizedBox(height: 14),
+          Pick(s.t('rel_vis'), s.me!.rvis, (v) async { try { await s.setRvis(v); toast(s.t('saved')); } catch (e) { toast(s.err(e), bad: true); } }, opts: profileAud),
         ],
         if (!kIsWeb) ...[
           label(s.t('notif')),
@@ -710,7 +711,7 @@ class _NotifState extends State<NotifPage> {
 
   Widget _item(Map n, int i) {
     final s = Store.i;
-    final k = '${n['type']}', sys = k == 'streak' || k == 'missed' || k == 'tired', like = k == 'like', relk = k == 'rel_req' || k == 'rel_ok';
+    final k = '${n['type']}', sys = k == 'streak' || k == 'missed' || k == 'tired', like = k == 'like', cm = k == 'comment' || k == 'reply', relk = k == 'rel_req' || k == 'rel_ok';
     final bg = n['seen'] == true ? soft(context) : ink(context).withValues(alpha: .12);
     final when = Text(s.ago(n['created'] as int), style: TextStyle(color: sub(context), fontSize: 12));
     if (sys) {
@@ -721,8 +722,8 @@ class _NotifState extends State<NotifPage> {
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Text(k == 'tired' ? s.t('r_title') : 'Hulhup', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)), const Spacer(), when]), const SizedBox(height: 2), Text(txt, style: const TextStyle(fontSize: 15, height: 1.4))])),
       ])));
     }
-    return In(i, Tap(onTap: () => go(context, ProfilePage(n['username'])), child: Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(26)), child: Row(children: [
-      Stack(clipBehavior: Clip.none, children: [Avatar(n['avatar'], n['name'], 46), Positioned(right: -4, bottom: -4, child: Container(width: 22, height: 22, decoration: BoxDecoration(color: like ? sorot : green, shape: BoxShape.circle, border: Border.all(color: bgOf(context), width: 2)), child: like ? const SorotIcon(filled: true, size: 13, color: cream) : Icon(relk ? Icons.diversity_3_rounded : Icons.person_add_alt_1_rounded, size: 11, color: cream)))]),
+    return In(i, Tap(onTap: () => (cm && (n['post'] ?? 0) != 0) ? go(context, PostPage(n['post'] as int)) : go(context, ProfilePage(n['username'])), child: Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(26)), child: Row(children: [
+      Stack(clipBehavior: Clip.none, children: [Avatar(n['avatar'], n['name'], 46), Positioned(right: -4, bottom: -4, child: Container(width: 22, height: 22, decoration: BoxDecoration(color: green, shape: BoxShape.circle, border: Border.all(color: bgOf(context), width: 2)), child: like ? const HIcon(HK.sorot, filled: true, size: 13, color: cream, hole: green) : cm ? const HIcon(HK.comment, size: 12, color: cream) : Icon(relk ? Icons.diversity_3_rounded : Icons.person_add_alt_1_rounded, size: 11, color: cream)))]),
       const SizedBox(width: 14),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text.rich(TextSpan(children: [TextSpan(text: n['name'], style: const TextStyle(fontWeight: FontWeight.w800)), TextSpan(text: '  ${s.notifText(k, '${n['extra'] ?? ''}')}')]), style: const TextStyle(fontSize: 15, height: 1.4)),
@@ -746,153 +747,6 @@ class _NotifState extends State<NotifPage> {
 }
 
 // ---------- unggah ----------
-class UploadPage extends StatefulWidget {
-  const UploadPage({super.key});
-  @override
-  State<UploadPage> createState() => _UploadState();
-}
-
-class _UploadState extends State<UploadPage> {
-  final rec = AudioRecorder();
-  final pv = AudioPlayer();
-  final desc = TextEditingController();
-  Uint8List? bytes;
-  String ext = 'm4a';
-  int ms = 0;
-  bool recording = false, pprof = true, busy = false, previewing = false;
-  String rand = 'public';
-  Map<String, Map> picked = {};
-  Timer? timer;
-
-  @override
-  void initState() { super.initState(); pv.onPlayerComplete.listen((_) { if (mounted) setState(() => previewing = false); }); }
-  @override
-  void dispose() { timer?.cancel(); rec.dispose(); pv.dispose(); super.dispose(); }
-
-  Future<void> _rec() async {
-    if (recording) return _stop();
-    final s = Store.i;
-    try {
-      if (!await rec.hasPermission()) { toast(s.t('mic_denied'), bad: true); return; }
-      final p = kIsWeb ? '' : '${(await getTemporaryDirectory()).path}/h${DateTime.now().millisecondsSinceEpoch}.m4a';
-      await rec.start(kIsWeb ? const RecordConfig(encoder: AudioEncoder.wav, numChannels: 1, sampleRate: 16000) : const RecordConfig(encoder: AudioEncoder.aacLc, numChannels: 1), path: p);
-      await pv.stop();
-      setState(() { recording = true; ms = 0; bytes = null; previewing = false; });
-      final t0 = DateTime.now();
-      timer = Timer.periodic(const Duration(milliseconds: 100), (_) { setState(() => ms = min(15000, DateTime.now().difference(t0).inMilliseconds)); if (ms >= 15000) _stop(); });
-    } catch (_) { toast(s.t('e_server'), bad: true); }
-  }
-
-  Future<void> _stop() async {
-    timer?.cancel();
-    final p = await rec.stop();
-    ext = kIsWeb ? 'wav' : 'm4a';
-    Uint8List? b;
-    if (p != null) { try { b = await XFile(p).readAsBytes(); } catch (_) {} }
-    if (mounted) setState(() { recording = false; bytes = b; });
-  }
-
-  Future<void> _pick() async {
-    final s = Store.i;
-    final r = await FilePicker.platform.pickFiles(type: FileType.audio, withData: kIsWeb);
-    final f = r?.files.single;
-    if (f == null) return;
-    if (f.size > 3 * 1024 * 1024) { toast(s.t('e_too_big'), bad: true); return; }
-    final b = f.bytes ?? await XFile(f.path!).readAsBytes();
-    final tp = AudioPlayer();
-    int? secs;
-    try {
-      await tp.setSource(BytesSource(b, mimeType: mimeOf(b)));
-      for (var i = 0; i < 10 && secs == null; i++) {
-        final d = await tp.getDuration();
-        if (d != null) { secs = (d.inMilliseconds / 1000).round(); } else { await Future.delayed(const Duration(milliseconds: 150)); }
-      }
-    } catch (_) {}
-    await tp.dispose();
-    if (secs == null) { toast(s.t('e_bad_file'), bad: true); return; }
-    if (secs > 15) { toast(s.t('too_long'), bad: true); return; }
-    await pv.stop();
-    setState(() { bytes = b; ext = (f.extension ?? 'm4a').toLowerCase(); ms = max(1, secs!) * 1000; previewing = false; });
-  }
-
-  Future<void> _preview() async {
-    if (bytes == null) return;
-    if (previewing) { await pv.stop(); setState(() => previewing = false); return; }
-    setState(() => previewing = true);
-    await pv.play(BytesSource(bytes!, mimeType: mimeOf(bytes!)));
-  }
-
-  Future<void> _pickAcc() async {
-    final r = await sheet<Map<String, Map>>(context, (_) => AccountPickSheet(Map.of(picked)));
-    if (r == null || !mounted) return;
-    setState(() { picked = r; if (r.isEmpty && rand == 'accounts') rand = 'public'; });
-  }
-
-  Future<void> _send() async {
-    final s = Store.i;
-    if (rand == 'accounts' && picked.isEmpty) { toast(s.t('e_need_accounts'), bad: true); return; }
-    setState(() => busy = true);
-    try {
-      await Api.multi('/audios', bytes!, 'a.$ext', {'desc': desc.text, 'secs': '${max(1, (ms / 1000).ceil())}', 'pprof': pprof ? '1' : '0', 'rand': rand, 'to': picked.keys.join(',')});
-      if (!mounted) return;
-      Navigator.pop(context);
-      toast(s.t('uploaded'));
-    } catch (e) { toast(s.err(e), bad: true); if (mounted) setState(() => busy = false); }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final s = Store.i, p = ink(context);
-    return Scaffold(body: Column(children: [
-      TopBar(back: true, title: s.t('upload')),
-      Expanded(child: ListView(padding: const EdgeInsets.fromLTRB(24, 0, 24, 40), children: [
-        In(0, Center(child: SizedBox(width: 190, height: 190, child: Stack(alignment: Alignment.center, children: [
-          TweenAnimationBuilder<double>(tween: Tween(end: ms / 15000), duration: const Duration(milliseconds: 120), builder: (_, v, __) => CustomPaint(size: const Size(190, 190), painter: _Arc(v, p))),
-          Tap(onTap: _rec, child: AnimatedContainer(duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic, width: recording ? 92 : 128, height: recording ? 92 : 128, decoration: BoxDecoration(color: recording ? heart : green, borderRadius: BorderRadius.circular(recording ? 28 : 64), boxShadow: [BoxShadow(color: (recording ? heart : green).withValues(alpha: .3), blurRadius: 30, offset: const Offset(0, 12))]), child: Icon(recording ? Icons.stop_rounded : Icons.mic_rounded, color: cream, size: 44))),
-        ])))),
-        const SizedBox(height: 8),
-        Center(child: Text('${mmss((ms / 1000).floor())} / 0:15', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20))),
-        const SizedBox(height: 16),
-        Row(children: [
-          Expanded(child: PBtn(s.t('pick'), recording ? null : _pick, ghost: true, icon: Icons.audio_file_outlined)),
-          if (bytes != null && !recording) ...[const SizedBox(width: 10), Expanded(child: PBtn(s.t('preview'), _preview, ghost: true, icon: previewing ? Icons.pause_rounded : Icons.play_arrow_rounded))],
-        ]),
-        const SizedBox(height: 24),
-        Field(s.t('desc'), desc, max: 200, lines: 4),
-        const SizedBox(height: 18),
-        Row(children: [Expanded(child: Text(s.t('pprof'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16))), Toggle(pprof, (v) => setState(() => pprof = v))]),
-        const SizedBox(height: 22),
-        Pick(s.t('who_rand'), rand, (v) async {
-          if (v == 'accounts') { await _pickAcc(); if (picked.isEmpty) return; }
-          if (mounted) setState(() => rand = v);
-        }, opts: uploadAud),
-        if (rand == 'accounts') Padding(padding: const EdgeInsets.only(top: 10), child: Tap(onTap: _pickAcc, scale: .98, child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(24)),
-          child: Row(children: [Icon(Icons.person_search_outlined, size: 20, color: ink(context)), const SizedBox(width: 12), Expanded(child: Text(s.t('pick_acc_n').replaceAll('{n}', '${picked.length}'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15))), Icon(Icons.edit_outlined, size: 18, color: sub(context))]),
-        ))),
-        const SizedBox(height: 28),
-        PBtn(s.t('upload'), bytes == null || recording ? null : _send, loading: busy, icon: Icons.arrow_upward_rounded),
-        const SizedBox(height: 12),
-        Center(child: Text(s.t('noedit'), style: TextStyle(color: sub(context), fontSize: 13))),
-      ])),
-    ]));
-  }
-}
-
-class _Arc extends CustomPainter {
-  final double v;
-  final Color c;
-  _Arc(this.v, this.c);
-  @override
-  void paint(Canvas canvas, Size s) {
-    final r = Rect.fromCircle(center: s.center(Offset.zero), radius: s.width / 2 - 4);
-    canvas.drawArc(r, 0, 6.2832, false, Paint()..style = PaintingStyle.stroke..strokeWidth = 5..color = c.withValues(alpha: .1));
-    canvas.drawArc(r, -1.5708, 6.2832 * v, false, Paint()..style = PaintingStyle.stroke..strokeWidth = 5..strokeCap = StrokeCap.round..color = c);
-  }
-  @override
-  bool shouldRepaint(_Arc o) => o.v != v || o.c != c;
-}
-
 /// Pilih akun (untuk "Pilih akun" saat unggah): cari, centang beberapa akun, lalu selesai.
 class AccountPickSheet extends StatefulWidget {
   final Map<String, Map> init;
@@ -967,7 +821,7 @@ class RelationsPage extends StatefulWidget {
 
 class _RelationsState extends State<RelationsPage> {
   List rels = [], relIn = [], relOut = [];
-  bool loading = true;
+  bool loading = true, locked = false;
   String? error;
   bool get mine => widget.u == Store.i.me?.username;
 
@@ -980,7 +834,9 @@ class _RelationsState extends State<RelationsPage> {
         final r = await Api.req('GET', '/me/relations');
         rels = r['active']; relIn = r['incoming']; relOut = r['outgoing'];
       } else {
-        rels = (await Api.req('GET', '/users/${widget.u}/relations'))['items'];
+        final r = await Api.req('GET', '/users/${widget.u}/relations');
+        rels = r['items'];
+        locked = r['locked'] == true;
       }
       error = null;
     } catch (e) { error = Store.i.err(e); }
@@ -1007,7 +863,7 @@ class _RelationsState extends State<RelationsPage> {
     return Scaffold(body: Column(children: [
       TopBar(back: true, title: s.t('rel_title')),
       Expanded(child: loading ? const Loader() : error != null ? Empty(Icons.cloud_off_rounded, error!) : RefreshIndicator(color: ink(context), backgroundColor: card(context), onRefresh: _load, child: ListView(padding: const EdgeInsets.fromLTRB(20, 4, 20, 40), children: [
-        if (empty) Empty(Icons.diversity_3_rounded, s.t('rel_none')),
+        if (locked) Empty(Icons.lock_outline_rounded, s.t('rel_locked')) else if (empty) Empty(Icons.diversity_3_rounded, s.t('rel_none')),
         if (relIn.isNotEmpty) ...[head(s.t('rel_in')), for (var i = 0; i < relIn.length; i++) row(relIn[i], i, act: [
           IconBtn(Icons.check_rounded, () => _relReq(() => Api.req('POST', '/relations/${relIn[i]['username']}/accept'), s.t('rel_made'))),
           IconBtn(Icons.close_rounded, () => _relReq(() => Api.req('POST', '/relations/${relIn[i]['username']}/decline'), s.t('rel_ended'))),

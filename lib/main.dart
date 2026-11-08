@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 import 'core.dart';
 import 'home.dart';
+import 'hups.dart';
 import 'notify.dart';
 import 'ui.dart';
 
@@ -12,6 +14,10 @@ Future<void> main() async {
   await Notifier.init();
   await Store.i.refresh(); // status masuk sudah benar di layar pertama
   runApp(const HulhupApp());
+  if (kIsWeb) {
+    final m = RegExp(r'^/p/(\d+)/?$').firstMatch(Uri.base.path);
+    if (m != null) WidgetsBinding.instance.addPostFrameCallback((_) => navKey.currentState?.push(route(PostPage(int.parse(m.group(1)!)))));
+  }
   WidgetsBinding.instance.addObserver(_Life());
   _boot();
 }

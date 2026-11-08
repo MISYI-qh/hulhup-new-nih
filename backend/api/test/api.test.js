@@ -105,3 +105,73 @@ test('privasi profil & perangkat', async () => {
   assert.equal((await call('GET', '/me', { token: t2 })).error, 'unauthorized');
   assert.equal((await call('DELETE', '/me/sessions/' + s2.items.find((i) => i.current).id, { token: a })).error, 'not_found');
 });
+
+test('Hups: teks panjang, banyak audio, komentar bersarang, simpan, filter', async () => {
+  const a = await reg('hupa'), b = await reg('hupb');
+  const long = 'kata '.repeat(600).trim(); // 2999 huruf -> teks lengkap di penyimpanan teks
+  // pilih tempat wajib
+  assert.equal((await call('POST', '/posts', { token: a, body: { text: 'x' } })).error, 'pick_place');
+  assert.equal((await call('POST', '/posts', { token: a, body: { hups: true } })).error, 'empty');
+  assert.equal((await call('POST', '/posts', { token: null, body: { text: 'x', hups: true } })).error, 'unauthorized');
+  const p1 = await call('POST', '/posts', { token: a, body: { text: long, hups: true, rand_on: true, audios: 0 } });
+  assert.ok(p1.id);
+  // banyak audio: otomatis tidak masuk acak, tersembunyi sampai semua audio terunggah
+  const p2 = await call('POST', '/posts', { token: a, body: { text: 'dua audio', hups: true, rand_on: true, audios: 2 } });
+  assert.equal((await call('GET', `/posts/${p2.id}`, { token: b })).error, 'not_found');
+  assert.equal((await call('POST', `/posts/${p2.id}/audio?secs=3`, { token: a, raw: mp3() })).done, false);
+  assert.equal((await call('POST', `/posts/${p2.id}/audio?secs=4`, { token: a, raw: mp3() })).done, true);
+  assert.equal((await call('POST', `/posts/${p2.id}/audio?secs=4`, { token: a, raw: mp3() })).ok, false);
+  const d2 = await call('GET', `/posts/${p2.id}`, { token: b });
+  assert.deepEqual(d2.post.files.map((f) => f.secs), [3, 4]);
+  assert.equal(d2.post.in_rand, false);
+  // preview dipotong, halaman penuh lengkap
+  const feed = await call('GET', '/hups?f=public', { token: b });
+  const it1 = feed.items.find((x) => x.id === p1.id);
+  assert.ok(it1.long && it1.desc.length <= 300);
+  assert.equal((await call('GET', `/posts/${p1.id}`, { token: b })).text, long);
+  assert.equal((await call('GET', '/hups?f=public')).ok, true); // tamu boleh lihat
+  // filter hups = filter acak
+  const p3 = await call('POST', '/posts', { token: a, body: { text: 'untuk teman', hups: true, rand: 'friend' } });
+  assert.equal((await call('GET', '/hups?f=public', { token: b })).items.some((x) => x.id === p3.id), false);
+  assert.equal((await call('GET', '/hups?f=friend', { token: b })).items.length, 0);
+  // acak: teks saja boleh, banyak audio tidak
+  const rr = await call('GET', '/random?f=public', { token: b });
+  assert.notEqual(rr.audio && rr.audio.id, p2.id);
+  // komentar bersarang
+  const c1 = await call('POST', `/posts/${p1.id}/comments`, { token: b, body: { text: 'komentar pertama' } });
+  const c2 = await call('POST', `/posts/${p1.id}/comments`, { token: a, body: { text: 'balasan', parent: c1.id } });
+  assert.equal((await call('POST', `/posts/${p1.id}/comments`, { token: null, body: { text: 'x' } })).error, 'unauthorized');
+  assert.equal((await call('POST', `/posts/${p1.id}/comments`, { token: b, body: {} })).error, 'empty');
+  const bigc = await call('POST', `/posts/${p1.id}/comments`, { token: b, body: { text: 'z'.repeat(5000) } });
+  const cl = await call('GET', `/posts/${p1.id}/comments`, { token: b });
+  assert.equal(cl.items.length, 3);
+  assert.equal(cl.items.find((x) => x.id === c2.id).parent, c1.id);
+  assert.ok(cl.items.find((x) => x.id === bigc.id).long);
+  assert.equal((await call('GET', `/comments/${bigc.id}/text`, { token: b })).text.length, 5000);
+  assert.equal((await call('GET', `/posts/${p1.id}`, { token: b })).post.comments, 3);
+  // komentar audio satu
+  const ca = await call('POST', `/posts/${p1.id}/comments`, { token: b, body: { audio: true } });
+  assert.equal((await call('GET', `/posts/${p1.id}/comments`, { token: a })).items.length, 3);
+  assert.equal((await call('POST', `/comments/${ca.id}/audio?secs=2`, { token: b, raw: mp3() })).ok, true);
+  const cl2 = await call('GET', `/posts/${p1.id}/comments`, { token: a });
+  assert.equal(cl2.items.length, 4);
+  assert.ok((await call('GET', `/comments/${ca.id}/file`, { token: a })).binary);
+  // sorot komentar, notifikasi, hapus
+  assert.equal((await call('POST', `/comments/${c1.id}/like`, { token: a })).likes, 1);
+  assert.ok((await call('GET', '/me', { token: a })).unread_social >= 1);
+  assert.equal((await call('DELETE', `/comments/${c1.id}`, { token: await reg('hupc') })).status, 403);
+  assert.equal((await call('DELETE', `/comments/${c1.id}`, { token: a })).ok, true); // pemilik post boleh; balasan ikut terhapus
+  assert.equal((await call('GET', `/posts/${p1.id}`, { token: b })).post.comments, 2);
+  // simpan
+  assert.equal((await call('POST', `/audios/${p1.id}/save`, { token: b })).saved, true);
+  assert.equal((await call('GET', '/me/saved', { token: b })).audios[0].id, p1.id);
+  assert.equal((await call('POST', `/audios/${p1.id}/save`, { token: b })).saved, false);
+  assert.equal((await call('POST', `/audios/${p1.id}/save`, { token: null })).error, 'unauthorized');
+  // privasi daftar hubungan
+  await call('PATCH', '/me/settings', { token: a, body: { rvis: 'me' } });
+  assert.equal((await call('GET', '/users/hupa/relations', { token: b })).locked, true);
+  assert.equal((await call('GET', '/me', { token: a })).user.rvis, 'me');
+  // hapus post membersihkan
+  assert.equal((await call('DELETE', `/audios/${p2.id}`, { token: a })).ok, true);
+  assert.equal((await call('GET', `/posts/${p2.id}`, { token: a })).error, 'not_found');
+});

@@ -7,7 +7,7 @@ import 'core.dart';
 const green = Color(0xFF163F2B);
 const cream = Color(0xFFFBF6E9);
 const heart = Color(0xFFE0524A);
-const sorot = Color(0xFFD9962B);
+const leaf = Color(0xFF2F8F5B);
 final navKey = GlobalKey<NavigatorState>();
 
 bool isDark(BuildContext c) => Theme.of(c).brightness == Brightness.dark;
@@ -81,7 +81,7 @@ class PBtn extends StatelessWidget {
       onTap: loading ? null : onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 220), height: 52,
-        decoration: BoxDecoration(color: onTap == null && !loading ? bg.withValues(alpha: .4) : bg, borderRadius: BorderRadius.circular(26)),
+        decoration: BoxDecoration(color: onTap == null && !loading ? bg.withValues(alpha: .4) : bg, gradient: (!ghost && color == null && (onTap != null || loading)) ? const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF24603F), green]) : null, borderRadius: BorderRadius.circular(26)),
         alignment: Alignment.center,
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 200),
@@ -340,61 +340,133 @@ class Loader extends StatelessWidget {
 class Empty extends StatelessWidget {
   final IconData icon;
   final String text;
-  final Widget? action;
-  const Empty(this.icon, this.text, {super.key, this.action});
+  final Widget? action, custom;
+  const Empty(this.icon, this.text, {super.key, this.action, this.custom});
   @override
   Widget build(BuildContext context) => In(0, Padding(padding: const EdgeInsets.all(40), child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Container(width: 72, height: 72, decoration: BoxDecoration(color: soft(context), shape: BoxShape.circle), child: Icon(icon, size: 30, color: sub(context))),
+        Container(width: 72, height: 72, decoration: BoxDecoration(color: soft(context), shape: BoxShape.circle), child: custom ?? Icon(icon, size: 30, color: sub(context))),
         const SizedBox(height: 14),
         Text(text, textAlign: TextAlign.center, style: TextStyle(color: sub(context), fontSize: 15, height: 1.4)),
         if (action != null) ...[const SizedBox(height: 16), action!],
       ]))));
 }
 
-/// Ikon Sorot: kilau empat sudut yang ramping dengan satu kilau kecil. Garis tipis saat belum, penuh dengan cahaya lembut saat sudah.
-class SorotIcon extends StatelessWidget {
+Color acc(BuildContext c) => isDark(c) ? const Color(0xFF5FC08F) : leaf;
+
+enum HK { sorot, comment, hups, acak, save, share, add }
+
+/// Ikon buatan sendiri (garis tipis, ujung bulat): sorot (penanda), komentar, hups, acak, simpan, bagikan.
+class HIcon extends StatelessWidget {
+  final HK k;
   final bool filled;
   final double size;
   final Color color;
-  const SorotIcon({super.key, this.filled = false, this.size = 24, required this.color});
+  final Color? hole;
+  const HIcon(this.k, {super.key, this.filled = false, this.size = 24, required this.color, this.hole});
   @override
-  Widget build(BuildContext context) => SizedBox(width: size, height: size, child: CustomPaint(painter: _SorotPainter(filled, color)));
+  Widget build(BuildContext context) => SizedBox(width: size, height: size, child: CustomPaint(painter: _HPainter(k, filled, color, hole ?? bgOf(context))));
 }
 
-class _SorotPainter extends CustomPainter {
+class _HPainter extends CustomPainter {
+  final HK k;
   final bool filled;
-  final Color color;
-  _SorotPainter(this.filled, this.color);
-  Path _star(Offset c, double r) {
-    final k = r * .16;
-    return Path()
-      ..moveTo(c.dx, c.dy - r)
-      ..quadraticBezierTo(c.dx + k, c.dy - k, c.dx + r, c.dy)
-      ..quadraticBezierTo(c.dx + k, c.dy + k, c.dx, c.dy + r)
-      ..quadraticBezierTo(c.dx - k, c.dy + k, c.dx - r, c.dy)
-      ..quadraticBezierTo(c.dx - k, c.dy - k, c.dx, c.dy - r)
-      ..close();
-  }
+  final Color color, hole;
+  _HPainter(this.k, this.filled, this.color, this.hole);
 
   @override
   void paint(Canvas canvas, Size sz) {
-    final u = sz.width / 24;
-    canvas.scale(u);
-    final big = _star(const Offset(10.5, 13.5), 9.2), small = _star(const Offset(19, 5), 3.6);
-    if (filled) {
-      canvas.drawCircle(const Offset(10.5, 13.5), 9, Paint()..color = color.withValues(alpha: .28)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.2));
-      final f = Paint()..color = color..style = PaintingStyle.fill..isAntiAlias = true;
-      canvas.drawPath(big, f);
-      canvas.drawPath(small, f);
-    } else {
-      final st = Paint()..color = color..style = PaintingStyle.stroke..strokeWidth = 1.6..strokeJoin = StrokeJoin.round..isAntiAlias = true;
-      canvas.drawPath(big, st);
-      canvas.drawPath(small, st);
+    canvas.scale(sz.width / 24);
+    final st = Paint()..color = color..style = PaintingStyle.stroke..strokeWidth = 1.7..strokeCap = StrokeCap.round..strokeJoin = StrokeJoin.round..isAntiAlias = true;
+    final fl = Paint()..color = color..style = PaintingStyle.fill..isAntiAlias = true;
+    switch (k) {
+      case HK.sorot:
+        final pin = Path()
+          ..moveTo(12, 21.4)
+          ..cubicTo(8.3, 18, 5, 14.7, 5, 10)
+          ..arcToPoint(const Offset(19, 10), radius: const Radius.circular(7))
+          ..cubicTo(19, 14.7, 15.7, 18, 12, 21.4)
+          ..close();
+        if (filled) {
+          canvas.drawPath(pin, fl);
+          canvas.drawCircle(const Offset(12, 10), 2.6, Paint()..color = hole..isAntiAlias = true);
+        } else {
+          canvas.drawPath(pin, st);
+          canvas.drawCircle(const Offset(12, 10), 2.4, st);
+        }
+      case HK.save:
+        final bm = Path()
+          ..moveTo(7.5, 3.6)
+          ..lineTo(16.5, 3.6)
+          ..arcToPoint(const Offset(18, 5.1), radius: const Radius.circular(1.5))
+          ..lineTo(18, 20.4)
+          ..lineTo(12, 16.2)
+          ..lineTo(6, 20.4)
+          ..lineTo(6, 5.1)
+          ..arcToPoint(const Offset(7.5, 3.6), radius: const Radius.circular(1.5))
+          ..close();
+        canvas.drawPath(bm, filled ? fl : st);
+      case HK.comment:
+        final b = Path()
+          ..moveTo(6.5, 4)
+          ..lineTo(17.5, 4)
+          ..arcToPoint(const Offset(21, 7.5), radius: const Radius.circular(3.5))
+          ..lineTo(21, 13)
+          ..arcToPoint(const Offset(17.5, 16.5), radius: const Radius.circular(3.5))
+          ..lineTo(12.4, 16.5)
+          ..lineTo(8, 20.4)
+          ..lineTo(8, 16.5)
+          ..lineTo(6.5, 16.5)
+          ..arcToPoint(const Offset(3, 13), radius: const Radius.circular(3.5))
+          ..lineTo(3, 7.5)
+          ..arcToPoint(const Offset(6.5, 4), radius: const Radius.circular(3.5))
+          ..close();
+        canvas.drawPath(b, st);
+        canvas.drawLine(const Offset(8, 9), const Offset(16, 9), st);
+        canvas.drawLine(const Offset(8, 12.2), const Offset(13, 12.2), st);
+      case HK.hups:
+        canvas.drawCircle(const Offset(5.6, 6), 2.4, st);
+        canvas.drawCircle(const Offset(5.6, 17.4), 2.4, st);
+        canvas.drawLine(const Offset(5.6, 8.4), const Offset(5.6, 15), st);
+        canvas.drawLine(const Offset(10.6, 5), const Offset(20, 5), st);
+        canvas.drawLine(const Offset(10.6, 8.4), const Offset(16.4, 8.4), st);
+        canvas.drawLine(const Offset(10.6, 16.4), const Offset(20, 16.4), st);
+        canvas.drawLine(const Offset(10.6, 19.8), const Offset(15.4, 19.8), st);
+      case HK.acak:
+        final a = Path()..moveTo(3, 7.5)..lineTo(6.4, 7.5)..cubicTo(10.4, 7.5, 11.4, 16.5, 15.4, 16.5)..lineTo(19.4, 16.5);
+        final b = Path()..moveTo(3, 16.5)..lineTo(6.4, 16.5)..cubicTo(10.4, 16.5, 11.4, 7.5, 15.4, 7.5)..lineTo(19.4, 7.5);
+        canvas.drawPath(a, st);
+        canvas.drawPath(b, st);
+        canvas.drawPath(Path()..moveTo(17.2, 14.3)..lineTo(19.4, 16.5)..lineTo(17.2, 18.7), st);
+        canvas.drawPath(Path()..moveTo(17.2, 5.3)..lineTo(19.4, 7.5)..lineTo(17.2, 9.7), st);
+      case HK.share:
+        canvas.drawPath(Path()..moveTo(5, 12.5)..lineTo(5, 18)..arcToPoint(const Offset(7, 20), radius: const Radius.circular(2))..lineTo(17, 20)..arcToPoint(const Offset(19, 18), radius: const Radius.circular(2))..lineTo(19, 12.5), st);
+        canvas.drawLine(const Offset(12, 15), const Offset(12, 4), st);
+        canvas.drawPath(Path()..moveTo(8, 8)..lineTo(12, 4)..lineTo(16, 8), st);
+      case HK.add:
+        canvas.drawLine(const Offset(12, 5), const Offset(12, 19), st);
+        canvas.drawLine(const Offset(5, 12), const Offset(19, 12), st);
     }
   }
 
   @override
-  bool shouldRepaint(_SorotPainter o) => o.filled != filled || o.color != color;
+  bool shouldRepaint(_HPainter o) => o.k != k || o.filled != filled || o.color != color || o.hole != hole;
+}
+
+/// Tombol ikon + angka (dipakai untuk sorot, komentar, simpan, bagikan).
+class ActBtn extends StatelessWidget {
+  final HK k;
+  final bool on;
+  final int? count;
+  final VoidCallback onTap;
+  const ActBtn(this.k, this.onTap, {super.key, this.on = false, this.count});
+  @override
+  Widget build(BuildContext context) => Tap(
+        onTap: onTap,
+        child: Padding(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8), child: Row(mainAxisSize: MainAxisSize.min, children: [
+          TweenAnimationBuilder<double>(key: ValueKey(on), tween: Tween(begin: on ? .6 : 1, end: 1), duration: const Duration(milliseconds: 420), curve: Curves.elasticOut, builder: (_, v, c) => Transform.scale(scale: v, child: c), child: HIcon(k, filled: on, size: 23, color: on ? acc(context) : sub(context))),
+          if (count != null) ...[const SizedBox(width: 6), Text(fmt(count!), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, color: on ? acc(context) : sub(context)))],
+        ])),
+      );
 }
 
 class LikeBtn extends StatelessWidget {
@@ -403,24 +475,9 @@ class LikeBtn extends StatelessWidget {
   final VoidCallback onTap;
   const LikeBtn(this.liked, this.count, this.onTap, {super.key});
   @override
-  Widget build(BuildContext context) => Tap(
-        onTap: onTap,
-        child: Padding(padding: const EdgeInsets.all(8), child: Row(mainAxisSize: MainAxisSize.min, children: [
-          TweenAnimationBuilder<double>(key: ValueKey(liked), tween: Tween(begin: liked ? .5 : 1, end: 1), duration: const Duration(milliseconds: 450), curve: Curves.elasticOut, builder: (_, v, c) => Transform.scale(scale: v, child: c), child: SorotIcon(filled: liked, size: 26, color: liked ? sorot : sub(context))),
-          const SizedBox(width: 6),
-          AnimatedSwitcher(duration: const Duration(milliseconds: 250), transitionBuilder: (w, a) => FadeTransition(opacity: a, child: ScaleTransition(scale: a, child: w)), child: Text('$count', key: ValueKey(count), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: sub(context)))),
-        ])),
-      );
+  Widget build(BuildContext context) => ActBtn(HK.sorot, onTap, on: liked, count: count);
 }
 
-Widget img(String url, {BoxFit fit = BoxFit.cover, Widget? fallback}) {
-  final b = Local.bytes(url);
-  final fb = fallback ?? const SizedBox();
-  final net = url.startsWith('/') ? '${Api.base}$url' : url;
-  return b != null ? Image.memory(b, fit: fit, gaplessPlayback: true, errorBuilder: (_, __, ___) => fb) : Image.network(net, fit: fit, errorBuilder: (_, __, ___) => fb);
-}
-
-/// Latar profil: penuh lebar, memudar halus ke warna halaman di semua sisi.
 class CoverBox extends StatelessWidget {
   final String? url;
   final double h;

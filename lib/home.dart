@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'core.dart';
 import 'ui.dart';
 import 'pages.dart';
+import 'hups.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -16,6 +17,7 @@ class HomePage extends StatefulWidget {
 
 class _HomeState extends State<HomePage> {
   bool menu = false, _busy = false;
+  int mode = 0; // 0 = Acak, 1 = Hups
 
   Future<void> _tap() async {
     if (_busy) return;
@@ -26,7 +28,7 @@ class _HomeState extends State<HomePage> {
       if (!mounted) return;
       if (a == null) { toast(s.t(s.fromOffline ? 'no_net_empty' : (s.me != null && s.filter != 'public') ? 'nofilter' : 'nobody')); return; }
       if (s.fromOffline) toast(s.t('no_net'));
-      s.play(a, force: true).catchError((_) => toast(s.t('e_server'), bad: true));
+      if (a.url.isNotEmpty) s.play(a, force: true).catchError((_) => toast(s.t('e_server'), bad: true));
       sheet(context, (_) => PopupBody(a)).then((_) { if (s.playing == a.id) s.stop(); });
     } catch (e) {
       toast(s.err(e), bad: true);
@@ -41,6 +43,52 @@ class _HomeState extends State<HomePage> {
     if (r == null) return;
     if (s.me == null && r != 'public') { toast(s.t('filter_login')); return; }
     await s.setFilter(r);
+  }
+
+  Widget _filterChip(Store s) => ListenableBuilder(listenable: s, builder: (_, __) {
+        final f = s.me == null ? 'public' : s.filter;
+        return Tap(onTap: _filter, scale: .96, child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(22)),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(audIcon(f, filter: true), size: 16, color: ink(context)), const SizedBox(width: 7), Text(audLabel(f, filter: true), style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)), const SizedBox(width: 2), Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: sub(context))]),
+        ));
+      });
+
+  Widget _randBody(Store s) => Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        TapButton(onTap: _tap),
+        const SizedBox(height: 20),
+        ListenableBuilder(listenable: s, builder: (_, __) => AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          transitionBuilder: (w, a) => FadeTransition(opacity: a, child: SlideTransition(position: Tween(begin: const Offset(0, .3), end: Offset.zero).animate(a), child: w)),
+          child: Text(fmt(s.taps), key: ValueKey(s.taps), style: TextStyle(fontSize: 38, fontWeight: FontWeight.w800, letterSpacing: -1.2, color: ink(context))),
+        )),
+        const SizedBox(height: 16),
+        _filterChip(s),
+      ]));
+
+  Widget _hupsBody(Store s) => Column(children: [
+        Padding(padding: const EdgeInsets.only(bottom: 8), child: _filterChip(s)),
+        Expanded(child: ListenableBuilder(listenable: s, builder: (_, __) {
+          final f = s.me == null ? 'public' : s.filter;
+          return Stack(children: [
+            HupsFeed(f, key: ValueKey('hf_$f${s.me?.username}')),
+            Positioned(right: 20, bottom: 14, child: Tap(onTap: () => go(context, s.me == null ? const AuthPage() : const ComposePage()), child: Container(width: 56, height: 56, decoration: BoxDecoration(gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF24603F), green]), shape: BoxShape.circle, boxShadow: [BoxShadow(color: green.withValues(alpha: .35), blurRadius: 22, offset: const Offset(0, 10))]), child: const Center(child: HIcon(HK.add, size: 26, color: cream))))),
+          ]);
+        })),
+      ]);
+
+  Widget _switcher(Store s) {
+    Widget seg(int i, HK k, String label) {
+      final on = mode == i;
+      return Expanded(child: Tap(onTap: () { if (mode != i) setState(() => mode = i); }, scale: .97, child: AnimatedContainer(
+        duration: const Duration(milliseconds: 260), curve: Curves.easeOutCubic, height: 44,
+        decoration: BoxDecoration(color: on ? ink(context) : Colors.transparent, borderRadius: BorderRadius.circular(22)),
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [HIcon(k, size: 19, color: on ? bgOf(context) : sub(context)), const SizedBox(width: 8), Text(label, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: on ? bgOf(context) : sub(context)))]),
+      )));
+    }
+    return SafeArea(top: false, child: Padding(padding: const EdgeInsets.fromLTRB(60, 6, 60, 12), child: Container(
+      padding: const EdgeInsets.all(4), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(26)),
+      child: Row(children: [seg(0, HK.acak, s.t('rand_tab')), seg(1, HK.hups, s.t('hups'))]),
+    )));
   }
 
   @override
@@ -61,23 +109,11 @@ class _HomeState extends State<HomePage> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(18)),
             child: Row(children: [Icon(Icons.system_update_rounded, size: 20, color: ink(context)), const SizedBox(width: 12), Expanded(child: Text(s.t('upd_title'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14))), Text(s.t('upd_btn'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14))]),
           )))),
-          Expanded(child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-            TapButton(onTap: _tap),
-            const SizedBox(height: 20),
-            ListenableBuilder(listenable: s, builder: (_, __) => AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              transitionBuilder: (w, a) => FadeTransition(opacity: a, child: SlideTransition(position: Tween(begin: const Offset(0, .3), end: Offset.zero).animate(a), child: w)),
-              child: Text(fmt(s.taps), key: ValueKey(s.taps), style: TextStyle(fontSize: 38, fontWeight: FontWeight.w800, letterSpacing: -1.2, color: ink(context))),
-            )),
-            const SizedBox(height: 16),
-            ListenableBuilder(listenable: s, builder: (_, __) {
-              final f = s.me == null ? 'public' : s.filter;
-              return Tap(onTap: _filter, scale: .96, child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(22)),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(audIcon(f, filter: true), size: 16, color: ink(context)), const SizedBox(width: 7), Text(audLabel(f, filter: true), style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)), const SizedBox(width: 2), Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: sub(context))]),
-              ));
-            }),
-          ]))),
+          Expanded(child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 260),
+            child: mode == 0 ? KeyedSubtree(key: const ValueKey('rand'), child: _randBody(s)) : KeyedSubtree(key: const ValueKey('hups'), child: _hupsBody(s)),
+          )),
+          _switcher(s),
         ]),
         SideMenu(open: menu, close: () => setState(() => menu = false)),
       ]),
@@ -169,7 +205,7 @@ class _SideMenuState extends State<SideMenu> {
           child: SafeArea(child: ListenableBuilder(listenable: s, builder: (_, __) => Padding(padding: const EdgeInsets.fromLTRB(20, 18, 20, 18), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Brand(),
             const SizedBox(height: 28),
-            Padding(padding: const EdgeInsets.only(bottom: 8), child: PBtn(s.t('create'), () { close(); go(context, s.me == null ? const AuthPage() : const UploadPage()); }, icon: Icons.add_rounded)),
+            Padding(padding: const EdgeInsets.only(bottom: 8), child: PBtn(s.t('create'), () { close(); go(context, s.me == null ? const AuthPage() : const ComposePage()); }, icon: Icons.add_rounded)),
             item(Icons.tune_rounded, 'settings', () => const SettingsPage()),
             item(Icons.download_done_rounded, 'offline_t', () => const OfflinePage()),
             Tap(onTap: () => setState(() => more = !more), child: Padding(padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8), child: Row(children: [Icon(Icons.more_horiz_rounded, size: 24, color: ink(context)), const SizedBox(width: 16), Expanded(child: Text(s.t('more'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600))), AnimatedRotation(turns: more ? .5 : 0, duration: const Duration(milliseconds: 200), child: Icon(Icons.expand_more_rounded, size: 24, color: sub(context)))]))),
@@ -207,9 +243,9 @@ class PopupBody extends StatelessWidget {
         Icon(Icons.chevron_right_rounded, color: sub(context)),
       ])),
       if (!a.pprof && a.created > 0) Align(alignment: Alignment.centerLeft, child: Padding(padding: const EdgeInsets.only(bottom: 6), child: Text(s.when(a.created), style: TextStyle(color: sub(context), fontSize: 13)))),
-      if (a.desc.trim().isNotEmpty) Padding(padding: EdgeInsets.only(top: a.pprof ? 12 : 0), child: Align(alignment: Alignment.centerLeft, child: Text(a.desc.trim(), style: const TextStyle(fontSize: 15, height: 1.4)))),
+      if (a.desc.trim().isNotEmpty) Tap(onTap: () { Navigator.pop(context); openPost(context, a); }, scale: .99, child: Padding(padding: EdgeInsets.only(top: a.pprof ? 12 : 0), child: Align(alignment: Alignment.centerLeft, child: Text.rich(TextSpan(children: [TextSpan(text: a.desc.trim()), if (a.long) TextSpan(text: ' …  ${s.t('read_more')}', style: TextStyle(color: acc(context), fontWeight: FontWeight.w700))]), maxLines: 6, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, height: 1.4))))),
       SizedBox(height: a.pprof || a.desc.trim().isNotEmpty ? 14 : 4),
-      Container(
+      if (a.url.isNotEmpty) Container(
         padding: const EdgeInsets.fromLTRB(8, 8, 6, 8), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(26)),
         child: ListenableBuilder(listenable: s, builder: (_, __) {
           final on = s.playing == a.id;
@@ -220,14 +256,13 @@ class PopupBody extends StatelessWidget {
               return Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: (ms / total).clamp(0.0, 1.0), minHeight: 6, backgroundColor: ink(context).withValues(alpha: .12), color: ink(context))));
             })),
             ValueListenableBuilder<int>(valueListenable: s.pos, builder: (_, ms, __) => Text('${mmss(ms ~/ 1000)} / ${mmss(a.secs)}', style: TextStyle(color: on ? ink(context) : sub(context), fontSize: 13, fontWeight: FontWeight.w700))),
-            LikeBtn(a.liked, a.likes, () => likeAudio(a)),
           ]);
         }),
       ),
-      const SizedBox(height: 10),
-      const SpeedRow(),
-      const SizedBox(height: 10),
-      ListenableBuilder(listenable: s, builder: (_, __) {
+      if (a.url.isNotEmpty) ...[const SizedBox(height: 10), const SpeedRow()],
+      const SizedBox(height: 6),
+      PostActions(a, onComments: () { Navigator.pop(context); openPost(context, a); }),
+      if (a.url.isNotEmpty) ListenableBuilder(listenable: s, builder: (_, __) {
         final off = s.isOffline(a.id);
         return PBtn(off ? s.t('is_offline') : s.t('mk_offline'), () => toggleOffline(a), ghost: true, icon: off ? Icons.offline_pin_rounded : Icons.download_for_offline_outlined);
       }),

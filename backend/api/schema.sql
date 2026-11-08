@@ -165,3 +165,65 @@ CREATE TABLE IF NOT EXISTS push_tokens (
 CREATE INDEX IF NOT EXISTS push_tokens_user ON push_tokens(user_id);
 
 ALTER TABLE push_tokens ADD COLUMN IF NOT EXISTS remind BOOLEAN DEFAULT TRUE;
+
+-- Hups: tulisan tanpa batas, banyak audio, komentar bersarang, simpan. Tabel audios menjadi tabel "post".
+ALTER TABLE audios DROP CONSTRAINT IF EXISTS audios_descr_check;
+ALTER TABLE audios DROP CONSTRAINT IF EXISTS audios_secs_check;
+ALTER TABLE audios DROP CONSTRAINT IF EXISTS audios_store_check;
+ALTER TABLE audios ALTER COLUMN store DROP NOT NULL;
+ALTER TABLE audios ALTER COLUMN blob_key DROP NOT NULL;
+ALTER TABLE audios ALTER COLUMN mime DROP NOT NULL;
+ALTER TABLE audios ADD COLUMN IF NOT EXISTS body TEXT;
+ALTER TABLE audios ADD COLUMN IF NOT EXISTS body_key TEXT;
+ALTER TABLE audios ADD COLUMN IF NOT EXISTS body_len INT NOT NULL DEFAULT 0;
+ALTER TABLE audios ADD COLUMN IF NOT EXISTS in_rand BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE audios ADD COLUMN IF NOT EXISTS in_hups BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE audios ADD COLUMN IF NOT EXISTS n_audio INT NOT NULL DEFAULT 1;
+ALTER TABLE audios ADD COLUMN IF NOT EXISTS comments INT NOT NULL DEFAULT 0;
+ALTER TABLE audios ADD COLUMN IF NOT EXISTS pending BOOLEAN NOT NULL DEFAULT FALSE;
+CREATE INDEX IF NOT EXISTS audios_hups ON audios(id DESC) WHERE in_hups AND NOT hidden AND NOT pending;
+
+CREATE TABLE IF NOT EXISTS post_audios (
+  post_id  BIGINT NOT NULL REFERENCES audios(id) ON DELETE CASCADE,
+  idx      INT NOT NULL,
+  store    TEXT NOT NULL,
+  blob_key TEXT NOT NULL,
+  mime     TEXT NOT NULL,
+  secs     INT NOT NULL,
+  PRIMARY KEY (post_id, idx)
+);
+
+CREATE TABLE IF NOT EXISTS comments (
+  id       BIGSERIAL PRIMARY KEY,
+  post_id  BIGINT NOT NULL REFERENCES audios(id) ON DELETE CASCADE,
+  owner    BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  parent   BIGINT REFERENCES comments(id) ON DELETE CASCADE,
+  body     TEXT NOT NULL DEFAULT '',
+  body_key TEXT,
+  body_len INT NOT NULL DEFAULT 0,
+  store    TEXT,
+  blob_key TEXT,
+  mime     TEXT,
+  secs     INT NOT NULL DEFAULT 0,
+  likes    INT NOT NULL DEFAULT 0,
+  pending  BOOLEAN NOT NULL DEFAULT FALSE,
+  created  BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS comments_post ON comments(post_id, id);
+CREATE INDEX IF NOT EXISTS comments_owner ON comments(owner);
+
+CREATE TABLE IF NOT EXISTS comment_likes (
+  user_id    BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  comment_id BIGINT NOT NULL REFERENCES comments(id) ON DELETE CASCADE,
+  PRIMARY KEY (user_id, comment_id)
+);
+
+CREATE TABLE IF NOT EXISTS saves (
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  post_id BIGINT NOT NULL REFERENCES audios(id) ON DELETE CASCADE,
+  created BIGINT NOT NULL,
+  PRIMARY KEY (user_id, post_id)
+);
+CREATE INDEX IF NOT EXISTS saves_post ON saves(post_id);
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS rvis TEXT NOT NULL DEFAULT 'public';
