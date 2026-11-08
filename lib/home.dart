@@ -39,7 +39,7 @@ class _HomeState extends State<HomePage> {
 
   Future<void> _filter() async {
     final s = Store.i;
-    final r = await chooseSheet(context, s.t('filter_title'), filterAud, s.me == null ? 'public' : s.filter, filter: true);
+    final r = await multiSheet(context, s.t('filter_title'), filterAud, s.me == null ? 'public' : s.filter, filter: true);
     if (r == null) return;
     if (s.me == null && r != 'public') { toast(s.t('filter_login')); return; }
     await s.setFilter(r);
@@ -49,7 +49,7 @@ class _HomeState extends State<HomePage> {
         final f = s.me == null ? 'public' : s.filter;
         return Tap(onTap: _filter, scale: .96, child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(22)),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(audIcon(f, filter: true), size: 16, color: ink(context)), const SizedBox(width: 7), Text(audLabel(f, filter: true), style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)), const SizedBox(width: 2), Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: sub(context))]),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(audIcon(audSplit(f).first, filter: true), size: 16, color: ink(context)), const SizedBox(width: 7), Flexible(child: Text(audText(f, filter: true), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600))), const SizedBox(width: 2), Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: sub(context))]),
         ));
       });
 

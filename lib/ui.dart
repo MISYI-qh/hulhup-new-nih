@@ -362,16 +362,18 @@ class HIcon extends StatelessWidget {
   final double size;
   final Color color;
   final Color? hole;
-  const HIcon(this.k, {super.key, this.filled = false, this.size = 24, required this.color, this.hole});
+  final double burst; // 0..1: animasi sinar saat sorot dinyalakan
+  const HIcon(this.k, {super.key, this.filled = false, this.size = 24, required this.color, this.hole, this.burst = 1});
   @override
-  Widget build(BuildContext context) => SizedBox(width: size, height: size, child: CustomPaint(painter: _HPainter(k, filled, color, hole ?? bgOf(context))));
+  Widget build(BuildContext context) => SizedBox(width: size, height: size, child: CustomPaint(painter: _HPainter(k, filled, color, hole ?? bgOf(context), burst)));
 }
 
 class _HPainter extends CustomPainter {
   final HK k;
   final bool filled;
   final Color color, hole;
-  _HPainter(this.k, this.filled, this.color, this.hole);
+  final double burst;
+  _HPainter(this.k, this.filled, this.color, this.hole, this.burst);
 
   @override
   void paint(Canvas canvas, Size sz) {
@@ -380,18 +382,29 @@ class _HPainter extends CustomPainter {
     final fl = Paint()..color = color..style = PaintingStyle.fill..isAntiAlias = true;
     switch (k) {
       case HK.sorot:
-        final pin = Path()
-          ..moveTo(12, 21.4)
-          ..cubicTo(8.3, 18, 5, 14.7, 5, 10)
-          ..arcToPoint(const Offset(19, 10), radius: const Radius.circular(7))
-          ..cubicTo(19, 14.7, 15.7, 18, 12, 21.4)
-          ..close();
+        // Lampu sorot: kepala lampu kecil di atas, berkas cahaya melebar ke bawah. Menyala = berkas terisi + garis sinar.
+        final head = RRect.fromLTRBR(8.2, 2.6, 15.8, 7.4, const Radius.circular(1.8));
+        final beam = Path()..moveTo(8.9, 9.2)..lineTo(15.1, 9.2)..lineTo(19.6, 20.6)..lineTo(4.4, 20.6)..close();
         if (filled) {
-          canvas.drawPath(pin, fl);
-          canvas.drawCircle(const Offset(12, 10), 2.6, Paint()..color = hole..isAntiAlias = true);
+          canvas.drawRRect(head, fl);
+          canvas.drawPath(beam, fl);
+          final ray = Paint()..color = hole..style = PaintingStyle.stroke..strokeWidth = 1.5..strokeCap = StrokeCap.round..isAntiAlias = true;
+          for (final dx in const [-3.6, 0.0, 3.6]) {
+            final e = Offset(12 + dx * 1.35, 18.2);
+            final o = const Offset(12, 11.4);
+            canvas.drawLine(o, Offset.lerp(o, e, burst.clamp(0.0, 1.0))!, ray);
+          }
+          if (burst < 1) {
+            final glow = Paint()..color = color.withValues(alpha: (1 - burst) * .9)..style = PaintingStyle.stroke..strokeWidth = 1.5..strokeCap = StrokeCap.round..isAntiAlias = true;
+            final r = 1 + burst * 2.6;
+            canvas.drawLine(Offset(6.2 - r, 6.4 - r * .2), Offset(4.2 - r, 6.4 - r * .2), glow);
+            canvas.drawLine(Offset(17.8 + r, 6.4 - r * .2), Offset(19.8 + r, 6.4 - r * .2), glow);
+            canvas.drawLine(Offset(5.6 - r, 11 + r * .4), Offset(3.6 - r, 11.4 + r * .5), glow);
+            canvas.drawLine(Offset(18.4 + r, 11 + r * .4), Offset(20.4 + r, 11.4 + r * .5), glow);
+          }
         } else {
-          canvas.drawPath(pin, st);
-          canvas.drawCircle(const Offset(12, 10), 2.4, st);
+          canvas.drawRRect(head, st);
+          canvas.drawPath(beam, st);
         }
       case HK.save:
         final bm = Path()
@@ -449,10 +462,10 @@ class _HPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_HPainter o) => o.k != k || o.filled != filled || o.color != color || o.hole != hole;
+  bool shouldRepaint(_HPainter o) => o.k != k || o.filled != filled || o.color != color || o.hole != hole || o.burst != burst;
 }
 
-/// Tombol ikon + angka (dipakai untuk sorot, komentar, simpan, bagikan).
+/// Tombol ikon + angka (dipakai untuk sorot, komentar, simpan, bagikan). Sorot hitam-putih dengan sinar saat menyala.
 class ActBtn extends StatelessWidget {
   final HK k;
   final bool on;
@@ -460,13 +473,16 @@ class ActBtn extends StatelessWidget {
   final VoidCallback onTap;
   const ActBtn(this.k, this.onTap, {super.key, this.on = false, this.count});
   @override
-  Widget build(BuildContext context) => Tap(
-        onTap: onTap,
-        child: Padding(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8), child: Row(mainAxisSize: MainAxisSize.min, children: [
-          TweenAnimationBuilder<double>(key: ValueKey(on), tween: Tween(begin: on ? .6 : 1, end: 1), duration: const Duration(milliseconds: 420), curve: Curves.elasticOut, builder: (_, v, c) => Transform.scale(scale: v, child: c), child: HIcon(k, filled: on, size: 23, color: on ? acc(context) : sub(context))),
-          if (count != null) ...[const SizedBox(width: 6), Text(fmt(count!), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, color: on ? acc(context) : sub(context)))],
-        ])),
-      );
+  Widget build(BuildContext context) {
+    final c = on ? (k == HK.sorot ? ink(context) : acc(context)) : sub(context);
+    return Tap(
+      onTap: onTap,
+      child: Padding(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8), child: Row(mainAxisSize: MainAxisSize.min, children: [
+        TweenAnimationBuilder<double>(key: ValueKey(on), tween: Tween(begin: on ? 0 : 1, end: 1), duration: const Duration(milliseconds: 520), curve: Curves.easeOutCubic, builder: (_, v, __) => Transform.scale(scale: on ? .78 + .22 * Curves.elasticOut.transform(v.clamp(0.0, 1.0)) : 1, child: HIcon(k, filled: on, size: 23, color: c, burst: v))),
+        if (count != null) ...[const SizedBox(width: 6), Text(fmt(count!), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, color: c))],
+      ])),
+    );
+  }
 }
 
 class LikeBtn extends StatelessWidget {
@@ -600,7 +616,50 @@ IconData audIcon(String v, {bool filter = false}) => (filter && v == 'me' ? Icon
     }[v]) ?? Icons.public_rounded;
 String audLabel(String v, {bool filter = false}) => Store.i.t(filter && v == 'me' ? 'f_me' : 'a_$v');
 
-/// Daftar pilihan bergulir (bisa banyak opsi). Mengembalikan nilai yang dipilih.
+List<String> audSplit(String v) => v.split(',').where((e) => e.isNotEmpty).toList();
+
+/// Teks ringkas untuk satu atau beberapa audiens ("Pengikut · Teman" atau "Pengikut +2").
+String audText(String v, {bool filter = false}) {
+  final l = audSplit(v);
+  if (l.isEmpty) return audLabel('public', filter: filter);
+  if (l.length <= 2) return l.map((e) => audLabel(e, filter: filter)).join(' · ');
+  return '${audLabel(l.first, filter: filter)} +${l.length - 1}';
+}
+
+/// Pilih lebih dari satu audiens (centang). Untuk pengaturan/post, "Publik" dan "Hanya saya" berdiri sendiri; untuk filter semua boleh digabung.
+Future<String?> multiSheet(BuildContext context, String title, List<String> opts, String value, {bool filter = false}) => sheet<String>(context, (sc) {
+      var sel = audSplit(value).where(opts.contains).toList();
+      if (sel.isEmpty) sel = [opts.first];
+      return StatefulBuilder(builder: (_, set) {
+        void toggle(String v) {
+          if (sel.contains(v)) {
+            if (sel.length > 1) sel.remove(v);
+          } else {
+            if (!filter && (v == 'public' || v == 'me')) { sel = [v]; }
+            else { sel = [...sel.where((e) => filter || (e != 'public' && e != 'me')), v]; }
+          }
+          set(() {});
+        }
+        return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Padding(padding: const EdgeInsets.only(left: 4, bottom: 2), child: Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18))),
+          Padding(padding: const EdgeInsets.only(left: 4, bottom: 12), child: Text(Store.i.t('multi_note'), style: TextStyle(color: sub(sc), fontSize: 13))),
+          ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: MediaQuery.of(sc).size.height * .5),
+            child: SingleChildScrollView(child: Column(children: [
+              for (final v in opts) Tap(onTap: () => toggle(v), scale: .98, child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200), margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                decoration: BoxDecoration(color: sel.contains(v) ? ink(sc).withValues(alpha: .14) : soft(sc), borderRadius: BorderRadius.circular(24)),
+                child: Row(children: [Icon(audIcon(v, filter: filter), size: 22, color: ink(sc)), const SizedBox(width: 14), Expanded(child: Text(audLabel(v, filter: filter), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16))), Icon(sel.contains(v) ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded, size: 22, color: sel.contains(v) ? ink(sc) : sub(sc))]),
+              )),
+            ])),
+          ),
+          const SizedBox(height: 8),
+          PBtn(Store.i.t('multi_done'), () => Navigator.pop(sc, sel.join(',')), icon: Icons.check_rounded),
+        ]);
+      });
+    });
+
+/// Daftar pilihan bergulir (satu pilihan). Mengembalikan nilai yang dipilih.
 Future<String?> chooseSheet(BuildContext context, String title, List<String> opts, String? value, {bool filter = false}) => sheet<String>(context, (sc) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
       Padding(padding: const EdgeInsets.only(left: 4, bottom: 12), child: Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18))),
       ConstrainedBox(
@@ -629,12 +688,12 @@ class Pick extends StatelessWidget {
       Tap(
         scale: .98,
         onTap: () async {
-          final r = await chooseSheet(context, label, opts, value);
+          final r = await multiSheet(context, label, opts, value);
           if (r != null) on(r);
         },
         child: Container(
           height: 56, padding: const EdgeInsets.symmetric(horizontal: 18), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(28)),
-          child: Row(children: [Icon(audIcon(value), size: 22, color: ink(context)), const SizedBox(width: 12), Expanded(child: Text(s.t('a_$value'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500))), Icon(Icons.unfold_more_rounded, color: sub(context))]),
+          child: Row(children: [Icon(audIcon(audSplit(value).isEmpty ? 'public' : audSplit(value).first), size: 22, color: ink(context)), const SizedBox(width: 12), Expanded(child: Text(audText(value), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500))), Icon(Icons.unfold_more_rounded, color: sub(context))]),
         ),
       ),
     ]);
@@ -642,12 +701,12 @@ class Pick extends StatelessWidget {
 }
 
 /// Lembar pelaporan buatan sendiri: pilih alasan, laporan dikirim ke server.
-Future<void> reportSheet(BuildContext context, {int? audio, String? user}) => sheet(context, (ctx) {
+Future<void> reportSheet(BuildContext context, {int? audio, String? user, int? comment}) => sheet(context, (ctx) {
   final s = Store.i;
   Future<void> send(String r) async {
     Navigator.pop(ctx);
     try {
-      await Api.req('POST', '/reports', body: {if (audio != null) 'audio': audio, if (user != null) 'user': user, 'reason': r});
+      await Api.req('POST', '/reports', body: {if (comment != null) 'comment': comment else if (audio != null) 'audio': audio, if (user != null) 'user': user, 'reason': r});
       toast(s.t('report_done'));
     } catch (e) { toast(s.err(e), bad: true); }
   }

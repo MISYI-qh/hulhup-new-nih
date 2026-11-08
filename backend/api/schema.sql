@@ -227,3 +227,21 @@ CREATE TABLE IF NOT EXISTS saves (
 CREATE INDEX IF NOT EXISTS saves_post ON saves(post_id);
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS rvis TEXT NOT NULL DEFAULT 'public';
+
+-- Hups v2: backsound, komentar sematan/banyak audio, laporan komentar, tag, kode pemulihan.
+ALTER TABLE audios ADD COLUMN IF NOT EXISTS bgm BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE audios ADD COLUMN IF NOT EXISTS mentions TEXT NOT NULL DEFAULT '';
+ALTER TABLE comments ADD COLUMN IF NOT EXISTS pinned BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE comments ADD COLUMN IF NOT EXISTS n_audio INT NOT NULL DEFAULT 0;
+CREATE TABLE IF NOT EXISTS comment_audios (
+  comment_id BIGINT NOT NULL REFERENCES comments(id) ON DELETE CASCADE,
+  idx        INT NOT NULL,
+  store      TEXT NOT NULL,
+  blob_key   TEXT NOT NULL,
+  mime       TEXT NOT NULL,
+  secs       INT NOT NULL,
+  PRIMARY KEY (comment_id, idx)
+);
+ALTER TABLE reports ADD COLUMN IF NOT EXISTS target_comment BIGINT REFERENCES comments(id) ON DELETE CASCADE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS rec_hash TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS rec_salt TEXT;

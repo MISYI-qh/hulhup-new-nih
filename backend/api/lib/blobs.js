@@ -25,7 +25,8 @@ async function sb(method, key, body, mime) {
   return r;
 }
 
-export const storeFor = (secs) => (secs <= 20 && (process.env.MONGODB_URI || !process.env.SUPABASE_URL) ? 'mongo' : 'supabase');
+// Audio (maks 1 MB) selalu ke Supabase Storage; tanpa konfigurasi (tes lokal) memakai memori. Teks ke MongoDB, foto ke Postgres.
+export const storeFor = () => (process.env.SUPABASE_URL ? 'supabase' : 'mongo');
 
 export async function putAudio(store, buf, mime) {
   const key = randomBytes(12).toString('hex');

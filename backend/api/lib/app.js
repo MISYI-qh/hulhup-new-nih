@@ -6,8 +6,8 @@ import { storeFor, putAudio, getAudio, delAudio } from './blobs.js';
 import { randomInt } from 'node:crypto';
 import { pushLater, pushDiag, pushReminders } from './push.js';
 
-const MAX_IMG = 3 * 1024 * 1024, MAX_AUDIO = 3 * 1024 * 1024;
-const MAX_TEXT = 200000, MAX_POST_AUDIO = 10, INLINE_TEXT = 1000, PREVIEW = 300;
+const MAX_IMG = 3 * 1024 * 1024, MAX_AUDIO = 1024 * 1024; // semua audio maks 1 MB; foto profil maks 3 MB
+const MAX_TEXT = 200000, MAX_POST_AUDIO = 1, MAX_CMT_AUDIO = 3, INLINE_TEXT = 3000, PREVIEW = 300;
 const FILTERS = ['public', 'followers', 'following', 'both', 'friend', 'best', 'partner', 'family', 'relations', 'me'];
 const REL_TYPES = ['friend', 'best', 'partner', 'family'];
 const UN = /^[a-z0-9_]{3,20}$/;
@@ -27,35 +27,56 @@ async function hit(key, limit, windowSec) {
 const FOLLOW = (a, b) => `exists(select 1 from follows x where x.src=${a} and x.dst=${b})`;
 const REL = (a, b, type) => `exists(select 1 from rels r where r.status='active' ${type ? `and r.type='${type}'` : ''} and ((r.a=${a} and r.b=${b}) or (r.a=${b} and r.b=${a})))`;
 
-/** Syarat SQL audiens untuk filter acak. Alias audio = a, pemirsa = $1. Hanya audio yang rand-nya persis filter itu. */
-function audCond(f) {
+/** Daftar audiens (boleh banyak, dipisah koma). Kosong/tidak valid -> null. 'public' mengalahkan yang lain; 'me' berdiri sendiri. */
+function parseAud(x, allowMe = false, allowAccounts = false, collapse = true) {
+  const raw = Array.isArray(x) ? x : String(x ?? '').split(',');
+  const ok = new Set(FILTERS.filter((e) => allowMe || e !== 'me').concat(allowAccounts ? ['accounts'] : []));
+  const out = [...new Set(raw.map((e) => String(e).trim()).filter((e) => ok.has(e)))];
+  if (!out.length) return null;
+  if (!collapse) return out.join(',');
+  if (out.includes('public')) return 'public';
+  if (allowMe && out.includes('me')) return 'me';
+  return out.join(',');
+}
+const audList = (s) => String(s || 'public').split(',').filter(Boolean);
+const HAS = (k) => `'${k}'=any(string_to_array(a.rand,','))`;
+
+/** Syarat SQL audiens untuk satu filter. Alias audio = a, pemirsa = $1. Audiens post boleh banyak: cukup satu yang cocok. */
+function audCond1(f) {
   switch (f) {
-    case 'public': return `a.rand='public'`;
-    case 'followers': return `a.rand='followers' and ${FOLLOW('$1', 'a.owner')}`;
-    case 'following': return `a.rand='following' and ${FOLLOW('a.owner', '$1')}`;
-    case 'both': return `a.rand='both' and (${FOLLOW('$1', 'a.owner')} or ${FOLLOW('a.owner', '$1')})`;
-    case 'friend': case 'best': case 'partner': case 'family': return `a.rand='${f}' and ${REL('$1', 'a.owner', f)}`;
-    case 'relations': return `a.rand='relations' and ${REL('$1', 'a.owner')}`;
-    case 'me': return `a.rand='accounts' and exists(select 1 from audio_to t where t.audio_id=a.id and t.user_id=$1)`;
+    case 'public': return HAS('public');
+    case 'followers': return `${HAS('followers')} and ${FOLLOW('$1', 'a.owner')}`;
+    case 'following': return `${HAS('following')} and ${FOLLOW('a.owner', '$1')}`;
+    case 'both': return `${HAS('both')} and (${FOLLOW('$1', 'a.owner')} or ${FOLLOW('a.owner', '$1')})`;
+    case 'friend': case 'best': case 'partner': case 'family': return `${HAS(f)} and ${REL('$1', 'a.owner', f)}`;
+    case 'relations': return `${HAS('relations')} and ${REL('$1', 'a.owner')}`;
+    case 'me': return `${HAS('accounts')} and exists(select 1 from audio_to t where t.audio_id=a.id and t.user_id=$1)`;
     default: return 'false';
   }
 }
+/** Filter boleh lebih dari satu: "public,followers" = salah satu. */
+function audCond(f) { return '(' + audList(f).map(audCond1).join(' or ') + ')'; }
+/** Filter dari query: daftar valid, kalau kosong 'public'. */
+const filterOf = (x) => parseAud(x, true, false, false) ?? 'public';
 
-/** Apakah pemirsa boleh melihat sesuatu berdasarkan mode audiens pemilik (untuk visibilitas profil). */
+/** Apakah pemirsa boleh melihat sesuatu berdasarkan audiens pemilik (boleh banyak; untuk profil/hubungan). */
 async function canSee(mode, ownerId, viewerId, self = true) {
-  if (mode === 'public') return true;
+  const modes = audList(mode);
+  if (modes.includes('public')) return true;
   viewerId = Number(viewerId) || 0; ownerId = Number(ownerId);
   if (!viewerId) return false;
   if (viewerId === ownerId) return self;
-  if (mode === 'me' || mode === 'accounts') return false;
-  if (['friend', 'best', 'partner', 'family', 'relations'].includes(mode)) {
+  const relMode = modes.filter((e) => ['friend', 'best', 'partner', 'family', 'relations'].includes(e));
+  if (relMode.length) {
     const r = await one(`select type from rels where status='active' and ((a=$1 and b=$2) or (a=$2 and b=$1))`, [viewerId, ownerId]);
-    return !!r && (mode === 'relations' || r.type === mode);
+    if (r && (relMode.includes('relations') || relMode.includes(r.type))) return true;
   }
-  const r = await one(`select ${FOLLOW('$1', '$2')} as fol, ${FOLLOW('$2', '$1')} as ing`, [viewerId, ownerId]);
-  if (mode === 'followers') return r.fol;
-  if (mode === 'following') return r.ing;
-  if (mode === 'both') return r.fol || r.ing;
+  if (modes.some((e) => ['followers', 'following', 'both'].includes(e))) {
+    const r = await one(`select ${FOLLOW('$1', '$2')} as fol, ${FOLLOW('$2', '$1')} as ing`, [viewerId, ownerId]);
+    if (modes.includes('followers') && r.fol) return true;
+    if (modes.includes('following') && r.ing) return true;
+    if (modes.includes('both') && (r.fol || r.ing)) return true;
+  }
   return false;
 }
 
@@ -74,7 +95,11 @@ async function uv(u, me, today) {
   const r = await one(
     `select (select count(*) from audios where owner=$1 and not hidden and not pending)::int as audios, ${me && !mine ? FOLLOW('$2', '$1') : 'false'} as isf`,
     me && !mine ? [u.id, me.id] : [u.id]);
+  // Angka hubungan hanya dikirim bila pemirsa termasuk yang boleh melihat (-1 = disembunyikan, tidak bisa diklik).
+  const relOk = mine || (await canSee(u.rvis || 'public', u.id, me ? me.id : 0));
+  const rels = relOk ? Number((await one(`select count(*)::int n from rels where status='active' and (a=$1 or b=$1)`, [u.id])).n) : -1;
   return {
+    rels,
     username: u.username, name: u.name, bio: u.bio, age: mine ? ageOf(u.birth) : 0, birth: mine ? u.birth : '',
     avatar: avUrl(u), cover: cvUrl(u), taps: mine ? Number(u.taps) : 0, pvis: mine ? u.pvis : '', rvis: mine ? (u.rvis || 'public') : '',
     streak: streakOf(u, today), days: mine ? u.days : 0,
@@ -82,7 +107,7 @@ async function uv(u, me, today) {
   };
 }
 
-const AUD_SQL = `select a.id, a.descr, a.secs, a.pprof, a.rand, a.created, a.likes, a.owner, a.body_len, a.in_rand, a.in_hups, a.n_audio, a.comments, u.username ou, u.name oname, u.av_ver oav, u.verified ov, u.pvis opvis,
+const AUD_SQL = `select a.id, a.descr, a.secs, a.pprof, a.rand, a.created, a.likes, a.owner, a.body_len, a.in_rand, a.in_hups, a.n_audio, a.comments, a.bgm, a.body btext, u.username ou, u.name oname, u.av_ver oav, u.verified ov, u.pvis opvis,
   exists(select 1 from likes l where l.audio_id=a.id and l.user_id=$1) liked, exists(select 1 from saves sv where sv.post_id=a.id and sv.user_id=$1) saved from audios a join users u on u.id=a.owner`;
 
 function av(a) {
@@ -94,6 +119,7 @@ function av(a) {
     owner_avatar: a.oav > 0 ? `/users/${a.ou}/avatar?v=${a.oav}` : null, owner_verified: a.ov,
     long: Number(a.body_len || 0) > String(a.descr || '').length, in_rand: a.in_rand !== false, in_hups: a.in_hups === true,
     files, comments: a.comments || 0, saved: a.saved === true,
+    bgm: a.bgm === true, text: a.btext ?? null,
   };
 }
 const mini = (u) => ({ username: u.username, name: u.name, avatar: avUrl(u), verified: u.verified });
@@ -148,6 +174,16 @@ function todayOf(req) {
 }
 const okBirthLike = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(new Date(s + 'T00:00:00Z'));
 
+// ---------- pemulihan sandi (kode pemulihan, tanpa email) ----------
+const REC_CHARS = 'abcdefghjkmnpqrstuvwxyz23456789';
+const recNorm = (x) => String(x ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+async function issueRecovery(userId) {
+  const raw = Array.from({ length: 12 }, () => REC_CHARS[randomInt(REC_CHARS.length)]).join('');
+  const { salt, hash } = await hashPw(raw);
+  await q('update users set rec_hash=$2, rec_salt=$3 where id=$1', [userId, hash, salt]);
+  return raw.replace(/(.{4})(?=.)/g, '$1-');
+}
+
 // ---------- penangan ----------
 const routes = [];
 const route = (method, re, fn) => routes.push([method, re, fn]);
@@ -169,7 +205,8 @@ route('POST', /^\/register$/, async (c) => {
     if (e.code === '23505') throw new ApiErr('username_taken', 409);
     throw e;
   }
-  return { token: await newSession(u.id, c.req), user: await uv(u, u, c.today) };
+  const code = await issueRecovery(u.id);
+  return { token: await newSession(u.id, c.req), user: await uv(u, u, c.today), recovery: code };
 });
 
 route('POST', /^\/login$/, async (c) => {
@@ -182,6 +219,31 @@ route('POST', /^\/login$/, async (c) => {
   return { token: await newSession(u.id, c.req), user: await uv(u, u, c.today) };
 });
 
+route('POST', /^\/recover$/, async (c) => {
+  const username = String(c.body.username ?? '').trim().toLowerCase();
+  await hit(`rec:${c.ip}`, 10, 3600);
+  await hit(`recu:${username}`, 5, 3600);
+  const pw = String(c.body.password ?? '').trim();
+  if (pw.length < 6 || pw.length > 100 || /\s/.test(pw)) throw new ApiErr('bad_password');
+  const u = await one('select * from users where username=$1', [username]);
+  const code = recNorm(c.body.code);
+  if (!u || !u.rec_hash || code.length !== 12 || !(await checkPw(code, u.rec_salt, u.rec_hash))) throw new ApiErr('bad_recovery', 401);
+  if (u.status !== 'active') throw new ApiErr('banned', 403);
+  const { salt, hash } = await hashPw(pw);
+  await tx(async (t) => {
+    await t.query('update users set pass_hash=$2, pass_salt=$3 where id=$1', [u.id, hash, salt]);
+    await t.query('delete from sessions where user_id=$1', [u.id]);
+  });
+  return { ok: true, recovery: await issueRecovery(u.id) }; // kode lama hangus, kode baru diberikan
+});
+
+route('POST', /^\/me\/recovery$/, async (c) => {
+  const u = c.need();
+  await hit(`recg:${u.id}`, 5, 3600);
+  if (!(await checkPw(String(c.body.password ?? '').trim(), u.pass_salt, u.pass_hash))) throw new ApiErr('bad_credentials', 401);
+  return { recovery: await issueRecovery(u.id) };
+});
+
 route('POST', /^\/logout$/, async (c) => {
   const h = c.req.headers.authorization || '';
   if (h.startsWith('Bearer ')) await q('delete from sessions where token_hash=$1', [sha(h.slice(7))]);
@@ -192,9 +254,9 @@ route('GET', /^\/stats$/, async (c) => ({ taps: c.me ? Number(c.me.taps) : 0, ta
 
 route('GET', /^\/random$/, async (c) => {
   await hit(`rnd:${c.me ? 'u' + c.me.id : c.ip}`, 120, 60);
-  const f = FILTERS.includes(c.query.f) ? c.query.f : 'public';
+  const f = filterOf(c.query.f);
   const vid = c.me ? c.me.id : 0, last = Number(c.query.last) || 0;
-  const base = `from audios a join users u on u.id=a.owner where not a.hidden and not a.pending and a.in_rand and u.status='active' and (${audCond(f)} or (a.owner=$1 and a.rand='public' and '${f}'='public'))`;
+  const base = `from audios a join users u on u.id=a.owner where not a.hidden and not a.pending and a.in_rand and a.n_audio>0 and u.status='active' and (${audCond(f)} or (a.owner=$1 and ${HAS('public')} and '${f}'='public'))`;
   let n = (await one(`select count(*)::int n ${base} and a.id<>$2`, [vid, last])).n;
   let excl = true;
   if (n === 0) { n = (await one(`select count(*)::int n ${base} and ($2=$2)`, [vid, last])).n; excl = false; }
@@ -216,19 +278,18 @@ route('GET', /^\/search$/, async (c) => {
   if (!s) return { users: [], audios: [] };
   const esc = s.replace(/[\\%_]/g, (m) => '\\' + m);
   const users = await many(`select * from users where status='active' and (username like $1 or lower(name) like $2) order by username limit 30`, [esc + '%', '%' + esc + '%']);
-  const rows = await many(`${AUD_SQL} join users ou on ou.id=a.owner where not a.hidden and ou.status='active' and lower(a.descr) like $2 order by a.id desc limit 80`, [c.me ? c.me.id : 0, '%' + esc + '%']);
+  const vid = c.me ? Number(c.me.id) : 0;
+  const rows = await many(`${AUD_SQL} where not a.hidden and not a.pending and u.status='active' and (lower(a.descr) like $2 or lower(coalesce(a.body,'')) like $2) order by a.id desc limit 80`, [vid, '%' + esc + '%']);
   const audios = [];
-  const pv = new Map();
   for (const a of rows) {
-    if (!pv.has(a.owner)) { const o = await one('select pvis from users where id=$1', [a.owner]); pv.set(a.owner, await canSee(o.pvis, Number(a.owner), c.me ? c.me.id : 0)); }
-    if (pv.get(a.owner)) audios.push(av(a));
+    if (await canOpen({ id: a.id, owner: a.owner, rand: a.rand, hidden: false, pending: false, ostatus: 'active', pvis: a.opvis }, vid)) audios.push(av(a));
     if (audios.length >= 30) break;
   }
   return { users: users.map(mini), audios };
 });
 
 async function unreadCounts(id) {
-  const r = await one(`select count(*)::int u, count(*) filter (where type in ('like','follow','rel_req','rel_ok','comment','reply'))::int s from notifs where to_user=$1 and not seen`, [id]);
+  const r = await one(`select count(*)::int u, count(*) filter (where type in ('like','follow','rel_req','rel_ok','comment','reply','mention'))::int s from notifs where to_user=$1 and not seen`, [id]);
   return { unread: r.u, unread_social: r.s };
 }
 
@@ -236,8 +297,8 @@ route('GET', /^\/me$/, async (c) => ({ user: await uv(c.need(), c.me, c.today), 
 
 route('PATCH', /^\/me\/settings$/, async (c) => {
   const u = c.need();
-  const pv = c.body.pvis ?? u.pvis, rv = c.body.rvis ?? u.rvis ?? 'public';
-  if (!FILTERS.includes(pv) || !FILTERS.includes(rv)) throw new ApiErr('bad_file');
+  const pv = c.body.pvis === undefined ? u.pvis : parseAud(c.body.pvis, true), rv = c.body.rvis === undefined ? (u.rvis || 'public') : parseAud(c.body.rvis, true);
+  if (!pv || !rv) throw new ApiErr('bad_file');
   const r = await one('update users set pvis=$2, rvis=$3 where id=$1 returning *', [u.id, pv, rv]);
   return { user: await uv(r, r, c.today) };
 });
@@ -368,9 +429,14 @@ route('POST', /^\/reports$/, async (c) => {
   await hit(`rep:${u.id}`, 20, 3600);
   const reason = REASONS.includes(c.body.reason) ? c.body.reason : 'other';
   const note = String(c.body.note ?? '').trim().slice(0, 300);
-  const aid = Number(c.body.audio) || null;
-  let tu = null, ta = null;
-  if (aid) {
+  const aid = Number(c.body.audio) || null, cid = Number(c.body.comment) || null;
+  let tu = null, ta = null, tc = null;
+  if (cid) {
+    const cm = await one('select id, owner, post_id from comments where id=$1', [cid]);
+    if (!cm) throw new ApiErr('not_found', 404);
+    if (Number(cm.owner) === Number(u.id)) throw new ApiErr('forbidden', 403);
+    tc = cm.id; ta = cm.post_id; tu = cm.owner;
+  } else if (aid) {
     const a = await one('select id, owner from audios where id=$1', [aid]);
     if (!a) throw new ApiErr('not_found', 404);
     if (Number(a.owner) === Number(u.id)) throw new ApiErr('forbidden', 403);
@@ -381,9 +447,9 @@ route('POST', /^\/reports$/, async (c) => {
     if (Number(o.id) === Number(u.id)) throw new ApiErr('forbidden', 403);
     tu = o.id;
   }
-  const dup = await one(`select 1 from reports where reporter=$1 and target_user=$2 and target_audio is not distinct from $3 and status='open'`, [u.id, tu, ta]);
+  const dup = await one(`select 1 from reports where reporter=$1 and target_user=$2 and target_audio is not distinct from $3 and target_comment is not distinct from $4 and status='open'`, [u.id, tu, ta, tc]);
   if (!dup) {
-    await q('insert into reports(reporter, target_user, target_audio, reason, created) values ($1,$2,$3,$4,$5)', [u.id, tu, ta, (reason + (note ? ': ' + note : '')).slice(0, 320), now()]);
+    await q('insert into reports(reporter, target_user, target_audio, target_comment, reason, created) values ($1,$2,$3,$4,$5,$6)', [u.id, tu, ta, tc, (reason + (note ? ': ' + note : '')).slice(0, 320), now()]);
   }
   return { ok: true };
 });
@@ -405,13 +471,21 @@ route('GET', /^\/me\/liked$/, async (c) => {
 route('GET', /^\/notifications$/, async (c) => {
   const u = c.need();
   const rows = await many(
-    `select n.type, n.created, n.seen, n.n, n.extra, n.actor, n.audio, a.username, a.name, a.av_ver, au.descr from notifs n
+    `select n.id, n.type, n.created, n.seen, n.n, n.extra, n.actor, n.audio, a.username, a.name, a.av_ver, au.descr from notifs n
      left join users a on a.id=n.actor left join audios au on au.id=n.audio where n.to_user=$1 order by n.created desc, n.id desc limit 60`, [u.id]);
   const items = rows.filter((r) => r.actor === null || r.username).map((r) => (r.actor === null
-    ? { type: r.type, created: Number(r.created), seen: r.seen, n: r.n, username: '', name: 'Hulhup', avatar: null, desc: '' }
-    : { type: r.type, created: Number(r.created), seen: r.seen, username: r.username, name: r.name, avatar: r.av_ver > 0 ? `/users/${r.username}/avatar?v=${r.av_ver}` : null, desc: r.descr ?? '', extra: r.extra, post: r.audio ? Number(r.audio) : 0 }));
+    ? { id: Number(r.id), type: r.type, created: Number(r.created), seen: r.seen, n: r.n, username: '', name: 'Hulhup', avatar: null, desc: '' }
+    : { id: Number(r.id), type: r.type, created: Number(r.created), seen: r.seen, username: r.username, name: r.name, avatar: r.av_ver > 0 ? `/users/${r.username}/avatar?v=${r.av_ver}` : null, desc: r.descr ?? '', extra: r.extra, post: r.audio ? Number(r.audio) : 0 }));
   await q('update notifs set seen=true where to_user=$1 and not seen', [u.id]);
   return { items };
+});
+
+route('POST', /^\/notifications\/delete$/, async (c) => {
+  const u = c.need();
+  if (c.body.all === true) return { ok: true, n: (await q('delete from notifs where to_user=$1', [u.id])).rowCount };
+  const ids = (Array.isArray(c.body.ids) ? c.body.ids : []).map(Number).filter((x) => Number.isInteger(x) && x > 0).slice(0, 200);
+  if (!ids.length) return { ok: true, n: 0 };
+  return { ok: true, n: (await q('delete from notifs where to_user=$1 and id = any($2)', [u.id, ids])).rowCount };
 });
 
 route('DELETE', /^\/audios\/(\d+)$/, async (c, m) => {
@@ -451,9 +525,9 @@ route('POST', /^\/audios$/, async (c) => {
   const mime = audioMime(body);
   if (!mime) throw new ApiErr('bad_file');
   const f = c.query;
-  const rnd = f.rand === 'accounts' ? 'accounts' : (FILTERS.filter((e) => e !== 'me').includes(f.rand) ? f.rand : 'public');
+  const rnd = parseAud(f.rand, false, true) ?? 'public';
   let to = [];
-  if (rnd === 'accounts') {
+  if (audList(rnd).includes('accounts')) {
     const names = String(f.to ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean).slice(0, 200);
     const us = names.length ? await many('select id from users where username = any($1) and id<>$2 and status=$3', [names, u.id, 'active']) : [];
     to = us.map((r) => r.id);
@@ -594,7 +668,7 @@ route('GET', /^\/users\/([a-z0-9_]+)$/, async (c, m) => {
   if (!u) throw new ApiErr('not_found', 404);
   const uid = Number(u.id), vid = c.me ? Number(c.me.id) : 0, mine = vid === uid;
   const locked = !mine && !(await canSee(u.pvis, uid, vid));
-  const rows = locked ? [] : await many(`${AUD_SQL} where a.owner=$2 and not a.pending ${mine ? '' : 'and not a.hidden'} order by a.id desc limit 200`, [vid, uid]);
+  const rows = locked ? [] : await many(`${AUD_SQL} where a.owner=$2 and not a.pending ${mine ? '' : `and not a.hidden and (${audCond(FILTERS.join(','))})`} order by a.id desc limit 200`, [vid, uid]);
   let rel = { status: 'none', type: '' };
   if (vid && !mine) {
     const r = await one(`select * from rels where (a=$1 and b=$2) or (a=$2 and b=$1)`, [vid, uid]);
@@ -663,7 +737,8 @@ async function blobsOf(postWhere, commentWhere, params) {
   const add = (store, key) => { if (key) out.push({ store, key }); };
   for (const r of await many(`select a.store, a.blob_key, a.body_key from audios a where ${postWhere}`, params)) { add(r.store, r.blob_key); add('mongo', r.body_key); }
   for (const r of await many(`select pa.store, pa.blob_key from post_audios pa join audios a on a.id=pa.post_id where ${postWhere}`, params)) add(r.store, r.blob_key);
-  for (const r of await many(`select c.store, c.blob_key, c.body_key from comments c where ${commentWhere}`, params)) { add(r.store, r.blob_key); add('mongo', r.body_key); }
+  for (const r of await many(`select c.body_key from comments c where ${commentWhere}`, params)) add('mongo', r.body_key);
+  for (const r of await many(`select ca.store, ca.blob_key from comment_audios ca join comments c on c.id=ca.comment_id where ${commentWhere}`, params)) add(r.store, r.blob_key);
   return out;
 }
 
@@ -674,10 +749,9 @@ async function accessRow(id) {
 async function canOpen(a, vid) {
   if (vid && vid === Number(a.owner)) return true;
   if (a.hidden || a.pending || a.ostatus !== 'active') return false;
-  let ok;
-  if (a.rand === 'accounts') ok = !!vid && !!(await one('select 1 from audio_to where audio_id=$1 and user_id=$2', [a.id, vid]));
-  else ok = await canSee(a.rand, Number(a.owner), vid, false);
-  if (!ok) ok = await canSee(a.pvis, Number(a.owner), vid, false);
+  let ok = false;
+  if (audList(a.rand).includes('accounts')) ok = !!vid && !!(await one('select 1 from audio_to where audio_id=$1 and user_id=$2', [a.id, vid]));
+  if (!ok) ok = await canSee(a.rand, Number(a.owner), vid, false);
   if (!ok && vid) ok = !!(await one('select 1 from likes where audio_id=$1 and user_id=$2 union select 1 from saves where post_id=$1 and user_id=$2', [a.id, vid]));
   return ok;
 }
@@ -697,12 +771,14 @@ route('POST', /^\/posts$/, async (c) => {
   if (text.length > MAX_TEXT) throw new ApiErr('too_long', 413);
   const n = Math.min(MAX_POST_AUDIO, Math.max(0, parseInt(b.audios, 10) || 0));
   if (!text && !n) throw new ApiErr('empty');
-  let inRand = b.rand_on === true, inHups = b.hups === true;
-  if (n > 1) inRand = false; // lebih dari satu audio hanya untuk Hups
+  const bgm = n > 0 && b.bgm === true;
+  let inRand = b.rand_on === true && n > 0 && !bgm, inHups = b.hups === true || n === 0 || bgm; // tulisan saja / backsound tidak masuk Acak
+  if (b.rand_on === true && n === 0 && b.hups !== true) throw new ApiErr('pick_place');
   if (!inRand && !inHups) throw new ApiErr('pick_place');
-  const rnd = b.rand === 'accounts' ? 'accounts' : (FILTERS.filter((e) => e !== 'me').includes(b.rand) ? b.rand : 'public');
+  const rnd = parseAud(b.rand, false, true) ?? 'public';
+  const mentions = [...new Set((text.match(/@([a-z0-9_]{3,20})/g) || []).map((x) => x.slice(1)))].slice(0, 10);
   let to = [];
-  if (rnd === 'accounts') {
+  if (audList(rnd).includes('accounts')) {
     const names = (Array.isArray(b.to) ? b.to : []).map((s) => String(s).trim().toLowerCase()).filter(Boolean).slice(0, 200);
     const us = names.length ? await many('select id from users where username = any($1) and id<>$2 and status=$3', [names, u.id, 'active']) : [];
     to = us.map((r) => r.id);
@@ -712,12 +788,13 @@ route('POST', /^\/posts$/, async (c) => {
   let id;
   try {
     id = await tx(async (t) => {
-      const r = await t.query(`insert into audios(owner, descr, secs, rand, pprof, created, body, body_key, body_len, in_rand, in_hups, n_audio, pending) values ($1,$2,0,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) returning id`,
-        [u.id, cutPreview(text), rnd, b.pprof !== false, now(), body, key, text.length, inRand, inHups, n, n > 0]);
+      const r = await t.query(`insert into audios(owner, descr, secs, rand, pprof, created, body, body_key, body_len, in_rand, in_hups, n_audio, pending, bgm, mentions) values ($1,$2,0,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) returning id`,
+        [u.id, cutPreview(text), rnd, b.pprof !== false, now(), body, key, text.length, inRand, inHups, n, n > 0, bgm, mentions.join(',')]);
       for (const x of to) await t.query('insert into audio_to(audio_id, user_id) values ($1,$2)', [r.rows[0].id, x]);
       return Number(r.rows[0].id);
     });
   } catch (e) { if (key) await delAudio('mongo', key); throw e; }
+  if (n === 0) await mentionNotify(id, u.id);
   return { ok: true, id };
 });
 
@@ -739,6 +816,7 @@ route('POST', /^\/posts\/(\d+)\/audio$/, async (c, m) => {
     else await q('insert into post_audios(post_id, idx, store, blob_key, mime, secs) values ($1,$2,$3,$4,$5,$6)', [a.id, have, store, key, mime, secs]);
     if (have + 1 >= a.n_audio) await q('update audios set pending=false where id=$1', [a.id]);
   } catch (e) { await delAudio(store, key); throw e; }
+  if (have + 1 >= a.n_audio) await mentionNotify(a.id, u.id);
   return { ok: true, done: have + 1 >= a.n_audio };
 });
 
@@ -754,14 +832,16 @@ route('GET', /^\/posts\/(\d+)$/, async (c, m) => {
 });
 
 route('GET', /^\/hups$/, async (c) => {
-  await hit(`hups:${c.me ? 'u' + c.me.id : c.ip}`, 180, 60);
-  const f = FILTERS.includes(c.query.f) ? c.query.f : 'public';
-  const vid = c.me ? c.me.id : 0, before = Number(c.query.before) || 0;
+  await hit(`hups:${c.me ? 'u' + c.me.id : c.ip}`, 240, 60);
+  const f = filterOf(c.query.f);
+  const vid = c.me ? c.me.id : 0, off = Math.min(2000, Math.max(0, Number(c.query.next) || 0));
+  // Peringkat Hups: sorot + komentar (komentar lebih berat) dibagi usia post; makin baru makin besar peluang di atas.
+  const score = `((a.likes * 2.0 + a.comments * 3.0 + 1.0) / power(((${now()} - a.created) / 3600000.0) + 2.0, 1.45))`;
   const rows = await many(
-    `${AUD_SQL} where a.in_hups and not a.hidden and not a.pending and u.status='active' and (${audCond(f)} or (a.owner=$1 and a.rand='public' and '${f}'='public'))${before ? ' and a.id<$2' : ''} order by a.id desc limit 21`,
-    before ? [vid, before] : [vid]);
+    `${AUD_SQL} where a.in_hups and not a.hidden and not a.pending and u.status='active' and (${audCond(f)} or (a.owner=$1 and ${HAS('public')} and '${f}'='public')) order by ${score} desc, a.id desc offset ${off} limit 21`,
+    [vid]);
   const items = rows.slice(0, 20).map(av);
-  return { items, next: rows.length > 20 ? items[items.length - 1].id : 0 };
+  return { items, next: rows.length > 20 ? off + 20 : 0 };
 });
 
 route('POST', /^\/audios\/(\d+)\/save$/, async (c, m) => {
@@ -774,28 +854,62 @@ route('POST', /^\/audios\/(\d+)\/save$/, async (c, m) => {
   return { saved: true };
 });
 
+route('GET', /^\/me\/sent$/, async (c) => {
+  const u = c.need();
+  const to = String(c.query.to ?? '').trim().toLowerCase();
+  if (!to) {
+    const rows = await many(`select x.username, x.name, x.av_ver, x.verified, count(*)::int n, max(a.created) last from audio_to t join audios a on a.id=t.audio_id join users x on x.id=t.user_id where a.owner=$1 and not a.pending group by x.username, x.name, x.av_ver, x.verified order by max(a.created) desc limit 200`, [u.id]);
+    return { people: rows.map((r) => ({ ...mini(r), n: r.n })) };
+  }
+  const rows = await many(`${AUD_SQL} where a.owner=$1 and not a.pending and exists(select 1 from audio_to t join users x on x.id=t.user_id where t.audio_id=a.id and x.username=$2) order by a.id desc limit 200`, [u.id, to]);
+  return { audios: rows.map(av) };
+});
+
 route('GET', /^\/me\/saved$/, async (c) => {
   const u = c.need();
   const rows = await many(`${AUD_SQL} join saves sv on sv.post_id=a.id and sv.user_id=$1 where not a.hidden and not a.pending and u.status='active' order by sv.created desc limit 200`, [u.id]);
   return { audios: rows.map(av) };
 });
 
+// ----- tag (@nama) -----
+const mentionsOf = (t) => [...new Set((String(t || '').match(/@([a-z0-9_]{3,20})/g) || []).map((x) => x.slice(1)))].slice(0, 10);
+/** Beri notifikasi "menyebut" ke akun yang di-tag (hanya yang boleh membuka post), kecuali yang sudah dapat notifikasi lain. */
+async function mentionNotify(postId, actorId, names = null, skip = [], snippet = '') {
+  const post = await one('select id, owner, mentions from audios where id=$1', [postId]);
+  if (!post) return;
+  const list = names ?? String(post.mentions || '').split(',').filter(Boolean);
+  if (!list.length) return;
+  const users = await many(`select id from users where username = any($1) and status='active'`, [list]);
+  const row = await accessRow(postId);
+  for (const x of users) {
+    const id = Number(x.id);
+    if (id === Number(actorId) || skip.includes(id)) continue;
+    if (!(await canOpen(row, id))) continue;
+    await tx(async (t) => { await notify(t, id, 'mention', actorId, Number(postId), snippet); });
+  }
+}
+
 // ----- komentar -----
-function cv(r, me) {
+function cv(r, me, files) {
   return {
     id: Number(r.id), parent: r.parent ? Number(r.parent) : 0, username: r.username, name: r.name,
     avatar: r.av_ver > 0 ? `/users/${r.username}/avatar?v=${r.av_ver}` : null, verified: r.verified,
-    text: r.body, long: !!r.body_key, audio: r.store ? { url: `/comments/${r.id}/file`, secs: r.secs } : null,
+    text: r.body, long: !!r.body_key, audios: files || [],
+    audio: files && files.length ? files[0] : null,
     likes: r.likes, liked: r.liked === true, created: Number(r.created), mine: !!me && Number(r.owner) === Number(me.id),
+    pinned: r.pinned === true,
   };
 }
-const CMT_SQL = `select c.id, c.parent, c.owner, c.body, c.body_key, c.store, c.secs, c.likes, c.created, u.username, u.name, u.av_ver, u.verified,
+const CMT_SQL = `select c.id, c.parent, c.owner, c.body, c.body_key, c.likes, c.created, c.pinned, u.username, u.name, u.av_ver, u.verified,
   exists(select 1 from comment_likes l where l.comment_id=c.id and l.user_id=$2) liked from comments c join users u on u.id=c.owner`;
 
 route('GET', /^\/posts\/(\d+)\/comments$/, async (c, m) => {
   await openPost(m[1], c);
   const rows = await many(`${CMT_SQL} where c.post_id=$1 and not c.pending and u.status='active' order by c.id asc limit 500`, [m[1], c.me ? c.me.id : 0]);
-  return { items: rows.map((r) => cv(r, c.me)) };
+  const fl = await many(`select ca.comment_id, ca.idx, ca.secs from comment_audios ca join comments c on c.id=ca.comment_id where c.post_id=$1 order by ca.comment_id, ca.idx`, [m[1]]);
+  const by = new Map();
+  for (const f of fl) { const k = Number(f.comment_id); if (!by.has(k)) by.set(k, []); by.get(k).push({ url: `/comments/${k}/file?i=${f.idx}`, secs: f.secs }); }
+  return { items: rows.map((r) => cv(r, c.me, by.get(Number(r.id)))) };
 });
 
 route('POST', /^\/posts\/(\d+)\/comments$/, async (c, m) => {
@@ -804,8 +918,8 @@ route('POST', /^\/posts\/(\d+)\/comments$/, async (c, m) => {
   const post = await openPost(m[1], c);
   const text = okText(c.body.text);
   if (text.length > MAX_TEXT) throw new ApiErr('too_long', 413);
-  const wantAudio = c.body.audio === true;
-  if (!text && !wantAudio) throw new ApiErr('empty');
+  const na = Math.min(MAX_CMT_AUDIO, Math.max(0, c.body.audios !== undefined ? parseInt(c.body.audios, 10) || 0 : (c.body.audio === true ? 1 : 0)));
+  if (!text && !na) throw new ApiErr('empty');
   let parent = null, parentOwner = null;
   if (c.body.parent) {
     const pr = await one('select id, owner from comments where id=$1 and post_id=$2 and not pending', [c.body.parent, post.id]);
@@ -814,46 +928,67 @@ route('POST', /^\/posts\/(\d+)\/comments$/, async (c, m) => {
   }
   const body = text.length <= INLINE_TEXT ? text : cutPreview(text);
   const key = text.length <= INLINE_TEXT ? null : await putAudio('mongo', Buffer.from(text, 'utf8'), 'text/plain');
+  const snip = (text || '').slice(0, 80);
   let id;
   try {
     id = await tx(async (t) => {
-      const r = await t.query('insert into comments(post_id, owner, parent, body, body_key, body_len, pending, created) values ($1,$2,$3,$4,$5,$6,$7,$8) returning id', [post.id, u.id, parent, body, key, text.length, wantAudio, now()]);
-      const snip = (text || '').slice(0, 80);
+      const r = await t.query('insert into comments(post_id, owner, parent, body, body_key, body_len, pending, n_audio, created) values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning id', [post.id, u.id, parent, body, key, text.length, na > 0, na, now()]);
       if (parentOwner) await notify(t, parentOwner, 'reply', u.id, Number(post.id), snip);
       if (Number(post.owner) !== parentOwner) await notify(t, Number(post.owner), 'comment', u.id, Number(post.id), snip);
       return Number(r.rows[0].id);
     });
   } catch (e) { if (key) await delAudio('mongo', key); throw e; }
   await recount(post.id);
+  await mentionNotify(post.id, u.id, mentionsOf(text), [parentOwner, Number(post.owner)].filter(Boolean), snip);
   return { ok: true, id };
 });
 
 route('POST', /^\/comments\/(\d+)\/audio$/, async (c, m) => {
   const u = c.need();
-  await hit(`ca:${u.id}`, 60, 3600);
-  const r = await one('select id, owner, post_id, pending from comments where id=$1', [m[1]]);
+  await hit(`ca:${u.id}`, 90, 3600);
+  const r = await one('select id, owner, post_id, pending, n_audio from comments where id=$1', [m[1]]);
   if (!r || Number(r.owner) !== Number(u.id) || !r.pending) throw new ApiErr('not_found', 404);
+  const have = Number((await one('select count(*)::int n from comment_audios where comment_id=$1', [r.id])).n);
+  if (have >= r.n_audio) throw new ApiErr('bad_request');
   const body = await readBody(c.req, MAX_AUDIO + 1024);
   if (!body.length || body.length > MAX_AUDIO) throw new ApiErr('too_big', 413);
   const mime = audioMime(body);
   if (!mime) throw new ApiErr('bad_file');
   const secs = Math.min(15, Math.max(1, parseInt(c.query.secs, 10) || 15));
   const store = storeFor(secs), key = await putAudio(store, body, mime);
-  try { await q('update comments set store=$2, blob_key=$3, mime=$4, secs=$5, pending=false where id=$1', [r.id, store, key, mime, secs]); }
-  catch (e) { await delAudio(store, key); throw e; }
-  await recount(r.post_id);
-  return { ok: true };
+  try {
+    await q('insert into comment_audios(comment_id, idx, store, blob_key, mime, secs) values ($1,$2,$3,$4,$5,$6)', [r.id, have, store, key, mime, secs]);
+    if (have + 1 >= r.n_audio) await q('update comments set pending=false where id=$1', [r.id]);
+  } catch (e) { await delAudio(store, key); throw e; }
+  if (have + 1 >= r.n_audio) await recount(r.post_id);
+  return { ok: true, done: have + 1 >= r.n_audio };
 });
 
 route('GET', /^\/comments\/(\d+)\/(file|text)$/, async (c, m) => {
-  const r = await one('select id, post_id, body, body_key, store, blob_key, mime, pending, owner from comments where id=$1', [m[1]]);
+  const r = await one('select id, post_id, body, body_key, pending, owner from comments where id=$1', [m[1]]);
   if (!r || (r.pending && (!c.me || Number(c.me.id) !== Number(r.owner)))) throw new ApiErr('not_found', 404);
   await openPost(r.post_id, c);
   if (m[2] === 'text') return { text: await readText(r.body_key ? null : r.body, r.body_key) };
-  if (!r.store) throw new ApiErr('not_found', 404);
-  const b = await getAudio(r.store, r.blob_key);
+  const f = await one('select store, blob_key, mime from comment_audios where comment_id=$1 and idx=$2', [r.id, parseInt(c.query.i, 10) || 0]);
+  if (!f) throw new ApiErr('not_found', 404);
+  const b = await getAudio(f.store, f.blob_key);
   if (!b) throw new ApiErr('not_found', 404);
-  return { binary: b, mime: r.mime, cache: 'private, max-age=86400' };
+  return { binary: b, mime: f.mime, cache: 'private, max-age=86400' };
+});
+
+// Pemilik post menyematkan satu komentar utama (menekan lagi = lepas).
+route('POST', /^\/comments\/(\d+)\/pin$/, async (c, m) => {
+  const u = c.need();
+  const r = await one('select c.id, c.post_id, c.parent, c.pinned, c.pending, a.owner post_owner from comments c join audios a on a.id=c.post_id where c.id=$1', [m[1]]);
+  if (!r || r.pending) throw new ApiErr('not_found', 404);
+  if (Number(r.post_owner) !== Number(u.id)) throw new ApiErr('forbidden', 403);
+  if (r.parent) throw new ApiErr('bad_request');
+  const on = !r.pinned;
+  await tx(async (t) => {
+    await t.query('update comments set pinned=false where post_id=$1', [r.post_id]);
+    if (on) await t.query('update comments set pinned=true where id=$1', [r.id]);
+  });
+  return { pinned: on };
 });
 
 route('DELETE', /^\/comments\/(\d+)$/, async (c, m) => {
@@ -861,8 +996,11 @@ route('DELETE', /^\/comments\/(\d+)$/, async (c, m) => {
   const r = await one('select c.id, c.owner, c.post_id, a.owner post_owner from comments c join audios a on a.id=c.post_id where c.id=$1', [m[1]]);
   if (!r) throw new ApiErr('not_found', 404);
   if (Number(r.owner) !== Number(u.id) && Number(r.post_owner) !== Number(u.id)) throw new ApiErr('forbidden', 403);
-  const bl = (await many(`with recursive t as (select id, store, blob_key, body_key from comments where id=$1 union all select c.id, c.store, c.blob_key, c.body_key from comments c join t on c.parent=t.id) select store, blob_key, body_key from t`, [r.id]))
-    .flatMap((x) => [x.blob_key ? { store: x.store, key: x.blob_key } : null, x.body_key ? { store: 'mongo', key: x.body_key } : null]).filter(Boolean);
+  const tree = `with recursive t as (select id, body_key from comments where id=$1 union all select c.id, c.body_key from comments c join t on c.parent=t.id)`;
+  const bl = [
+    ...(await many(`${tree} select body_key from t where body_key is not null`, [r.id])).map((x) => ({ store: 'mongo', key: x.body_key })),
+    ...(await many(`${tree} select ca.store, ca.blob_key from comment_audios ca join t on t.id=ca.comment_id`, [r.id])).map((x) => ({ store: x.store, key: x.blob_key })),
+  ];
   await q('delete from comments where id=$1', [r.id]);
   await recount(r.post_id);
   await Promise.all(bl.map((b) => delAudio(b.store, b.key)));
@@ -895,7 +1033,7 @@ export async function handle(req, url) {
   if (path === '/' || path === '/health') { if (url.searchParams.get('warm')) await one('select 1 as x'); if (url.searchParams.get('push')) return { ok: true, push: await pushDiag() }; return { ok: true, service: 'hulhup-api' }; }
   const me = await authUser(req);
   const ip = ipOf(req);
-  await hit(`ip:${ip}`, 600, 60);
+  if (!/^\/users\/[a-z0-9_]+\/(avatar|cover)$/.test(path)) await hit(`ip:${ip}`, 600, 60); // foto profil di-cache lama; tidak dihitung agar daftar panjang tidak terblokir
   const query = Object.fromEntries(url.searchParams);
   const ctx = { req, me, ip, query, today: todayOf(req), body: {}, need() { if (!me) throw new ApiErr('unauthorized', 401); return me; } };
   for (const [method, re, fn] of routes) {

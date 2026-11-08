@@ -658,7 +658,7 @@ class Local {
     final me = session == null ? null : _byName(session!);
     if (me == null) throw ApiErr('unauthorized');
     if (!_ext.contains(name.split('.').last.toLowerCase())) throw ApiErr('bad_file');
-    if (b.isEmpty || b.length > 3 * 1024 * 1024) throw ApiErr('too_big');
+    if (b.isEmpty || b.length > 1024 * 1024) throw ApiErr('too_big');
     final ok = filters.where((e) => e != 'me').toList();
     final vis = 'public', rnd = f['rand'] == 'accounts' ? 'accounts' : (ok.contains(f['rand']) ? f['rand']! : 'public');
     final to = <int>[];
@@ -683,31 +683,33 @@ class Local {
 class U {
   final String username, name, bio, birth, pvis, rvis;
   final String? avatar, cover;
-  final int age, audios, streak, days, taps;
+  final int age, audios, streak, days, taps, rels; // rels -1 = disembunyikan pemiliknya
   int followers, following;
   bool isFollowing;
   final bool isMe, verified;
   U.from(Map j)
       : username = j['username'], name = j['name'], bio = j['bio'] ?? '', birth = j['birth'] ?? '', avatar = j['avatar'], cover = j['cover'],
         pvis = j['pvis'] ?? 'public', rvis = j['rvis'] ?? 'public', streak = j['streak'] ?? 0, days = j['days'] ?? 0, taps = j['taps'] ?? 0,
-        age = j['age'] ?? 0, audios = j['audios'] ?? 0, followers = j['followers'] ?? 0, following = j['following'] ?? 0,
+        age = j['age'] ?? 0, rels = j['rels'] ?? 0, audios = j['audios'] ?? 0, followers = j['followers'] ?? 0, following = j['following'] ?? 0,
         isFollowing = j['is_following'] == true, isMe = j['is_me'] == true, verified = j['verified'] == true;
 }
 
 class A {
-  final int id, secs, created, comments;
+  final int id, secs, created;
+  int comments;
   final String desc, url, vis, rand, owner, ownerName;
   final String? ownerAvatar;
-  final bool popup, pprof, ownerVerified, long, inRand, inHups;
+  final bool popup, pprof, ownerVerified, long, inRand, inHups, bgm;
+  final String? text; // teks lengkap bila pendek; null = hanya ringkasan (buka halaman penuh)
   final List<Map> files;
   int likes;
   bool liked, saved;
   A.from(Map j)
       : id = j['id'], secs = j['secs'] ?? 0, created = j['created'] ?? 0, desc = j['desc'] ?? '', url = j['url'] ?? '', vis = j['vis'] ?? 'public', rand = j['rand'] ?? 'public', owner = j['owner'],
         ownerName = j['owner_name'], ownerAvatar = j['owner_avatar'], ownerVerified = j['owner_verified'] == true, popup = j['popup'] == true, pprof = j['pprof'] != false, likes = j['likes'] ?? 0, liked = j['liked'] == true,
-        long = j['long'] == true, inRand = j['in_rand'] != false, inHups = j['in_hups'] == true, comments = j['comments'] ?? 0, saved = j['saved'] == true,
+        long = j['long'] == true, inRand = j['in_rand'] != false, inHups = j['in_hups'] == true, comments = j['comments'] ?? 0, saved = j['saved'] == true, bgm = j['bgm'] == true, text = j['text'] as String?,
         files = (j['files'] is List) ? [for (final f in j['files']) Map.from(f as Map)] : ((j['url'] ?? '') == '' ? <Map>[] : <Map>[{'url': j['url'], 'secs': j['secs'] ?? 0}]);
-  Map<String, dynamic> toJson() => {'id': id, 'secs': secs, 'created': created, 'desc': desc, 'url': url, 'vis': vis, 'rand': rand, 'owner': owner, 'owner_name': ownerName, 'owner_avatar': ownerAvatar, 'owner_verified': ownerVerified, 'popup': popup, 'pprof': pprof, 'likes': likes, 'liked': liked, 'long': long, 'in_rand': inRand, 'in_hups': inHups, 'comments': comments, 'saved': saved, 'files': files};
+  Map<String, dynamic> toJson() => {'id': id, 'secs': secs, 'created': created, 'desc': desc, 'url': url, 'vis': vis, 'rand': rand, 'owner': owner, 'owner_name': ownerName, 'owner_avatar': ownerAvatar, 'owner_verified': ownerVerified, 'popup': popup, 'pprof': pprof, 'likes': likes, 'liked': liked, 'long': long, 'in_rand': inRand, 'in_hups': inHups, 'comments': comments, 'saved': saved, 'files': files, 'bgm': bgm, 'text': text};
 }
 
 String mmss(int s) => '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}';
@@ -777,7 +779,8 @@ class Store extends ChangeNotifier {
     remind = _sp.getBool('remind') ?? true;
     filter = _sp.getString('filter') ?? 'public';
     rate = (_sp.getDouble('rate') ?? 1.0).clamp(0.5, 2.0);
-    if (!Local.filters.contains(filter)) filter = 'public';
+    bgmMuted = _sp.getBool('bgm_muted') ?? false;
+    if (filter.split(',').any((e) => !Local.filters.contains(e))) filter = 'public';
     await Local.init(_sp);
     await Api.init(_sp);
     if (Api.remote) Timer.periodic(const Duration(seconds: 30), (_) => _poll());
@@ -922,6 +925,7 @@ class Store extends ChangeNotifier {
       case 'like': return t('n_like');
       case 'comment': return t('n_comment');
       case 'reply': return t('n_reply');
+      case 'mention': return t('n_mention');
       case 'rel_req': return t('n_rel_req').replaceAll('{r}', t('a_$extra').toLowerCase());
       case 'rel_ok': return t('n_rel_ok').replaceAll('{r}', t('a_$extra').toLowerCase());
       default: return t('n_follow');
@@ -1015,6 +1019,53 @@ class Store extends ChangeNotifier {
     await _sp.setDouble('rate', r);
   }
 
+  /// Ganti kecepatan ke pilihan berikutnya (dipakai tombol kecil di tiap pemutar).
+  Future<void> cycleRate() {
+    const r = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+    final i = r.indexWhere((e) => e >= rate - .001);
+    return setRate(r[(i + 1) % r.length]);
+  }
+
+  // ---------- backsound Hups: pemutar kedua, jalan bersamaan dengan audio lain, bisa dimatikan ----------
+  final _bg = AudioPlayer();
+  int? bgmKey;
+  Object? _bgScope;
+  bool bgmMuted = false;
+  int _bgTok = 0;
+
+  Future<void> playBgm(int key, String url, {Object? scope}) async {
+    if (bgmKey == key) { await _bg.setVolume(bgmMuted ? 0 : 1); return; }
+    final tok = ++_bgTok;
+    bgmKey = key;
+    _bgScope = scope;
+    notifyListeners();
+    try {
+      await _bg.stop();
+      await _bg.setReleaseMode(ReleaseMode.loop);
+      final b = await Api.bytes(url);
+      if (tok != _bgTok) return;
+      await _bg.setVolume(bgmMuted ? 0 : 1);
+      await _bg.play(b != null ? BytesSource(b, mimeType: mimeOf(b)) : UrlSource(url));
+    } catch (_) {}
+  }
+
+  Future<void> stopBgm() async {
+    _bgTok++;
+    bgmKey = null;
+    _bgScope = null;
+    try { await _bg.stop(); } catch (_) {}
+    notifyListeners();
+  }
+
+  void leaveBgm(Object scope) { if (_bgScope == scope && bgmKey != null) Future.microtask(stopBgm); }
+
+  Future<void> setBgmMuted(bool v) async {
+    bgmMuted = v;
+    try { await _bg.setVolume(v ? 0 : 1); } catch (_) {}
+    await _sp.setBool('bgm_muted', v);
+    notifyListeners();
+  }
+
   Future<void> play(A a, {bool force = false, bool loop = true, Object? scope}) => playUrl(a.id, a.url, force: force, loop: loop, scope: scope);
 
   /// Putar satu berkas audio; [key] membedakan pemutar (audio post, audio ke-n, audio komentar).
@@ -1074,10 +1125,10 @@ const S = <String, List<String>>{
   'upd_menu': ['Perbarui aplikasi', 'Update app'], 'upd_none': ['Aplikasimu sudah versi terbaru', 'Your app is up to date'], 'upd_title': ['Versi baru tersedia', 'New version available'], 'upd_btn': ['Perbarui', 'Update'],
   'get_app': ['Unduh aplikasi Android', 'Download Android app'], 'website': ['Situs web hulhup.my.id', 'Website hulhup.my.id'], 'about': ['Tentang Hulhup', 'About Hulhup'], 'policy': ['Kebijakan', 'Policy'], 'privacy': ['Privasi', 'Privacy'],
   'followers': ['Pengikut', 'Followers'], 'following': ['Mengikuti', 'Following'], 'audio': ['Audio', 'Audio'], 'liked': ['Disorot', 'Spotlighted'],
-  'upload': ['Unggah audio', 'Upload audio'], 'record': ['Rekam', 'Record'], 'stop': ['Berhenti', 'Stop'], 'pick': ['Pilih file', 'Pick file'],
+  'upload': ['Posting', 'Post'], 'record': ['Rekam', 'Record'], 'stop': ['Berhenti', 'Stop'], 'pick': ['Pilih file', 'Pick file'],
   'desc': ['Deskripsi', 'Description'], 'bio': ['Bio', 'Bio'], 'popup': ['Tampilkan popup saat diketuk', 'Show popup on tap'],
   'who': ['Siapa boleh melihat di profil', 'Who can see it on profile'], 'v_all': ['Semua', 'Everyone'], 'v_fol': ['Pengikut', 'Followers'], 'v_me': ['Aku', 'Me'],
-  'noedit': ['Audio tidak bisa diedit, hanya dihapus.', 'Audio cannot be edited, only deleted.'],
+  'noedit': ['Post tidak bisa diedit, hanya dihapus.', 'Posts cannot be edited, only deleted.'],
   'search': ['Cari', 'Search'], 'notif': ['Notifikasi', 'Notifications'],
   'n_follow': ['mulai mengikutimu', 'started following you'],
   'remove_photo': ['Hapus foto profil', 'Remove profile photo'], 'remove_photo_q': ['Foto profil akan kembali ke bawaan.', 'Your profile photo will go back to the default.'], 'photo_removed': ['Foto profil dihapus', 'Profile photo removed'],
@@ -1101,16 +1152,24 @@ const S = <String, List<String>>{
   'hups': ['Hups', 'Hups'], 'rand_tab': ['Acak', 'Random'], 'sorot_tab': ['Sorot', 'Spotlight'], 'saved_tab': ['Simpan', 'Saved'], 'comments': ['Komentar', 'Comments'],
   'comment_ph': ['Tulis komentar…', 'Write a comment…'], 'reply': ['Balas', 'Reply'], 'replying': ['Membalas {n}', 'Replying to {n}'], 'send': ['Kirim', 'Send'], 'login_comment': ['Masuk untuk ikut berkomentar', 'Sign in to join the conversation'],
   'write_hups': ['Tulis sesuatu… tanpa batas panjang', 'Write something… no length limit'], 'add_audio': ['Tambah audio', 'Add audio'], 'audio_n': ['Audio ({n}/10)', 'Audio ({n}/10)'],
-  'in_rand': ['Tampil di Acak', 'Show in Random'], 'in_hups': ['Tampil di Hups', 'Show in Hups'], 'multi_no_rand': ['Lebih dari satu audio hanya tampil di Hups.', 'More than one audio only appears in Hups.'],
+  'in_rand': ['Tampil di Acak', 'Show in Random'], 'in_hups': ['Tampil di Hups', 'Show in Hups'], 'multi_no_rand': ['Tulisan saja dan backsound hanya tampil di Hups.', 'Text-only posts and backsounds only appear in Hups.'],
   'e_pick_place': ['Pilih tampil di Acak, Hups, atau keduanya', 'Choose Random, Hups, or both'], 'e_empty': ['Tulis sesuatu atau tambah audio', 'Write something or add audio'], 'e_too_long': ['Tulisan terlalu panjang', 'Text is too long'],
   'read_more': ['Selengkapnya', 'Read more'], 'share': ['Bagikan', 'Share'], 'saved_post': ['Disimpan', 'Saved'], 'unsaved_post': ['Dihapus dari simpanan', 'Removed from saved'],
   'no_hups': ['Belum ada Hups di sini', 'No Hups here yet'], 'empty_saved': ['Belum ada yang disimpan', 'Nothing saved yet'], 'empty_cmt': ['Belum ada komentar. Jadilah yang pertama.', 'No comments yet. Be the first.'],
   'n_comment': ['mengomentari postinganmu', 'commented on your post'], 'n_reply': ['membalas komentarmu', 'replied to your comment'],
   'rel_vis': ['Siapa yang bisa melihat hubunganmu', 'Who can see your relationships'], 'rel_locked': ['Daftar hubungan ini privat', 'This relationship list is private'],
+  'n_mention': ['menyebutmu', 'mentioned you'], 'author': ['Penulis', 'Author'], 'pin': ['Sematkan komentar', 'Pin comment'], 'unpin': ['Lepas sematan', 'Unpin comment'], 'pinned': ['Disematkan', 'Pinned'],
+  'notif_edit': ['Pilih', 'Select'], 'notif_del_all': ['Hapus semua', 'Delete all'], 'notif_del_sel': ['Hapus terpilih ({n})', 'Delete selected ({n})'], 'notif_del_q': ['Hapus notifikasi ini?', 'Delete these notifications?'], 'notif_del_all_q': ['Hapus semua notifikasi?', 'Delete all notifications?'], 'notif_deleted': ['Notifikasi dihapus', 'Notifications deleted'],
+  'sent_title': ['Terkirim', 'Sent'], 'sent_none': ['Belum ada yang kamu kirimi', 'You have not sent anything to anyone yet'], 'sent_n': ['{n} kiriman', '{n} sent'], 'sent_hint': ['Pilih akun untuk melihat apa yang pernah kamu kirim', 'Pick an account to see what you sent them'],
+  'forgot': ['Lupa kata sandi?', 'Forgot password?'], 'recover_title': ['Atur ulang kata sandi', 'Reset password'], 'recover_hint': ['Masukkan nama pengguna dan kode pemulihan yang kamu simpan saat mendaftar.', 'Enter your username and the recovery code you saved when signing up.'], 'recovery_code': ['Kode pemulihan', 'Recovery code'], 'new_password': ['Kata sandi baru', 'New password'], 'recover_do': ['Atur ulang', 'Reset'], 'recover_ok': ['Kata sandi diganti. Masuk dengan kata sandi baru.', 'Password changed. Sign in with the new password.'],
+  'rec_show_title': ['Simpan kode pemulihanmu', 'Save your recovery code'], 'rec_show_note': ['Kode ini satu-satunya cara masuk kembali bila kamu lupa kata sandi. Catat di tempat aman; kode ini hanya tampil sekali.', 'This code is the only way back in if you forget your password. Keep it somewhere safe; it is shown only once.'], 'rec_copy': ['Salin kode', 'Copy code'], 'rec_saved': ['Sudah kusimpan', 'I saved it'], 'rec_new': ['Buat kode pemulihan baru', 'Create a new recovery code'], 'rec_new_note': ['Kode lama tidak berlaku lagi. Masukkan kata sandimu untuk membuat yang baru.', 'The old code stops working. Enter your password to create a new one.'], 'e_bad_recovery': ['Nama pengguna atau kode pemulihan salah', 'Wrong username or recovery code'],
+  'bgm_label': ['Jadikan backsound', 'Use as backsound'], 'bgm_note': ['Terputar otomatis saat post terlihat di Hups, bisa dimatikan pembaca.', 'Plays automatically while the post is in view in Hups; readers can mute it.'], 'bgm_tag': ['Backsound', 'Backsound'], 'bgm_mute': ['Matikan backsound', 'Mute backsound'], 'bgm_unmute': ['Nyalakan backsound', 'Unmute backsound'],
+  'cmt_audio_max': ['Maksimal 3 audio per komentar', 'Up to 3 audios per comment'], 'multi_done': ['Selesai', 'Done'], 'multi_note': ['Boleh pilih lebih dari satu', 'You can pick more than one'], 'rel_count_hidden': ['Tersembunyi', 'Hidden'],
+  'report_cmt': ['Laporkan komentar', 'Report comment'], 'post_hint_text': ['Tulis sesuatu atau tambah audio', 'Write something or add audio'], 'rec_over': ['Audio melebihi 1 MB', 'Audio is over 1 MB'], 'search_hint2': ['Cari akun, audio, atau Hups', 'Search accounts, audio, or Hups'], 'tag_hint': ['Ketik @ untuk menandai akun', 'Type @ to tag an account'],
   'link_copied': ['Tautan disalin', 'Link copied'], 'rec_title': ['Rekam audio', 'Record audio'], 'rec_hint': ['Ketuk untuk merekam, maksimal 15 detik', 'Tap to record, up to 15 seconds'], 'use_audio': ['Pakai audio ini', 'Use this audio'],
   'delete_cmt_q': ['Hapus komentar ini beserta balasannya?', 'Delete this comment and its replies?'], 'post_gone': ['Post tidak ditemukan atau tidak bisa kamu lihat', 'Post not found or not visible to you'],
   'posting': ['Memposting…', 'Posting…'], 'posted': ['Terkirim', 'Posted'], 'new_post': ['Buat post', 'New post'], 'text_audio': ['Teks dan audio', 'Text and audio'], 'who_see': ['Siapa yang bisa melihat', 'Who can see it'],
-  'one_audio_cmt': ['Satu audio per komentar', 'One audio per comment'], 'post_audio_max': ['Maksimal 10 audio per post', 'Up to 10 audios per post'], 'text_only': ['Hanya teks', 'Text only'],
+  'one_audio_cmt': ['Satu audio per komentar', 'One audio per comment'], 'post_audio_max': ['Maksimal 1 audio per post', 'Up to 1 audio per post'], 'text_only': ['Hanya teks', 'Text only'],
   'empty_audio': ['Belum ada audio', 'No audio yet'], 'empty_liked': ['Belum ada yang disorot', 'Nothing spotlighted yet'],
   'empty_notif': ['Belum ada notifikasi', 'No notifications yet'], 'empty_search': ['Tidak ada hasil', 'No results'], 'empty_list': ['Belum ada akun', 'No accounts yet'],
   'follow': ['Ikuti', 'Follow'], 'unfollow': ['Mengikuti', 'Following'], 'photo': ['Foto profil', 'Profile photo'], 'cover': ['Latar profil', 'Cover'],
@@ -1128,7 +1187,7 @@ const S = <String, List<String>>{
   'e_bad_name': ['Nama wajib diisi (maks 40 karakter)', 'Name is required (max 40 chars)'],
   'e_bad_password': ['Kata sandi minimal 6 karakter dan tanpa spasi', 'Password must be at least 6 characters with no spaces'],
   'e_bad_age': ['Tanggal lahir tidak valid', 'Invalid date of birth'], 'e_bad_bio': ['Bio maksimal 300 karakter', 'Bio max 300 characters'],
-  'e_bad_file': ['File tidak valid', 'Invalid file'], 'e_too_big': ['File terlalu besar (maks 3 MB)', 'File too large (max 3 MB)'],
+  'e_bad_file': ['File tidak valid', 'Invalid file'], 'e_too_big': ['File terlalu besar (maks 1 MB)', 'File too large (max 1 MB)'],
   'e_not_found': ['Tidak ditemukan', 'Not found'],
   'e_forbidden': ['Tindakan ini tidak diizinkan', 'This action is not allowed'],
   'a_me': ['Hanya untuk saya', 'Only me'], 'pvis': ['Siapa yang bisa melihat audioku di profil', 'Who can see my audio on my profile'],

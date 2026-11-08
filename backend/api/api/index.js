@@ -29,6 +29,7 @@ export default async function handler(req, res) {
       res.statusCode = 200;
       res.setHeader('Content-Type', r.mime);
       res.setHeader('Cache-Control', r.cache);
+      if (String(r.cache).startsWith('public')) { res.setHeader('Access-Control-Allow-Origin', '*'); res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin'); } // foto profil publik: bisa tampil di domain mana pun
       res.setHeader('Content-Length', r.binary.length);
       return res.end(r.binary);
     }
