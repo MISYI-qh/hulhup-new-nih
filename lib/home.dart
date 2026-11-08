@@ -221,7 +221,7 @@ class _SideMenuState extends State<SideMenu> {
             if (s.me == null) PBtn(s.t('login'), () { close(); go(context, const AuthPage()); }, icon: Icons.login_rounded)
             else PBtn(s.t('logout'), () async { close(); await s.logout(); }, icon: Icons.logout_rounded, ghost: true, fgc: heart),
             const SizedBox(height: 14),
-            Center(child: Text(kBuild > 0 ? 'Misyi · v1.2.0 ($kBuild)' : 'Misyi · v1.2.0', style: TextStyle(color: sub(context), fontWeight: FontWeight.w700, letterSpacing: 1.2, fontSize: 12))),
+            Center(child: Text(kBuild > 0 ? 'Misyi · v1.3.0 ($kBuild)' : 'Misyi · v1.3.0', style: TextStyle(color: sub(context), fontWeight: FontWeight.w700, letterSpacing: 1.2, fontSize: 12))),
           ])))),
         ),
       ),
