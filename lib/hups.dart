@@ -5,7 +5,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:share_plus/share_plus.dart';
@@ -41,11 +40,11 @@ Future<void> savePost(A a) async {
 Future<void> openPost(BuildContext c, A a) => go(c, PostPage(a.id, seed: a));
 
 /// Satu klip audio yang direkam atau dipilih (maksimal 15 detik).
-class Clip {
+class AudioClip {
   final Uint8List bytes;
   final String ext;
   final int ms;
-  Clip(this.bytes, this.ext, this.ms);
+  AudioClip(this.bytes, this.ext, this.ms);
   int get secs => (ms / 1000).ceil().clamp(1, 15);
 }
 
@@ -113,7 +112,8 @@ class _RecordSheetState extends State<RecordSheet> {
     if (secs == null) { toast(s.t('e_bad_file'), bad: true); return; }
     if (secs > 15) { toast(s.t('too_long'), bad: true); return; }
     await pv.stop();
-    setState(() { bytes = b; ext = (f.extension ?? 'm4a').toLowerCase(); ms = (secs! < 1 ? 1 : secs!) * 1000; previewing = false; });
+    final sv = secs;
+    setState(() { bytes = b; ext = (f.extension ?? 'm4a').toLowerCase(); ms = (sv < 1 ? 1 : sv) * 1000; previewing = false; });
   }
 
   Future<void> _preview() async {
@@ -142,7 +142,7 @@ class _RecordSheetState extends State<RecordSheet> {
         if (bytes != null && !recording) ...[const SizedBox(width: 10), Expanded(child: PBtn(s.t('preview'), _preview, ghost: true, icon: previewing ? Icons.pause_rounded : Icons.play_arrow_rounded))],
       ]),
       const SizedBox(height: 10),
-      PBtn(s.t('use_audio'), bytes == null || recording ? null : () => Navigator.pop(context, Clip(bytes!, ext, ms)), icon: Icons.check_rounded),
+      PBtn(s.t('use_audio'), bytes == null || recording ? null : () => Navigator.pop(context, AudioClip(bytes!, ext, ms)), icon: Icons.check_rounded),
     ]);
   }
 }
@@ -338,7 +338,7 @@ class _PostPageState extends State<PostPage> {
   bool loading = true, sending = false;
   String? error;
   final input = TextEditingController();
-  Clip? clip;
+  AudioClip? clip;
   Map? replyTo;
   final sc = ScrollController();
 
@@ -366,7 +366,7 @@ class _PostPageState extends State<PostPage> {
   }
 
   Future<void> _addClip() async {
-    final c = await sheet<Clip>(context, (_) => const RecordSheet());
+    final c = await sheet<AudioClip>(context, (_) => const RecordSheet());
     if (c != null && mounted) setState(() => clip = c);
   }
 
@@ -536,7 +536,7 @@ class ComposePage extends StatefulWidget {
 
 class _ComposeState extends State<ComposePage> {
   final text = TextEditingController();
-  final clips = <Clip>[];
+  final clips = <AudioClip>[];
   final pv = AudioPlayer();
   int? previewing;
   bool inRand = true, inHups = true, pprof = true, busy = false;
@@ -551,7 +551,7 @@ class _ComposeState extends State<ComposePage> {
   Future<void> _add() async {
     final s = Store.i;
     if (clips.length >= 10) { toast(s.t('post_audio_max')); return; }
-    final c = await sheet<Clip>(context, (_) => const RecordSheet());
+    final c = await sheet<AudioClip>(context, (_) => const RecordSheet());
     if (c == null || !mounted) return;
     setState(() { clips.add(c); if (clips.length > 1) inRand = false; if (!inRand && !inHups) inHups = true; });
   }
