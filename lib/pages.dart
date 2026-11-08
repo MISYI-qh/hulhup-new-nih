@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'extra.dart';
 import 'package:image_picker/image_picker.dart';
 import 'core.dart';
 import 'hups.dart';
@@ -46,7 +47,8 @@ class _AuthState extends State<AuthPage> {
     setState(() => busy = true);
     try {
       if (reg) {
-        await s.auth('/register', {'name': name.text, 'username': user.text, 'password': pw.text, 'birth': age.text});
+        final rj = await s.auth('/register', {'name': name.text, 'username': user.text, 'password': pw.text, 'birth': age.text});
+        if (mounted) await showRecoveryCode(context, '${rj['recovery']}');
       } else {
         await s.auth('/login', {'username': user.text, 'password': pw.text});
       }
@@ -76,6 +78,7 @@ class _AuthState extends State<AuthPage> {
         ])),
         const SizedBox(height: 28),
         PBtn(reg ? s.t('register') : s.t('login'), _go, loading: busy),
+        if (!reg) Padding(padding: const EdgeInsets.only(top: 14), child: Tap(onTap: () => go(context, const RecoverPage()), child: Padding(padding: const EdgeInsets.all(8), child: Text(s.t('forgot'), style: TextStyle(color: acc(context), fontWeight: FontWeight.w700))))),
       ]))),
     ]));
   }
@@ -251,7 +254,7 @@ class _ProfileState extends State<ProfilePage> {
         Row(children: [Flexible(child: Text(u.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 24, letterSpacing: -.5))), if (u.verified) const Padding(padding: EdgeInsets.only(left: 6), child: Icon(Icons.verified_rounded, size: 22, color: Color(0xFF2F8F5B)))]),
         const SizedBox(height: 2),
         Text(u.username, style: TextStyle(color: sub(context), fontSize: 15)),
-        if (u.bio.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 12), child: Text(u.bio, style: const TextStyle(fontSize: 15, height: 1.45))),
+        if (u.bio.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 12), child: MentionText(u.bio, style: const TextStyle(fontSize: 15, height: 1.45))),
         const SizedBox(height: 16),
         Wrap(spacing: 22, runSpacing: 8, children: [_stat(u.followers, s.t('followers'), 'followers'), _stat(u.following, s.t('following'), 'following'),
           Tap(onTap: () async { await go(context, RelationsPage(widget.u!)); if (mounted) _load(); }, child: Row(mainAxisSize: MainAxisSize.min, children: [Text(fmt(rels.length), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17)), const SizedBox(width: 6), Text(s.t('rel_title'), style: TextStyle(color: sub(context), fontSize: 14)), if (mine && relIn.isNotEmpty) Container(margin: const EdgeInsets.only(left: 6), width: 8, height: 8, decoration: const BoxDecoration(color: heart, shape: BoxShape.circle))]))]),
@@ -613,6 +616,7 @@ class SettingsPage extends StatelessWidget {
         Seg<ThemeMode>([(ThemeMode.system, s.t('system')), (ThemeMode.light, s.t('light')), (ThemeMode.dark, s.t('dark'))], s.mode, s.setMode),
         if (s.me != null) ...[
           label(''),
+          row(Icons.key_rounded, s.t('rec_new'), () => newRecovery(context)),
           row(Icons.devices_other_rounded, s.t('logout_others'), () => go(context, const SessionsPage())),
           row(Icons.logout_rounded, s.t('logout'), () async { await s.logout(); if (context.mounted) Navigator.of(context).popUntil((r) => r.isFirst); }, c: heart),
           row(Icons.delete_outline_rounded, s.t('delete_acc'), () async {
@@ -703,11 +707,31 @@ class NotifPage extends StatefulWidget {
 class _NotifState extends State<NotifPage> {
   List? items;
   String? error;
+  bool selecting = false;
+  final sel = <int>{};
   @override
   void initState() { super.initState(); _load(); }
   Future<void> _load() async {
     try { items = (await Api.req('GET', '/notifications'))['items']; } catch (e) { error = Store.i.err(e); }
     if (mounted) setState(() {});
+  }
+
+  Future<void> _delete({required bool all}) async {
+    final s = Store.i;
+    if (!await confirm(context, s.t('delete'), s.t(all ? 'notif_del_all_q' : 'notif_del_q'), s.t('delete'), danger: true)) return;
+    try {
+      await Api.req('POST', '/notifications/delete', body: all ? {'all': true} : {'ids': sel.toList()});
+      if (all) { items = []; } else { items!.removeWhere((e) => sel.contains((e as Map)['id'])); }
+      sel.clear();
+      selecting = false;
+      toast(s.t('notif_deleted'));
+    } catch (e) { toast(s.err(e), bad: true); }
+    if (mounted) setState(() {});
+  }
+
+  void _open(Map n) {
+    final k = '${n['type']}', post = (n['post'] ?? 0) as int;
+    if ((k == 'comment' || k == 'reply' || k == 'mention' || k == 'like') && post != 0) { go(context, PostPage(post)); } else { go(context, ProfilePage(n['username'])); }
   }
 
   Widget _item(Map n, int i) {
@@ -723,7 +747,7 @@ class _NotifState extends State<NotifPage> {
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Text(k == 'tired' ? s.t('r_title') : 'Hulhup', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)), const Spacer(), when]), const SizedBox(height: 2), Text(txt, style: const TextStyle(fontSize: 15, height: 1.4))])),
       ])));
     }
-    return In(i, Tap(onTap: () => (cm && (n['post'] ?? 0) != 0) ? go(context, PostPage(n['post'] as int)) : go(context, ProfilePage(n['username'])), child: Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(26)), child: Row(children: [
+    return In(i, Tap(onTap: () => selecting ? setState(() { sel.contains(n['id']) ? sel.remove(n['id']) : sel.add(n['id'] as int); }) : _open(n), child: Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(26)), child: Row(children: [
       Stack(clipBehavior: Clip.none, children: [Avatar(n['avatar'], n['name'], 46), Positioned(right: -4, bottom: -4, child: Container(width: 22, height: 22, decoration: BoxDecoration(color: green, shape: BoxShape.circle, border: Border.all(color: bgOf(context), width: 2)), child: like ? const HIcon(HK.sorot, filled: true, size: 13, color: cream, hole: green) : cm ? const HIcon(HK.comment, size: 12, color: cream) : Icon(relk ? Icons.diversity_3_rounded : Icons.person_add_alt_1_rounded, size: 11, color: cream)))]),
       const SizedBox(width: 14),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -737,7 +761,8 @@ class _NotifState extends State<NotifPage> {
   Widget build(BuildContext context) {
     final s = Store.i, me = s.me;
     return Scaffold(body: Column(children: [
-      TopBar(back: true, title: s.t('notif')),
+      TopBar(back: true, title: s.t('notif'), actions: [if (items != null && items!.isNotEmpty) Tap(onTap: () => setState(() { selecting = !selecting; sel.clear(); }), child: Padding(padding: const EdgeInsets.all(10), child: Text(selecting ? s.t('cancel') : s.t('notif_edit'), style: const TextStyle(fontWeight: FontWeight.w700))))]),
+      if (selecting) Padding(padding: const EdgeInsets.fromLTRB(20, 0, 20, 8), child: Row(children: [Expanded(child: PBtn(s.t('notif_del_sel').replaceAll('{n}', '${sel.length}'), sel.isEmpty ? null : () => _delete(all: false), ghost: true)), const SizedBox(width: 10), Expanded(child: PBtn(s.t('notif_del_all'), () => _delete(all: true), color: heart))])),
       Expanded(child: items == null && error == null ? const Loader() : error != null ? Empty(Icons.cloud_off_rounded, error!) : ListView(padding: const EdgeInsets.fromLTRB(20, 4, 20, 40), children: [
         if (me != null && (me.streak > 0 || me.days > 0)) Padding(padding: const EdgeInsets.only(bottom: 14), child: Align(alignment: Alignment.centerLeft, child: StreakChip(me.streak, me.days, open: true))),
         if (items!.isEmpty) Empty(Icons.notifications_none_rounded, s.t('empty_notif')),

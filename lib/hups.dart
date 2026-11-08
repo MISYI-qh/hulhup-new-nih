@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'extra.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
@@ -229,13 +230,17 @@ class _MentionTextState extends State<MentionText> {
     _rec.clear();
     final out = <InlineSpan>[];
     var last = 0;
-    for (final m in RegExp(r'@([a-z0-9_]{3,20})').allMatches(widget.text)) {
+    final re = RegExp('${linkRe.pattern}|@([a-z0-9_]{3,20})', caseSensitive: false);
+    for (final m in re.allMatches(widget.text)) {
+      final raw = m.group(0)!;
+      final isTag = m.group(2) != null;
+      final shown = isTag ? raw : trimLink(raw);
+      if (shown.isEmpty) continue;
       if (m.start > last) out.add(TextSpan(text: widget.text.substring(last, m.start)));
-      final u = m.group(1)!;
-      final r = TapGestureRecognizer()..onTap = () => go(context, ProfilePage(u));
+      final r = TapGestureRecognizer()..onTap = isTag ? () => go(context, ProfilePage(m.group(2)!)) : () => openLink(context, shown);
       _rec.add(r);
-      out.add(TextSpan(text: m.group(0), style: TextStyle(color: acc(context), fontWeight: FontWeight.w800), recognizer: r));
-      last = m.end;
+      out.add(TextSpan(text: shown, style: TextStyle(color: acc(context), fontWeight: isTag ? FontWeight.w800 : FontWeight.w600, decoration: isTag ? null : TextDecoration.underline), recognizer: r));
+      last = m.start + shown.length;
     }
     if (last < widget.text.length) out.add(TextSpan(text: widget.text.substring(last)));
     return TextSpan(children: out);

@@ -3,6 +3,7 @@ import 'home.dart';
 import 'hups.dart';
 import 'pages.dart';
 import 'core.dart';
+import 'extra.dart';
 import 'ui.dart';
 
 /// Alamat (URL) setiap halaman: 1 halaman = 1 alamat, bisa dibagikan dan dibuka langsung.
@@ -22,6 +23,8 @@ String? pathOf(Widget w) {
   if (w is ComposePage) return '/new';
   if (w is GetAppPage) return '/get-app';
   if (w is AuthPage) return '/login';
+  if (w is RecoverPage) return '/recover';
+  if (w is FaqPage) return '/faq';
   if (w is TextPage && w.slug != null) return '/${w.slug}';
   return null;
 }
@@ -53,6 +56,8 @@ Widget? pageFor(String name) {
     case 'new': return const ComposePage();
     case 'get-app': return const GetAppPage();
     case 'login': return const AuthPage();
+    case 'recover': return const RecoverPage();
+    case 'faq': return const FaqPage();
     case 'about': return TextPage(s.t('about'), s.t('about_t'), slug: 'about');
     case 'policy': return TextPage(s.t('policy'), s.t('policy_t'), slug: 'policy');
     case 'privacy': return TextPage(s.t('privacy'), s.t('privacy_t'), slug: 'privacy');
