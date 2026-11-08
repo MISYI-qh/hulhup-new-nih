@@ -21,7 +21,8 @@ Future<void> toggleOffline(A a) async {
 // ---------- teks ----------
 class TextPage extends StatelessWidget {
   final String title, body;
-  const TextPage(this.title, this.body, {super.key});
+  final String? slug;
+  const TextPage(this.title, this.body, {super.key, this.slug});
   @override
   Widget build(BuildContext context) => Scaffold(body: Column(children: [
         TopBar(back: true, title: title),

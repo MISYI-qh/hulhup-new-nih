@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'routes.dart';
 import 'package:flutter/services.dart';
 import 'core.dart';
 
@@ -17,7 +18,8 @@ Color soft(BuildContext c) => isDark(c) ? const Color(0xFF17211B) : const Color(
 Color card(BuildContext c) => isDark(c) ? const Color(0xFF1B2720) : Colors.white;
 Color bgOf(BuildContext c) => Theme.of(c).scaffoldBackgroundColor;
 
-Route<T> route<T>(Widget p) => PageRouteBuilder<T>(
+Route<T> route<T>(Widget p, {String? name}) => PageRouteBuilder<T>(
+      settings: RouteSettings(name: name ?? pathOf(p)),
       transitionDuration: const Duration(milliseconds: 420),
       reverseTransitionDuration: const Duration(milliseconds: 300),
       pageBuilder: (_, __, ___) => p,

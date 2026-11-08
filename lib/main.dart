@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter_web_plugins/url_strategy.dart';
+ import 'routes.dart';
 import 'package:flutter/services.dart';
 import 'core.dart';
 import 'home.dart';
@@ -8,16 +9,13 @@ import 'notify.dart';
 import 'ui.dart';
 
 Future<void> main() async {
+  usePathUrlStrategy();
   WidgetsFlutterBinding.ensureInitialized();
   await Store.i.init();
   Store.i.banner = (m) => toast(m);
   await Notifier.init();
   await Store.i.refresh(); // status masuk sudah benar di layar pertama
   runApp(const HulhupApp());
-  if (kIsWeb) {
-    final m = RegExp(r'^/p/(\d+)/?$').firstMatch(Uri.base.path);
-    if (m != null) WidgetsBinding.instance.addPostFrameCallback((_) => navKey.currentState?.push(route(PostPage(int.parse(m.group(1)!)))));
-  }
   WidgetsBinding.instance.addObserver(_Life());
   _boot();
 }
@@ -77,7 +75,9 @@ class HulhupApp extends StatelessWidget {
               child: child!,
             );
           },
-          home: const HomePage(),
+          initialRoute: '/',
+          onGenerateInitialRoutes: initialRoutes,
+          onGenerateRoute: generate,
         ),
       );
 }
