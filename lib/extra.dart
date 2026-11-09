@@ -184,7 +184,7 @@ class FaqPage extends StatelessWidget {
     ('Apa bedanya Acak dan Hups?', 'Acak menampilkan audio pendek yang diacak 100% rata. Hups adalah linimasa tulisan; urutannya dipengaruhi sorot, komentar, dan waktu (yang baru lebih berpeluang di atas). Post tanpa audio hanya muncul di Hups.'),
     ('Apa itu sorot?', 'Tanda suka. Ketuk ikon lampu sorot untuk menyorot sebuah post atau komentar.'),
     ('Apa itu backsound?', 'Audio di post Hups yang dipilih penulis sebagai musik latar. Terputar otomatis saat post terlihat di layar, bisa dimatikan pembaca, dan bisa menyala bersama audio lain.'),
-    ('Berapa batas audio?', 'Post Hups maksimal 1 audio, komentar maksimal 3 audio. Setiap audio maksimal 1 MB.'),
+    ('Berapa batas audio?', 'Post Hups maksimal 3 audio (salah satunya boleh jadi backsound), tetapi post yang ikut Acak hanya 1 audio. Komentar maksimal 1 audio. Setiap audio maksimal 1 MB.'),
     ('Bagaimana menandai akun?', 'Ketik @nama pengguna di post atau komentar. Ketuk tag untuk membuka akun itu; akun yang ditandai mendapat notifikasi.'),
     ('Siapa yang bisa melihat post saya?', 'Kamu memilih saat membuat post, bisa lebih dari satu (publik, pengikut, hubungan, akun tertentu, dan lainnya).'),
     ('Bagaimana menyematkan komentar?', 'Penulis post membuka menu komentar lalu memilih Sematkan komentar.'),
