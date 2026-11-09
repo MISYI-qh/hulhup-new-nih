@@ -611,6 +611,15 @@ IconData audIcon(String v, {bool filter = false}) => (filter && v == 'me' ? Icon
     }[v]) ?? Icons.public_rounded;
 String audLabel(String v, {bool filter = false}) => Store.i.t(filter && v == 'me' ? 'f_me' : 'a_$v');
 
+/// Label audiens satu post (hanya ditampilkan di profil pemilik): ikon + nama pilihan.
+Widget audChip(BuildContext context, String rand) {
+  final l = audSplit(rand).isEmpty ? ['public'] : audSplit(rand);
+  return Row(mainAxisSize: MainAxisSize.min, children: [
+    Icon(audIcon(l.first), size: 14, color: sub(context)), const SizedBox(width: 5),
+    Flexible(child: Text(l.map((e) => audLabel(e)).join(' · '), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: sub(context), fontSize: 12.5, fontWeight: FontWeight.w600))),
+  ]);
+}
+
 List<String> audSplit(String v) => v.split(',').where((e) => e.isNotEmpty).toList();
 
 /// Teks ringkas untuk satu atau beberapa audiens ("Pengikut · Teman" atau "Pengikut +2").

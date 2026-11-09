@@ -1201,7 +1201,7 @@ const S = <String, List<String>>{
   'e_bad_file': ['File tidak valid', 'Invalid file'], 'e_too_big': ['File terlalu besar (maks 1 MB)', 'File too large (max 1 MB)'],
   'e_not_found': ['Tidak ditemukan', 'Not found'],
   'e_forbidden': ['Tindakan ini tidak diizinkan', 'This action is not allowed'],
-  'a_me': ['Hanya untuk saya', 'Only me'], 'pvis': ['Siapa yang bisa melihat audioku di profil', 'Who can see my audio on my profile'],
+  'a_me': ['Hanya untuk saya', 'Only me'], 'pvis': ['Siapa yang bisa melihat postinganku', 'Who can see my posts'],
   'remind': ['Pengingat harian', 'Daily reminder'], 'remind_sub': ['Notifikasi “Kamu lelah?” setiap hari jam 19.00', 'A “Feeling tired?” notification every day at 7 PM'],
   'streak_t': ['{n} hari berturut-turut', '{n}-day streak'], 'days_total': ['Total masuk {n} hari', '{n} days signed in in total'],
   'view_photo': ['Lihat foto', 'View photo'], 'change_photo': ['Ganti foto', 'Change photo'],

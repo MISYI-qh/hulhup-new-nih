@@ -381,7 +381,8 @@ class PostCard extends StatefulWidget {
   final A a;
   final Object? scope;
   final VoidCallback? onDeleted;
-  const PostCard(this.a, {super.key, this.scope, this.onDeleted});
+  final bool showAudience;
+  const PostCard(this.a, {super.key, this.scope, this.onDeleted, this.showAudience = false});
   @override
   State<PostCard> createState() => _PostCardState();
 }
@@ -409,6 +410,7 @@ class _PostCardState extends State<PostCard> {
         decoration: BoxDecoration(color: card(context), borderRadius: BorderRadius.circular(28), border: Border.all(color: ink(context).withValues(alpha: .07)), boxShadow: [BoxShadow(color: green.withValues(alpha: .05), blurRadius: 18, offset: const Offset(0, 6))]),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           OwnerRow(a, more: () => postMenu(context, a, onDeleted: widget.onDeleted)),
+          if (widget.showAudience) Padding(padding: const EdgeInsets.only(top: 8, right: 8), child: audChip(context, a.rand)),
           if (text.isNotEmpty) Padding(padding: const EdgeInsets.fromLTRB(0, 10, 8, 0), child: MentionText(partial ? '$text …' : text, style: const TextStyle(fontSize: 15.5, height: 1.45))),
           if (partial) Tap(onTap: busy ? null : _expand, child: Padding(padding: const EdgeInsets.fromLTRB(0, 4, 8, 4), child: Text(busy ? '…' : s.t('read_more'), style: TextStyle(color: acc(context), fontWeight: FontWeight.w700, fontSize: 14)))),
           if (a.files.isNotEmpty) Padding(padding: const EdgeInsets.only(right: 8), child: audioBars(a, widget.scope)),
