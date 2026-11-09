@@ -1180,7 +1180,7 @@ const S = <String, List<String>>{
   'link_copied': ['Tautan disalin', 'Link copied'], 'rec_title': ['Rekam audio', 'Record audio'], 'rec_hint': ['Ketuk untuk merekam, maksimal 15 detik', 'Tap to record, up to 15 seconds'], 'use_audio': ['Pakai audio ini', 'Use this audio'],
   'delete_cmt_q': ['Hapus komentar ini beserta balasannya?', 'Delete this comment and its replies?'], 'faq': ['FAQ', 'FAQ'], 'not_found': ['Halaman tidak ditemukan', 'Page not found'], 'post_gone': ['Post tidak ditemukan atau tidak bisa kamu lihat', 'Post not found or not visible to you'],
   'posting': ['Memposting…', 'Posting…'], 'posted': ['Terkirim', 'Posted'], 'new_post': ['Buat post', 'New post'], 'text_audio': ['Teks dan audio', 'Text and audio'], 'who_see': ['Siapa yang bisa melihat', 'Who can see it'],
-  'one_audio_cmt': ['Satu audio per komentar', 'One audio per comment'], 'post_audio_max': ['Maksimal 1 audio per post', 'Up to 1 audio per post'], 'text_only': ['Hanya teks', 'Text only'],
+  'one_audio_cmt': ['Satu audio per komentar', 'One audio per comment'],  'text_only': ['Hanya teks', 'Text only'],
   'empty_audio': ['Belum ada audio', 'No audio yet'], 'empty_liked': ['Belum ada yang disorot', 'Nothing spotlighted yet'],
   'empty_notif': ['Belum ada notifikasi', 'No notifications yet'], 'empty_search': ['Tidak ada hasil', 'No results'], 'empty_list': ['Belum ada akun', 'No accounts yet'],
   'follow': ['Ikuti', 'Follow'], 'unfollow': ['Mengikuti', 'Following'], 'photo': ['Foto profil', 'Profile photo'], 'cover': ['Latar profil', 'Cover'],
