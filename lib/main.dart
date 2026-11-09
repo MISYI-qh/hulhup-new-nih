@@ -70,7 +70,10 @@ class HulhupApp extends StatelessWidget {
                 systemNavigationBarDividerColor: bg,
                 systemNavigationBarIconBrightness: dk ? Brightness.light : Brightness.dark,
               ),
-              child: child!,
+              child: MediaQuery(
+                data: MediaQuery.of(ctx).copyWith(textScaler: MediaQuery.textScalerOf(ctx).clamp(minScaleFactor: .9, maxScaleFactor: 1.1)),
+                child: ColoredBox(color: bg, child: Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 520), child: child!))),
+              ),
             );
           },
           initialRoute: '/',
