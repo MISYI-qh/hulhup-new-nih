@@ -215,9 +215,9 @@ class _SideMenuState extends State<SideMenu> {
             item(Icons.tune_rounded, 'settings', () => const SettingsPage()),
             if (s.me != null) item(Icons.send_outlined, 'sent_title', () => const SentPage()),
             item(Icons.download_done_rounded, 'offline_t', () => const OfflinePage()),
+            item(Icons.help_outline_rounded, 'faq', () => const FaqPage()),
             Tap(onTap: () => setState(() => more = !more), child: Padding(padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8), child: Row(children: [Icon(Icons.more_horiz_rounded, size: 24, color: ink(context)), const SizedBox(width: 16), Expanded(child: Text(s.t('more'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600))), AnimatedRotation(turns: more ? .5 : 0, duration: const Duration(milliseconds: 200), child: Icon(Icons.expand_more_rounded, size: 24, color: sub(context)))]))),
             AnimatedSize(duration: const Duration(milliseconds: 220), curve: Curves.easeOutCubic, alignment: Alignment.topCenter, child: more ? Padding(padding: const EdgeInsets.only(left: 16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              item(Icons.help_outline_rounded, 'faq', () => const FaqPage()),
               item(Icons.info_outline_rounded, 'about', () => TextPage(s.t('about'), s.t('about_t'), slug: 'about')),
               item(Icons.rule_rounded, 'policy', () => TextPage(s.t('policy'), s.t('policy_t'), slug: 'policy')),
               item(Icons.lock_outline_rounded, 'privacy', () => TextPage(s.t('privacy'), s.t('privacy_t'), slug: 'privacy')),

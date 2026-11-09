@@ -735,6 +735,20 @@ class _NotifState extends State<NotifPage> {
   }
 
   Widget _item(Map n, int i) {
+    final id = n['id'] as int, on = sel.contains(id);
+    final body = _itemBody(n, i);
+    if (!selecting) return GestureDetector(onLongPress: () => setState(() { selecting = true; sel..clear()..add(id); }), child: body);
+    return Tap(scale: .98, onTap: () => setState(() { on ? sel.remove(id) : sel.add(id); }), child: Container(
+      margin: EdgeInsets.zero,
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(28), border: Border.all(color: on ? ink(context) : Colors.transparent, width: 2)),
+      child: Row(children: [
+        Padding(padding: const EdgeInsets.only(left: 10, right: 4), child: Icon(on ? Icons.check_circle_rounded : Icons.circle_outlined, color: on ? ink(context) : sub(context))),
+        Expanded(child: IgnorePointer(child: Transform.translate(offset: Offset.zero, child: body))),
+      ]),
+    ));
+  }
+
+  Widget _itemBody(Map n, int i) {
     final s = Store.i;
     final k = '${n['type']}', sys = k == 'streak' || k == 'missed' || k == 'tired', like = k == 'like', cm = k == 'comment' || k == 'reply', relk = k == 'rel_req' || k == 'rel_ok';
     final bg = n['seen'] == true ? soft(context) : ink(context).withValues(alpha: .12);
@@ -747,7 +761,7 @@ class _NotifState extends State<NotifPage> {
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Text(k == 'tired' ? s.t('r_title') : 'Hulhup', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)), const Spacer(), when]), const SizedBox(height: 2), Text(txt, style: const TextStyle(fontSize: 15, height: 1.4))])),
       ])));
     }
-    return In(i, Tap(onTap: () => selecting ? setState(() { sel.contains(n['id']) ? sel.remove(n['id']) : sel.add(n['id'] as int); }) : _open(n), child: Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(26)), child: Row(children: [
+    return In(i, Tap(onTap: () => _open(n), child: Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(26)), child: Row(children: [
       Stack(clipBehavior: Clip.none, children: [Avatar(n['avatar'], n['name'], 46), Positioned(right: -4, bottom: -4, child: Container(width: 22, height: 22, decoration: BoxDecoration(color: green, shape: BoxShape.circle, border: Border.all(color: bgOf(context), width: 2)), child: like ? const HIcon(HK.sorot, filled: true, size: 13, color: cream, hole: green) : cm ? const HIcon(HK.comment, size: 12, color: cream) : Icon(relk ? Icons.diversity_3_rounded : Icons.person_add_alt_1_rounded, size: 11, color: cream)))]),
       const SizedBox(width: 14),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
