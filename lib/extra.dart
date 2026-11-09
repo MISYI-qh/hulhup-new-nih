@@ -198,7 +198,7 @@ class FaqPage extends StatelessWidget {
     ('Random vs Hups?', 'Random plays short audio, shuffled 100% evenly. Hups is a text timeline ranked by spotlights, comments and recency (newer posts are more likely to rank higher). Posts without audio appear only in Hups.'),
     ('What is a spotlight?', 'A like. Tap the spotlight icon on a post or comment.'),
     ('What is a backsound?', 'A Hups audio the author marks as background music. It autoplays while the post is on screen, readers can mute it, and it can play together with other audio.'),
-    ('Audio limits?', 'A Hups post has at most 1 audio, a comment at most 3. Each audio is at most 1 MB.'),
+    ('Audio limits?', 'A Hups post has at most 3 audios (one can be a backsound); a post that joins Acak has only 1. A comment has at most 1 audio. Each audio is at most 1 MB.'),
     ('How do I tag someone?', 'Type @username in a post or comment. Tap a tag to open that account; tagged accounts get a notification.'),
     ('Who can see my posts?', 'You choose when posting, and can pick more than one (public, followers, relations, specific accounts, and more).'),
     ('How do I pin a comment?', 'The post author opens the comment menu and picks Pin comment.'),
