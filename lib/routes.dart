@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'home.dart';
 import 'hups.dart';
 import 'pages.dart';
@@ -8,8 +10,8 @@ import 'ui.dart';
 
 /// Alamat (URL) setiap halaman: 1 halaman = 1 alamat, bisa dibagikan dan dibuka langsung.
 String? pathOf(Widget w) {
-  if (w is HomePage) return '/';
-  if (w is PostPage) return '/p/${w.id}';
+  if (w is HomePage) return w.mode0 == 1 ? '/hups' : '/';
+  if (w is PostPage) return w.comment == null ? '/p/${w.id}' : '/p/${w.id}/c/${w.comment}';
   if (w is ProfilePage) return w.u == null ? '/me' : '/u/${w.u}';
   if (w is FollowsPage) return '/u/${w.u}/${w.kind}';
   if (w is RelationsPage) return '/u/${w.u}/relations';
@@ -33,12 +35,14 @@ String? pathOf(Widget w) {
 Widget? pageFor(String name) {
   final path = Uri.tryParse(name)?.path ?? name;
   final seg = [for (final x in path.split('/')) if (x.isNotEmpty) Uri.decodeComponent(x)];
-  if (seg.isEmpty) return const HomePage();
+  if (seg.isEmpty || seg[0] == 'acak') return const HomePage();
+  if (seg[0] == 'hups') return const HomePage(mode0: 1);
   final s = Store.i;
   switch (seg[0]) {
     case 'p':
       final id = seg.length > 1 ? int.tryParse(seg[1]) : null;
-      return id == null ? null : PostPage(id);
+      if (id == null) return null;
+      return PostPage(id, comment: seg.length > 3 && seg[2] == 'c' ? int.tryParse(seg[3]) : null);
     case 'u':
       if (seg.length == 1) return null;
       if (seg.length == 2) return ProfilePage(seg[1]);
@@ -77,6 +81,7 @@ Route<dynamic>? generate(RouteSettings st) {
 List<Route<dynamic>> initialRoutes(String initial) {
   if (initial == '/' || initial.isEmpty) return [route(const HomePage(), name: '/')];
   final w = pageFor(initial) ?? NotFoundPage();
+  if (w is HomePage) return [route(w, name: initial)];
   return [route(const HomePage(), name: '/'), route(w, name: initial)];
 }
 
@@ -87,4 +92,18 @@ class NotFoundPage extends StatelessWidget {
         const TopBar(back: true, title: 'Hulhup'),
         Expanded(child: Empty(Icons.search_off_rounded, Store.i.t('not_found'))),
       ]));
+}
+
+/// Alamat Beranda mengikuti tab (Acak = "/", Hups = "/hups") tanpa menambah riwayat.
+void syncHomeUrl() {
+  if (!kIsWeb) return;
+  SystemNavigator.routeInformationUpdated(uri: Uri.parse(Store.i.homeMode == 1 ? '/hups' : '/'), replace: true);
+}
+
+class HomeUrlObserver extends NavigatorObserver {
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    final n = previousRoute?.settings.name;
+    if (n == '/' || n == '/hups') { Store.i.homeMode = n == '/hups' ? 1 : Store.i.homeMode; Future.microtask(syncHomeUrl); }
+  }
 }

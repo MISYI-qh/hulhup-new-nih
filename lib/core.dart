@@ -1034,6 +1034,7 @@ class Store extends ChangeNotifier {
   bool bgmMuted = false;
   int _bgTok = 0;
 
+  int homeMode = 0;
   final _bgCache = <String, Uint8List>{};
   Future<void> playBgm(int key, String url, {Object? scope}) async {
     if (bgmKey == key) { await _bg.setVolume(bgmMuted ? 0 : 1); return; }

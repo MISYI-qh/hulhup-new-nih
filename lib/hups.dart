@@ -15,6 +15,11 @@ import 'pages.dart';
 import 'ui.dart';
 
 String postLink(int id) => 'https://hulhup.my.id/p/$id';
+String commentLink(int post, int c) => 'https://hulhup.my.id/p/$post/c/$c';
+
+Future<void> shareUrl(String u) async {
+  try { await Share.share(u, subject: 'Hulhup'); } catch (_) { await Clipboard.setData(ClipboardData(text: u)); toast(Store.i.t('link_copied')); }
+}
 
 Future<void> sharePost(A a) async {
   final s = Store.i;
@@ -548,7 +553,8 @@ class _HupsFeedState extends State<HupsFeed> with WidgetsBindingObserver {
 class PostPage extends StatefulWidget {
   final int id;
   final A? seed;
-  const PostPage(this.id, {super.key, this.seed});
+  final int? comment;
+  const PostPage(this.id, {super.key, this.seed, this.comment});
   @override
   State<PostPage> createState() => _PostPageState();
 }
@@ -566,10 +572,13 @@ class _PostPageState extends State<PostPage> {
   String _autoTag = '';
   final sc = ScrollController();
   Timer? _live;
+  final _ck = <int, GlobalKey>{};
+  int? _hl;
 
   @override
   void initState() {
     super.initState();
+    _hl = widget.comment;
     a = widget.seed;
     text = widget.seed?.text ?? widget.seed?.desc ?? '';
     _load();
@@ -592,6 +601,7 @@ class _PostPageState extends State<PostPage> {
       await _comments();
       error = null;
       _bgm();
+      if (_hl != null) { WidgetsBinding.instance.addPostFrameCallback((_) { final c = _ck[_hl]?.currentContext; if (c != null) Scrollable.ensureVisible(c, duration: const Duration(milliseconds: 350), alignment: .2); Future.delayed(const Duration(seconds: 3), () { if (mounted) setState(() => _hl = null); }); }); }
     } catch (e) {
       error = e is ApiErr && e.code == 'not_found' ? Store.i.t('post_gone') : Store.i.err(e);
     }
@@ -759,7 +769,7 @@ class _PostPageState extends State<PostPage> {
         Text('${s.t('comments')} (${p.comments})', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
         const SizedBox(height: 10),
         if (cmts.isEmpty) Padding(padding: const EdgeInsets.symmetric(vertical: 24), child: Center(child: Text(s.t('empty_cmt'), style: TextStyle(color: sub(context)), textAlign: TextAlign.center))),
-        for (final e in _flat()) CommentTile(e.$1, e.$2 > 3 ? 3 : e.$2, key: ValueKey('c${e.$1['id']}'), postOwner: p.owner, scope: this, onReply: () => _reply(e.$1), onLike: () => _likeCmt(e.$1), onDelete: () => _delCmt(e.$1), onPin: () => _pinCmt(e.$1)),
+        for (final e in _flat()) KeyedSubtree(key: _ck.putIfAbsent(e.$1['id'] as int, () => GlobalKey()), child: Container(decoration: BoxDecoration(color: _hl == e.$1['id'] ? acc(context).withValues(alpha: .12) : null, borderRadius: BorderRadius.circular(16)), child: CommentTile(e.$1, e.$2 > 3 ? 3 : e.$2, key: ValueKey('c${e.$1['id']}'), postId: p.id, postOwner: p.owner, scope: this, onReply: () => _reply(e.$1), onLike: () => _likeCmt(e.$1), onDelete: () => _delCmt(e.$1), onPin: () => _pinCmt(e.$1)))),
       ])),
       _composer(s),
     ]));
@@ -770,9 +780,10 @@ class CommentTile extends StatefulWidget {
   final Map c;
   final int depth;
   final String postOwner;
+  final int postId;
   final Object? scope;
   final VoidCallback onReply, onLike, onDelete, onPin;
-  const CommentTile(this.c, this.depth, {super.key, required this.postOwner, this.scope, required this.onReply, required this.onLike, required this.onDelete, required this.onPin});
+  const CommentTile(this.c, this.depth, {super.key, required this.postId, required this.postOwner, this.scope, required this.onReply, required this.onLike, required this.onDelete, required this.onPin});
   @override
   State<CommentTile> createState() => _CommentTileState();
 }
@@ -791,6 +802,7 @@ class _CommentTileState extends State<CommentTile> {
     final s = Store.i, c = widget.c;
     final iAmOwner = s.me?.username == widget.postOwner;
     sheet(context, (ctx) => Column(mainAxisSize: MainAxisSize.min, children: [
+      PBtn(s.t('share'), () { Navigator.pop(ctx); shareUrl(commentLink(widget.postId, c['id'] as int)); }, ghost: true, icon: Icons.ios_share_rounded), const SizedBox(height: 10),
       if (iAmOwner && (c['parent'] as int) == 0) ...[PBtn(s.t(c['pinned'] == true ? 'unpin' : 'pin'), () { Navigator.pop(ctx); widget.onPin(); }, ghost: true, icon: Icons.push_pin_outlined), const SizedBox(height: 10)],
       if (c['mine'] == true || iAmOwner) PBtn(s.t('delete'), () { Navigator.pop(ctx); widget.onDelete(); }, ghost: true, icon: Icons.delete_outline_rounded, fgc: heart),
       if (c['mine'] != true && s.me != null) ...[if (iAmOwner) const SizedBox(height: 10), PBtn(s.t('report_cmt'), () { Navigator.pop(ctx); reportSheet(context, comment: c['id'] as int); }, ghost: true, icon: Icons.flag_outlined)],
@@ -804,7 +816,7 @@ class _CommentTileState extends State<CommentTile> {
     final isAuthor = '${c['username']}' == widget.postOwner;
     final audios = [for (final x in (c['audios'] as List? ?? const [])) Map.from(x as Map)];
     final shown = full ?? '${c['text']}';
-    final canMenu = s.me != null;
+    const canMenu = true;
     return Padding(
       padding: EdgeInsets.only(left: widget.depth * 16.0, bottom: 14),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [

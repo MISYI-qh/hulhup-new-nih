@@ -76,6 +76,7 @@ class HulhupApp extends StatelessWidget {
           initialRoute: '/',
           onGenerateInitialRoutes: initialRoutes,
           onGenerateRoute: generate,
+          navigatorObservers: [HomeUrlObserver()],
         ),
       );
 }

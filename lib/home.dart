@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'routes.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
@@ -11,14 +12,18 @@ import 'pages.dart';
 import 'hups.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  final int mode0;
+  const HomePage({super.key, this.mode0 = 0});
   @override
   State<HomePage> createState() => _HomeState();
 }
 
 class _HomeState extends State<HomePage> {
   bool menu = false, _busy = false;
-  int mode = 0; // 0 = Acak, 1 = Hups
+  late int mode = widget.mode0; // 0 = Acak, 1 = Hups
+
+  @override
+  void initState() { super.initState(); Store.i.homeMode = mode; }
 
   Future<void> _tap() async {
     if (_busy) return;
@@ -80,7 +85,7 @@ class _HomeState extends State<HomePage> {
   Widget _switcher(Store s) {
     Widget seg(int i, HK k, String label) {
       final on = mode == i;
-      return Expanded(child: Tap(onTap: () { if (mode != i) setState(() => mode = i); }, scale: .97, child: AnimatedContainer(
+      return Expanded(child: Tap(onTap: () { if (mode != i) { setState(() => mode = i); Store.i.homeMode = i; syncHomeUrl(); } }, scale: .97, child: AnimatedContainer(
         duration: const Duration(milliseconds: 260), curve: Curves.easeOutCubic, height: 44,
         decoration: BoxDecoration(color: on ? ink(context) : Colors.transparent, borderRadius: BorderRadius.circular(22)),
         child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [HIcon(k, size: 19, color: on ? bgOf(context) : sub(context)), const SizedBox(width: 8), Text(label, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: on ? bgOf(context) : sub(context)))]),
