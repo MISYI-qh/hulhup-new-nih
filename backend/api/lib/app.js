@@ -7,7 +7,7 @@ import { randomInt } from 'node:crypto';
 import { pushLater, pushDiag, pushReminders } from './push.js';
 
 const MAX_IMG = 3 * 1024 * 1024, MAX_AUDIO = 1024 * 1024; // semua audio maks 1 MB; foto profil maks 3 MB
-const MAX_TEXT = 200000, MAX_POST_AUDIO = 1, MAX_CMT_AUDIO = 3, INLINE_TEXT = 3000, PREVIEW = 300;
+const MAX_TEXT = 200000, MAX_POST_AUDIO = 3, MAX_CMT_AUDIO = 1, INLINE_TEXT = 3000, PREVIEW = 300;
 const FILTERS = ['public', 'followers', 'following', 'both', 'friend', 'best', 'partner', 'family', 'relations', 'me'];
 const REL_TYPES = ['friend', 'best', 'partner', 'family'];
 const UN = /^[a-z0-9_]{3,20}$/;
@@ -107,7 +107,7 @@ async function uv(u, me, today) {
   };
 }
 
-const AUD_SQL = `select a.id, a.descr, a.secs, a.pprof, a.rand, a.created, a.likes, a.owner, a.body_len, a.in_rand, a.in_hups, a.n_audio, a.comments, a.bgm, a.body btext, u.username ou, u.name oname, u.av_ver oav, u.verified ov, u.pvis opvis,
+const AUD_SQL = `select a.id, a.descr, a.secs, a.pprof, a.rand, a.created, a.likes, a.owner, a.body_len, a.in_rand, a.in_hups, a.n_audio, a.comments, a.bgm, a.bgm_idx, a.body btext, u.username ou, u.name oname, u.av_ver oav, u.verified ov, u.pvis opvis,
   exists(select 1 from likes l where l.audio_id=a.id and l.user_id=$1) liked, exists(select 1 from saves sv where sv.post_id=a.id and sv.user_id=$1) saved from audios a join users u on u.id=a.owner`;
 
 function av(a) {
@@ -119,7 +119,7 @@ function av(a) {
     owner_avatar: a.oav > 0 ? `/users/${a.ou}/avatar?v=${a.oav}` : null, owner_verified: a.ov,
     long: Number(a.body_len || 0) > String(a.descr || '').length, in_rand: a.in_rand !== false, in_hups: a.in_hups === true,
     files, comments: a.comments || 0, saved: a.saved === true,
-    bgm: a.bgm === true, text: a.btext ?? null,
+    bgm: a.bgm === true, bgm_idx: a.bgm_idx || 0, text: a.btext ?? null,
   };
 }
 const mini = (u) => ({ username: u.username, name: u.name, avatar: avUrl(u), verified: u.verified });
@@ -771,7 +771,8 @@ route('POST', /^\/posts$/, async (c) => {
   if (text.length > MAX_TEXT) throw new ApiErr('too_long', 413);
   const n = Math.min(MAX_POST_AUDIO, Math.max(0, parseInt(b.audios, 10) || 0));
   if (!text && !n) throw new ApiErr('empty');
-  const bgm = n > 0 && b.bgm === true;
+  if (n > 1 && b.rand_on === true) throw new ApiErr('rand_one');
+  const bgm = n > 0 && b.bgm === true, bgmIdx = bgm ? Math.min(n - 1, Math.max(0, parseInt(b.bgm_idx, 10) || 0)) : 0;
   let inRand = b.rand_on === true && n > 0 && !bgm, inHups = b.hups === true || n === 0 || bgm; // tulisan saja / backsound tidak masuk Acak
   if (b.rand_on === true && n === 0 && b.hups !== true) throw new ApiErr('pick_place');
   if (!inRand && !inHups) throw new ApiErr('pick_place');
@@ -788,8 +789,8 @@ route('POST', /^\/posts$/, async (c) => {
   let id;
   try {
     id = await tx(async (t) => {
-      const r = await t.query(`insert into audios(owner, descr, secs, rand, pprof, created, body, body_key, body_len, in_rand, in_hups, n_audio, pending, bgm, mentions) values ($1,$2,0,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) returning id`,
-        [u.id, cutPreview(text), rnd, b.pprof !== false, now(), body, key, text.length, inRand, inHups, n, n > 0, bgm, mentions.join(',')]);
+      const r = await t.query(`insert into audios(owner, descr, secs, rand, pprof, created, body, body_key, body_len, in_rand, in_hups, n_audio, pending, bgm, mentions, bgm_idx) values ($1,$2,0,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) returning id`,
+        [u.id, cutPreview(text), rnd, b.pprof !== false, now(), body, key, text.length, inRand, inHups, n, n > 0, bgm, mentions.join(','), bgmIdx]);
       for (const x of to) await t.query('insert into audio_to(audio_id, user_id) values ($1,$2)', [r.rows[0].id, x]);
       return Number(r.rows[0].id);
     });

@@ -155,6 +155,14 @@ class _RecordSheetState extends State<RecordSheet> {
 }
 
 // ---------- pemutar kecil ----------
+/// Semua audio sebuah post: satu yang berstatus backsound tampil sebagai penanda, sisanya pemutar biasa.
+Widget audioBars(A a, Object? scope) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      for (var i = 0; i < a.files.length; i++)
+        (a.bgm && i == a.bgmIdx) ? BgmBar(a) : FileBar(fileKey(a, i), '${a.files[i]['url']}', (a.files[i]['secs'] as num?)?.toInt() ?? 0, scope: scope),
+    ]);
+
+String bgmUrl(A a) => '${a.files[a.bgmIdx.clamp(0, a.files.length - 1)]['url']}';
+
 int fileKey(A a, int i) => i == 0 ? a.id : -(a.id * 20 + i);
 
 /// Pemutar satu audio: tombol putar, bilah waktu, dan tombol kecepatan (0.5×–2×) seperti di popup acak.
@@ -207,7 +215,7 @@ class BgmBar extends StatelessWidget {
           Icon(Icons.music_note_rounded, size: 18, color: live ? acc(context) : sub(context)),
           const SizedBox(width: 8),
           Expanded(child: Text(s.t('bgm_tag'), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, color: live ? ink(context) : sub(context)))),
-          Tap(onTap: () { s.setBgmMuted(!s.bgmMuted); if (s.bgmKey != a.id && !s.bgmMuted && a.files.isNotEmpty) s.playBgm(a.id, '${a.files[0]['url']}'); }, child: Padding(padding: const EdgeInsets.all(8), child: Icon(s.bgmMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded, size: 20, color: s.bgmMuted ? sub(context) : ink(context)))),
+          Tap(onTap: () { s.setBgmMuted(!s.bgmMuted); if (s.bgmKey != a.id && !s.bgmMuted && a.files.isNotEmpty) s.playBgm(a.id, '${a.files[a.bgmIdx.clamp(0, a.files.length - 1)]['url']}'); }, child: Padding(padding: const EdgeInsets.all(8), child: Icon(s.bgmMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded, size: 20, color: s.bgmMuted ? sub(context) : ink(context)))),
         ]),
       );
     });
@@ -403,9 +411,7 @@ class _PostCardState extends State<PostCard> {
           OwnerRow(a, more: () => postMenu(context, a, onDeleted: widget.onDeleted)),
           if (text.isNotEmpty) Padding(padding: const EdgeInsets.fromLTRB(0, 10, 8, 0), child: MentionText(partial ? '$text …' : text, style: const TextStyle(fontSize: 15.5, height: 1.45))),
           if (partial) Tap(onTap: busy ? null : _expand, child: Padding(padding: const EdgeInsets.fromLTRB(0, 4, 8, 4), child: Text(busy ? '…' : s.t('read_more'), style: TextStyle(color: acc(context), fontWeight: FontWeight.w700, fontSize: 14)))),
-          if (a.files.isNotEmpty) Padding(padding: const EdgeInsets.only(right: 8), child: a.bgm
-              ? BgmBar(a)
-              : FileBar(fileKey(a, 0), '${a.files[0]['url']}', (a.files[0]['secs'] as num?)?.toInt() ?? 0, scope: widget.scope)),
+          if (a.files.isNotEmpty) Padding(padding: const EdgeInsets.only(right: 8), child: audioBars(a, widget.scope)),
           const SizedBox(height: 4),
           PostActions(a),
         ]),
@@ -526,7 +532,7 @@ class _HupsFeedState extends State<HupsFeed> with WidgetsBindingObserver {
       if (d < bd) { bd = d; best = a; }
     }
     if (best != null && best.bgm && best.files.isNotEmpty) {
-      s.playBgm(best.id, '${best.files[0]['url']}', scope: this);
+      s.playBgm(best.id, bgmUrl(best), scope: this);
     } else if (s.bgmKey != null) {
       s.leaveBgm(this);
     }
@@ -590,7 +596,7 @@ class _PostPageState extends State<PostPage> {
 
   void _bgm() {
     final p = a;
-    if (p != null && p.bgm && p.files.isNotEmpty) Store.i.playBgm(p.id, '${p.files[0]['url']}', scope: this);
+    if (p != null && p.bgm && p.files.isNotEmpty) Store.i.playBgm(p.id, bgmUrl(p), scope: this);
   }
 
   Future<void> _load() async {
@@ -630,7 +636,7 @@ class _PostPageState extends State<PostPage> {
 
   Future<void> _addClip() async {
     final s = Store.i;
-    if (clips.length >= 3) { toast(s.t('cmt_audio_max')); return; }
+    if (clips.length >= 1) { toast(s.t('cmt_audio_max')); return; }
     final c = await sheet<AudioClip>(context, (_) => const RecordSheet());
     if (c != null && mounted) setState(() => clips.add(c));
   }
@@ -741,7 +747,7 @@ class _PostPageState extends State<PostPage> {
           Tap(onTap: () => setState(() => clips.removeAt(i)), child: Icon(Icons.close_rounded, size: 18, color: sub(context))),
         ])),
         Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Tap(onTap: _addClip, child: Padding(padding: const EdgeInsets.fromLTRB(4, 10, 10, 10), child: Icon(Icons.mic_none_rounded, size: 26, color: clips.length < 3 ? ink(context) : sub(context)))),
+          Tap(onTap: _addClip, child: Padding(padding: const EdgeInsets.fromLTRB(4, 10, 10, 10), child: Icon(Icons.mic_none_rounded, size: 26, color: clips.isEmpty ? ink(context) : sub(context)))),
           Expanded(child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(24)),
             child: TextField(controller: input, focusNode: focus, minLines: 1, maxLines: 5, textCapitalization: TextCapitalization.sentences, style: const TextStyle(fontSize: 15.5), cursorColor: ink(context), decoration: InputDecoration(border: InputBorder.none, hintText: s.t('comment_ph'), hintStyle: TextStyle(color: sub(context)))),
@@ -762,7 +768,7 @@ class _PostPageState extends State<PostPage> {
       Expanded(child: loading && p == null ? const Loader() : error != null && p == null ? Empty(Icons.lock_outline_rounded, error!) : ListView(controller: sc, padding: const EdgeInsets.fromLTRB(18, 4, 18, 24), children: [
         OwnerRow(p!),
         if (text.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 14), child: MentionText(text, selectable: true, style: const TextStyle(fontSize: 17, height: 1.55))),
-        if (p.files.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: p.bgm ? BgmBar(p) : FileBar(fileKey(p, 0), '${p.files[0]['url']}', (p.files[0]['secs'] as num?)?.toInt() ?? 0, scope: this)),
+        if (p.files.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: audioBars(p, this)),
         const SizedBox(height: 10),
         PostActions(p, onComments: () { focus.requestFocus(); }),
         Divider(color: ink(context).withValues(alpha: .08), height: 24),
@@ -856,31 +862,32 @@ class ComposePage extends StatefulWidget {
 
 class _ComposeState extends State<ComposePage> {
   final text = TextEditingController();
-  AudioClip? clip;
+  final clips = <AudioClip>[];
   final pv = AudioPlayer();
-  bool previewing = false;
-  bool inRand = true, inHups = true, pprof = true, bgm = false, busy = false;
+  int previewing = -1, bgmIdx = -1;
+  bool inRand = true, inHups = true, pprof = true, busy = false;
   String rand = 'public';
   Map<String, Map> picked = {};
 
   @override
-  void initState() { super.initState(); pv.onPlayerComplete.listen((_) { if (mounted) setState(() => previewing = false); }); }
+  void initState() { super.initState(); pv.onPlayerComplete.listen((_) { if (mounted) setState(() => previewing = -1); }); }
   @override
   void dispose() { text.dispose(); pv.dispose(); super.dispose(); }
 
   /// Acak hanya untuk post berisi audio dan bukan backsound; tulisan saja selalu hanya di Hups.
-  bool get _randOk => clip != null && !bgm;
+  bool get _randOk => clips.length == 1 && bgmIdx < 0;
 
   Future<void> _add() async {
+    if (clips.length >= 3) { toast(Store.i.t('post_audio_max')); return; }
     final c = await sheet<AudioClip>(context, (_) => const RecordSheet());
     if (c == null || !mounted) return;
-    setState(() { clip = c; });
+    setState(() { clips.add(c); });
   }
 
-  Future<void> _play() async {
-    if (previewing) { await pv.stop(); setState(() => previewing = false); return; }
-    setState(() => previewing = true);
-    await pv.play(BytesSource(clip!.bytes, mimeType: mimeOf(clip!.bytes)));
+  Future<void> _play(int i) async {
+    if (previewing == i) { await pv.stop(); setState(() => previewing = -1); return; }
+    setState(() => previewing = i);
+    await pv.play(BytesSource(clips[i].bytes, mimeType: mimeOf(clips[i].bytes)));
   }
 
   Future<void> _pickAcc() async {
@@ -891,16 +898,15 @@ class _ComposeState extends State<ComposePage> {
 
   Future<void> _send() async {
     final s = Store.i, t = text.text.trim();
-    final c = clip;
-    if (t.isEmpty && c == null) { toast(s.t('e_empty'), bad: true); return; }
+    if (t.isEmpty && clips.isEmpty) { toast(s.t('e_empty'), bad: true); return; }
     final toRand = _randOk && inRand, toHups = inHups || !toRand;
     if (audSplit(rand).contains('accounts') && picked.isEmpty) { toast(s.t('e_need_accounts'), bad: true); return; }
     setState(() => busy = true);
     int? id;
     try {
-      final j = await Api.req('POST', '/posts', body: {'text': t, 'audios': c == null ? 0 : 1, 'bgm': c != null && bgm, 'rand_on': toRand, 'hups': toHups, 'pprof': pprof, 'rand': audSplit(rand), 'to': picked.keys.toList()});
+      final j = await Api.req('POST', '/posts', body: {'text': t, 'audios': clips.length, 'bgm': bgmIdx >= 0, 'bgm_idx': bgmIdx < 0 ? 0 : bgmIdx, 'rand_on': toRand, 'hups': toHups, 'pprof': pprof, 'rand': audSplit(rand), 'to': picked.keys.toList()});
       id = (j['id'] as num).toInt();
-      if (c != null) await Api.multi('/posts/$id/audio', c.bytes, 'a.${c.ext}', {'secs': '${c.secs}'});
+      for (final c in clips) { await Api.multi('/posts/$id/audio', c.bytes, 'a.${c.ext}', {'secs': '${c.secs}'}); }
       if (!mounted) return;
       Navigator.pop(context, true);
       toast(s.t('posted'));
@@ -931,17 +937,18 @@ class _ComposeState extends State<ComposePage> {
         const SizedBox(height: 6),
         MentionBar(text),
         Padding(padding: const EdgeInsets.only(left: 6, bottom: 10), child: Text(s.t('tag_hint'), style: TextStyle(color: sub(context), fontSize: 12.5))),
-        if (clip != null) Container(
+        for (var i = 0; i < clips.length; i++) Container(
           margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.fromLTRB(8, 8, 8, 8), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(24)),
           child: Row(children: [
-            Tap(onTap: _play, child: Container(width: 40, height: 40, decoration: BoxDecoration(color: previewing ? ink(context) : green, shape: BoxShape.circle), child: Icon(previewing ? Icons.pause_rounded : Icons.play_arrow_rounded, color: previewing ? bgOf(context) : cream, size: 22))),
+            Tap(onTap: () => _play(i), child: Container(width: 40, height: 40, decoration: BoxDecoration(color: previewing == i ? ink(context) : green, shape: BoxShape.circle), child: Icon(previewing == i ? Icons.pause_rounded : Icons.play_arrow_rounded, color: previewing == i ? bgOf(context) : cream, size: 22))),
             const SizedBox(width: 12),
-            Expanded(child: Text('Audio · ${mmss(clip!.secs)}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15))),
-            IconBtn(Icons.close_rounded, () { setState(() { clip = null; bgm = false; previewing = false; }); pv.stop(); }, color: sub(context)),
+            Expanded(child: Text('Audio ${i + 1} · ${mmss(clips[i].secs)}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15))),
+            Tap(onTap: () => setState(() { bgmIdx = bgmIdx == i ? -1 : i; }), child: Padding(padding: const EdgeInsets.all(8), child: Icon(Icons.music_note_rounded, size: 22, color: bgmIdx == i ? acc(context) : sub(context)))),
+            IconBtn(Icons.close_rounded, () { pv.stop(); setState(() { clips.removeAt(i); previewing = -1; if (bgmIdx == i) { bgmIdx = -1; } else if (bgmIdx > i) { bgmIdx--; } }); }, color: sub(context)),
           ]),
-        )
-        else PBtn(s.t('add_audio'), busy ? null : _add, ghost: true, icon: Icons.mic_none_rounded),
-        if (clip != null) Padding(padding: const EdgeInsets.only(top: 10), child: _row(s.t('bgm_label'), bgm, (v) => setState(() { bgm = v; }), k: null, note: s.t('bgm_note'))),
+        ),
+        if (clips.length < 3) PBtn(s.t('add_audio'), busy ? null : _add, ghost: true, icon: Icons.mic_none_rounded),
+        if (clips.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 10, left: 6), child: Text(s.t('bgm_note'), style: TextStyle(color: sub(context), fontSize: 12.5))),
         const SizedBox(height: 14),
         _row(s.t('in_rand'), inRand && _randOk, _randOk ? (v) => setState(() { inRand = v; }) : null, k: HK.acak, note: _randOk ? null : s.t('multi_no_rand')),
         _row(s.t('in_hups'), inHups || !_randOk, _randOk ? (v) => setState(() { inHups = v; }) : null, k: HK.hups),

@@ -116,13 +116,15 @@ test('Hups: teks, 1 audio/backsound, komentar bersarang, tag, sematan, laporan, 
   assert.ok(p1.id);
   const rr = await call('GET', '/random?f=public', { token: b });
   assert.equal(rr.audio && rr.audio.id === p1.id, false);
-  // maksimal 1 audio; backsound tidak masuk Acak; tersembunyi sampai audio terunggah
-  const p2 = await call('POST', '/posts', { token: a, body: { text: 'ada backsound @hupb', hups: true, rand_on: true, audios: 5, bgm: true } });
+  // maksimal 3 audio (Acak 1); backsound tidak masuk Acak; tersembunyi sampai audio terunggah
+  const p2 = await call('POST', '/posts', { token: a, body: { text: 'ada backsound @hupb', hups: true, audios: 5, bgm: true, bgm_idx: 1 } });
+  assert.equal((await call('POST', '/posts', { token: a, body: { text: 'x', hups: true, rand_on: true, audios: 2 } })).error, 'rand_one');
   assert.equal((await call('GET', `/posts/${p2.id}`, { token: b })).error, 'not_found');
-  assert.equal((await call('POST', `/posts/${p2.id}/audio?secs=3`, { token: a, raw: mp3() })).done, true);
+  for (let i = 0; i < 3; i++) assert.equal((await call('POST', `/posts/${p2.id}/audio?secs=3`, { token: a, raw: mp3() })).ok, true);
   assert.equal((await call('POST', `/posts/${p2.id}/audio?secs=4`, { token: a, raw: mp3() })).ok, false);
   const d2 = await call('GET', `/posts/${p2.id}`, { token: b });
-  assert.equal(d2.post.files.length, 1);
+  assert.equal(d2.post.files.length, 3);
+  assert.equal(d2.post.bgm_idx, 1);
   assert.equal(d2.post.bgm, true);
   assert.equal(d2.post.in_rand, false);
   // audio lebih dari 1 MB ditolak
@@ -161,14 +163,14 @@ test('Hups: teks, 1 audio/backsound, komentar bersarang, tag, sematan, laporan, 
   // tag di komentar -> notifikasi ke yang di-tag (hupc dapat akses karena post publik)
   await call('POST', `/posts/${p1.id}/comments`, { token: b, body: { text: 'halo @hupc', parent: c1.id } });
   assert.ok((await call('GET', '/notifications', { token: c3 })).items.some((x) => x.type === 'mention'));
-  // komentar audio maksimal 3
+  // komentar audio maksimal 1
   const ca = await call('POST', `/posts/${p1.id}/comments`, { token: b, body: { audios: 9 } });
   assert.equal((await call('GET', `/posts/${p1.id}/comments`, { token: a })).items.some((x) => x.id === ca.id), false);
-  for (let i = 0; i < 3; i++) assert.equal((await call('POST', `/comments/${ca.id}/audio?secs=2`, { token: b, raw: mp3() })).ok, true);
+  for (let i = 0; i < 1; i++) assert.equal((await call('POST', `/comments/${ca.id}/audio?secs=2`, { token: b, raw: mp3() })).ok, true);
   assert.equal((await call('POST', `/comments/${ca.id}/audio?secs=2`, { token: b, raw: mp3() })).ok, false);
   const cl2 = await call('GET', `/posts/${p1.id}/comments`, { token: a });
-  assert.equal(cl2.items.find((x) => x.id === ca.id).audios.length, 3);
-  assert.ok((await call('GET', `/comments/${ca.id}/file?i=2`, { token: a })).binary);
+  assert.equal(cl2.items.find((x) => x.id === ca.id).audios.length, 1);
+  assert.ok((await call('GET', `/comments/${ca.id}/file?i=0`, { token: a })).binary);
   // sematan: hanya pemilik post, hanya komentar utama, satu saja
   assert.equal((await call('POST', `/comments/${c1.id}/pin`, { token: b })).error, 'forbidden');
   assert.equal((await call('POST', `/comments/${last.id}/pin`, { token: a })).error, 'bad_request');
