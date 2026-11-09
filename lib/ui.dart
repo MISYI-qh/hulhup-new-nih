@@ -384,26 +384,19 @@ class _HPainter extends CustomPainter {
     final fl = Paint()..color = color..style = PaintingStyle.fill..isAntiAlias = true;
     switch (k) {
       case HK.sorot:
-        // Lampu sorot: kepala lampu kecil di atas, berkas cahaya melebar ke bawah. Menyala = berkas terisi + garis sinar.
-        final head = RRect.fromLTRBR(8.2, 2.6, 15.8, 7.4, const Radius.circular(1.8));
-        final beam = Path()..moveTo(8.9, 9.2)..lineTo(15.1, 9.2)..lineTo(19.6, 20.6)..lineTo(4.4, 20.6)..close();
+        // Lampu sorot: kepala lampu di bawah, berkas cahaya melebar ke atas. Menyala = terisi + garis sinar di LUAR berkas (hitam-putih).
+        final head = RRect.fromLTRBR(8.2, 17.6, 15.8, 22.2, const Radius.circular(1.8));
+        final beam = Path()..moveTo(8.9, 15.8)..lineTo(15.1, 15.8)..lineTo(19.2, 7.4)..lineTo(4.8, 7.4)..close();
         if (filled) {
           canvas.drawRRect(head, fl);
           canvas.drawPath(beam, fl);
-          final ray = Paint()..color = hole..style = PaintingStyle.stroke..strokeWidth = 1.5..strokeCap = StrokeCap.round..isAntiAlias = true;
-          for (final dx in const [-3.6, 0.0, 3.6]) {
-            final e = Offset(12 + dx * 1.35, 18.2);
-            final o = const Offset(12, 11.4);
-            canvas.drawLine(o, Offset.lerp(o, e, burst.clamp(0.0, 1.0))!, ray);
-          }
-          if (burst < 1) {
-            final glow = Paint()..color = color.withValues(alpha: (1 - burst) * .9)..style = PaintingStyle.stroke..strokeWidth = 1.5..strokeCap = StrokeCap.round..isAntiAlias = true;
-            final r = 1 + burst * 2.6;
-            canvas.drawLine(Offset(6.2 - r, 6.4 - r * .2), Offset(4.2 - r, 6.4 - r * .2), glow);
-            canvas.drawLine(Offset(17.8 + r, 6.4 - r * .2), Offset(19.8 + r, 6.4 - r * .2), glow);
-            canvas.drawLine(Offset(5.6 - r, 11 + r * .4), Offset(3.6 - r, 11.4 + r * .5), glow);
-            canvas.drawLine(Offset(18.4 + r, 11 + r * .4), Offset(20.4 + r, 11.4 + r * .5), glow);
-          }
+          final t = burst.clamp(0.0, 1.0);
+          final ray = Paint()..color = color..style = PaintingStyle.stroke..strokeWidth = 1.6..strokeCap = StrokeCap.round..isAntiAlias = true;
+          // tiga sinar di atas berkas: tengah, kiri, kanan (memanjang sesuai animasi)
+          void r(Offset from, Offset to) => canvas.drawLine(from, Offset.lerp(from, to, t)!, ray);
+          r(const Offset(12, 5.6), const Offset(12, 1.6));
+          r(const Offset(6.6, 5.4), const Offset(3.4, 2.2));
+          r(const Offset(17.4, 5.4), const Offset(20.6, 2.2));
         } else {
           canvas.drawRRect(head, st);
           canvas.drawPath(beam, st);

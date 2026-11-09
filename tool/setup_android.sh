@@ -42,6 +42,14 @@ meta = '''        <meta-data android:name="com.google.firebase.messaging.default
         <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="hulhup_main"/>
 '''
 s = s.replace('</application>', meta + rec + '    </application>', 1)
+link = '''            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https" android:host="hulhup.my.id"/>
+            </intent-filter>
+'''
+s = s.replace('</activity>', link + '        </activity>', 1)
 open(m, 'w').write(s)
 g = glob.glob('android/app/build.gradle*')[0]
 t = open(g).read()
