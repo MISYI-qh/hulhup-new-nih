@@ -698,6 +698,7 @@ class A {
   final int id, secs, created;
   int comments;
   final String desc, url, vis, rand, owner, ownerName;
+  final List<String> to;
   final String? ownerAvatar;
   final bool popup, pprof, ownerVerified, long, inRand, inHups, bgm;
   final int bgmIdx;
@@ -708,9 +709,9 @@ class A {
   A.from(Map j)
       : id = j['id'], secs = j['secs'] ?? 0, created = j['created'] ?? 0, desc = j['desc'] ?? '', url = j['url'] ?? '', vis = j['vis'] ?? 'public', rand = j['rand'] ?? 'public', owner = j['owner'],
         ownerName = j['owner_name'], ownerAvatar = j['owner_avatar'], ownerVerified = j['owner_verified'] == true, popup = j['popup'] == true, pprof = j['pprof'] != false, likes = j['likes'] ?? 0, liked = j['liked'] == true,
-        long = j['long'] == true, inRand = j['in_rand'] != false, inHups = j['in_hups'] == true, comments = j['comments'] ?? 0, saved = j['saved'] == true, bgm = j['bgm'] == true, bgmIdx = (j['bgm_idx'] as num?)?.toInt() ?? 0, text = j['text'] as String?,
+        long = j['long'] == true, inRand = j['in_rand'] != false, inHups = j['in_hups'] == true, comments = j['comments'] ?? 0, saved = j['saved'] == true, bgm = j['bgm'] == true, bgmIdx = (j['bgm_idx'] as num?)?.toInt() ?? 0, text = j['text'] as String?, to = ((j['to'] as List?) ?? const []).map((e) => '${e['username']}').toList(),
         files = (j['files'] is List) ? [for (final f in j['files']) Map.from(f as Map)] : ((j['url'] ?? '') == '' ? <Map>[] : <Map>[{'url': j['url'], 'secs': j['secs'] ?? 0}]);
-  Map<String, dynamic> toJson() => {'id': id, 'secs': secs, 'created': created, 'desc': desc, 'url': url, 'vis': vis, 'rand': rand, 'owner': owner, 'owner_name': ownerName, 'owner_avatar': ownerAvatar, 'owner_verified': ownerVerified, 'popup': popup, 'pprof': pprof, 'likes': likes, 'liked': liked, 'long': long, 'in_rand': inRand, 'in_hups': inHups, 'comments': comments, 'saved': saved, 'files': files, 'bgm': bgm, 'text': text};
+  Map<String, dynamic> toJson() => {'id': id, 'secs': secs, 'created': created, 'desc': desc, 'url': url, 'vis': vis, 'rand': rand, 'owner': owner, 'owner_name': ownerName, 'owner_avatar': ownerAvatar, 'owner_verified': ownerVerified, 'popup': popup, 'pprof': pprof, 'likes': likes, 'liked': liked, 'long': long, 'in_rand': inRand, 'in_hups': inHups, 'comments': comments, 'saved': saved, 'files': files, 'bgm': bgm, 'text': text, 'to': [for (final u in to) {'username': u}]};
 }
 
 String mmss(int s) => '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}';

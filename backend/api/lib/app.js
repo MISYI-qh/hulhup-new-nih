@@ -122,6 +122,15 @@ function av(a) {
     bgm: a.bgm === true, bgm_idx: a.bgm_idx || 0, text: a.btext ?? null,
   };
 }
+/** Untuk penulis sendiri: sertakan daftar akun tujuan pada post berpilihan "akun tertentu". */
+async function addTo(items, me) {
+  if (!me) return items;
+  const ids = items.filter((p) => p.owner === me.username && String(p.rand).split(',').includes('accounts')).map((p) => p.id);
+  if (!ids.length) return items;
+  const rows = await many('select t.audio_id, x.username, x.name from audio_to t join users x on x.id=t.user_id where t.audio_id = any($1::bigint[]) order by x.username', [ids]);
+  for (const p of items) if (ids.includes(p.id)) p.to = rows.filter((r) => Number(r.audio_id) === p.id).map((r) => ({ username: r.username, name: r.name }));
+  return items;
+}
 const mini = (u) => ({ username: u.username, name: u.name, avatar: avUrl(u), verified: u.verified });
 
 async function notify(c, to, type, actor, audio, extra = '') {
@@ -674,7 +683,7 @@ route('GET', /^\/users\/([a-z0-9_]+)$/, async (c, m) => {
     const r = await one(`select * from rels where (a=$1 and b=$2) or (a=$2 and b=$1)`, [vid, uid]);
     if (r) rel = { status: r.status === 'active' ? 'active' : Number(r.a) === Number(vid) ? 'out' : 'in', type: r.type };
   }
-  return { user: await uv(u, c.me, c.today), audios: rows.map(av), locked, rel };
+  return { user: await uv(u, c.me, c.today), audios: mine ? await addTo(rows.map(av), c.me) : rows.map(av), locked, rel };
 });
 
 route('POST', /^\/users\/([a-z0-9_]+)\/follow$/, async (c, m) => {
@@ -826,7 +835,7 @@ route('GET', /^\/posts\/(\d+)$/, async (c, m) => {
   await openPost(m[1], c);
   const row = await one(`${AUD_SQL} where a.id=$2`, [vid, m[1]]);
   const full = await one('select body, body_key from audios where id=$1', [m[1]]);
-  const p = av(row);
+  const p = (await addTo([av(row)], c.me))[0];
   const ex = await many('select idx, secs from post_audios where post_id=$1 order by idx', [m[1]]);
   for (const e of ex) if (p.files[e.idx]) p.files[e.idx].secs = e.secs;
   return { post: p, text: await readText(full.body, full.body_key) };
@@ -841,7 +850,7 @@ route('GET', /^\/hups$/, async (c) => {
   const rows = await many(
     `${AUD_SQL} where a.in_hups and not a.hidden and not a.pending and u.status='active' and (${audCond(f)} or (a.owner=$1 and ${HAS('public')} and '${f}'='public')) order by ${score} desc, a.id desc offset ${off} limit 21`,
     [vid]);
-  const items = rows.slice(0, 20).map(av);
+  const items = await addTo(rows.slice(0, 20).map(av), c.me);
   return { items, next: rows.length > 20 ? off + 20 : 0 };
 });
 

@@ -78,7 +78,7 @@ class _HomeState extends State<HomePage> {
           final f = s.me == null ? 'public' : s.filter;
           return Stack(children: [
             HupsFeed(f, key: ValueKey('hf_$f${s.me?.username}')),
-            Positioned(right: 20, bottom: 14, child: Tap(onTap: () => go(context, s.me == null ? const AuthPage() : const ComposePage()), child: Container(width: 56, height: 56, decoration: BoxDecoration(gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF24603F), green]), shape: BoxShape.circle, boxShadow: [BoxShadow(color: green.withValues(alpha: .35), blurRadius: 22, offset: const Offset(0, 10))]), child: const Center(child: HIcon(HK.add, size: 26, color: cream))))),
+            Positioned(right: 20, bottom: 14, child: Tap(onTap: () => go(context, s.me == null ? const AuthPage() : const ComposePage()), child: Container(width: 56, height: 56, decoration: BoxDecoration(color: btnBg(context), shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .35), blurRadius: 22, offset: const Offset(0, 10))]), child: const Center(child: HIcon(HK.add, size: 26, color: cream))))),
           ]);
         })),
       ]);
@@ -262,7 +262,7 @@ class PopupBody extends StatelessWidget {
         child: ListenableBuilder(listenable: s, builder: (_, __) {
           final on = s.playing == a.id;
           return Row(children: [
-            Tap(onTap: () => s.play(a).catchError((_) => toast(s.t('e_server'), bad: true)), child: AnimatedContainer(duration: const Duration(milliseconds: 250), width: 44, height: 44, decoration: BoxDecoration(color: on ? ink(context) : green, shape: BoxShape.circle), child: AnimatedSwitcher(duration: const Duration(milliseconds: 200), child: Icon(on ? Icons.pause_rounded : Icons.play_arrow_rounded, key: ValueKey(on), color: on ? bgOf(context) : cream, size: 26)))),
+            Tap(onTap: () => s.play(a).catchError((_) => toast(s.t('e_server'), bad: true)), child: AnimatedContainer(duration: const Duration(milliseconds: 250), width: 44, height: 44, decoration: BoxDecoration(color: on ? green : btnBg(context), shape: BoxShape.circle), child: AnimatedSwitcher(duration: const Duration(milliseconds: 200), child: Icon(on ? Icons.pause_rounded : Icons.play_arrow_rounded, key: ValueKey(on), color: on ? bgOf(context) : cream, size: 26)))),
             Expanded(child: ValueListenableBuilder<int>(valueListenable: s.pos, builder: (_, ms, __) {
               final total = (s.dur > 0 ? s.dur : a.secs * 1000).clamp(1, 1 << 30);
               return Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: (ms / total).clamp(0.0, 1.0), minHeight: 6, backgroundColor: ink(context).withValues(alpha: .12), color: ink(context))));

@@ -110,7 +110,7 @@ class AudioRow extends StatelessWidget {
             if (a.created > 0) Padding(padding: const EdgeInsets.only(bottom: 3), child: Text(s.when(a.created), style: TextStyle(color: sub(context), fontSize: 12.5))),
             Row(children: [
               if (a.url.isNotEmpty) ValueListenableBuilder<int>(valueListenable: s.pos, builder: (_, ms, __) => Text(on ? '${mmss(ms ~/ 1000)} / ${mmss(a.secs)}' : mmss(a.secs), style: TextStyle(color: on ? ink(context) : sub(context), fontSize: 13, fontWeight: FontWeight.w700))),
-              if (mine) ...[const SizedBox(width: 10), Flexible(child: audChip(context, a.rand))],
+              ...[const SizedBox(width: 10), Flexible(child: audChip(context, a.rand, to: a.to))],
               if (showOwner) ...[const SizedBox(width: 10), Flexible(child: Text(a.ownerName, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: sub(context), fontSize: 13)))],
               const SizedBox(width: 6),
               Tap(onTap: () => toggleOffline(a), child: Padding(padding: const EdgeInsets.all(4), child: Icon(s.isOffline(a.id) ? Icons.offline_pin_rounded : Icons.download_for_offline_outlined, size: 20, color: s.isOffline(a.id) ? ink(context) : sub(context)))),
@@ -249,7 +249,7 @@ class _ProfileState extends State<ProfilePage> {
     final u = user!, shown = switch (tab) { 1 => list.where((e) => e.inHups).toList(), 2 => likedList, 3 => savedList, _ => list.where((e) => e.inRand).toList() };
     return RefreshIndicator(color: ink(context), backgroundColor: card(context), onRefresh: _load, child: ListView(padding: const EdgeInsets.only(bottom: 40), children: [
       const SizedBox(height: 10),
-      In(0, Padding(padding: const EdgeInsets.symmetric(horizontal: 24), child: Align(alignment: Alignment.centerLeft, child: Container(padding: const EdgeInsets.all(5), decoration: BoxDecoration(color: bgOf(context), shape: BoxShape.circle, boxShadow: [BoxShadow(color: green.withValues(alpha: .16), blurRadius: 28, offset: const Offset(0, 10))]), child: Tap(onTap: u.avatar == null ? null : () => go(context, ImageViewer(u.avatar!, u.name)), scale: .96, child: Avatar(u.avatar, u.name, 96)))))),
+      In(0, Padding(padding: const EdgeInsets.symmetric(horizontal: 24), child: Align(alignment: Alignment.centerLeft, child: Container(padding: const EdgeInsets.all(5), decoration: BoxDecoration(color: bgOf(context), shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .16), blurRadius: 28, offset: const Offset(0, 10))]), child: Tap(onTap: u.avatar == null ? null : () => go(context, ImageViewer(u.avatar!, u.name)), scale: .96, child: Avatar(u.avatar, u.name, 96)))))),
       const SizedBox(height: 16),
       Padding(padding: const EdgeInsets.fromLTRB(24, 0, 24, 0), child: In(1, Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [Flexible(child: Text(u.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 24, letterSpacing: -.5))), if (u.verified) const Padding(padding: EdgeInsets.only(left: 6), child: Icon(Icons.verified_rounded, size: 22, color: Color(0xFF2F8F5B)))]),
@@ -270,7 +270,7 @@ class _ProfileState extends State<ProfilePage> {
       const SizedBox(height: 14),
       if (locked && !mine) Empty(Icons.lock_outline_rounded, s.t('locked'))
       else if (shown.isEmpty) Empty(Icons.graphic_eq_rounded, tab == 2 ? s.t('empty_liked') : tab == 3 ? s.t('empty_saved') : tab == 1 ? s.t('no_hups') : s.t('empty_audio'), custom: tab == 2 ? HIcon(HK.sorot, size: 30, color: sub(context)) : tab == 3 ? HIcon(HK.save, size: 30, color: sub(context)) : tab == 1 ? HIcon(HK.hups, size: 30, color: sub(context)) : HIcon(HK.acak, size: 30, color: sub(context)))
-      else Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Column(children: [for (var i = 0; i < shown.length; i++) In(i < 8 ? i : 0, tab == 0 ? AudioRow(shown[i], key: ValueKey('0_${shown[i].id}'), scope: this, mine: mine, onDelete: mine ? () => _del(shown[i]) : null) : PostCard(shown[i], showAudience: mine && tab == 1, key: ValueKey('${tab}_${shown[i].id}'), scope: this, onDeleted: () => setState(() { list.removeWhere((e) => e.id == shown[i].id); likedList.removeWhere((e) => e.id == shown[i].id); savedList.removeWhere((e) => e.id == shown[i].id); })))])),
+      else Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Column(children: [for (var i = 0; i < shown.length; i++) In(i < 8 ? i : 0, tab == 0 ? AudioRow(shown[i], key: ValueKey('0_${shown[i].id}'), scope: this, mine: mine, onDelete: mine ? () => _del(shown[i]) : null) : PostCard(shown[i], key: ValueKey('${tab}_${shown[i].id}'), scope: this, onDeleted: () => setState(() { list.removeWhere((e) => e.id == shown[i].id); likedList.removeWhere((e) => e.id == shown[i].id); savedList.removeWhere((e) => e.id == shown[i].id); })))])),
     ]));
   }
 }
@@ -556,7 +556,7 @@ class _EditState extends State<EditProfilePage> {
       TopBar(back: true, title: s.t('edit_profile')),
       Expanded(child: ListView(padding: const EdgeInsets.only(bottom: 40), children: [
         const SizedBox(height: 8),
-        In(0, Center(child: Tap(onTap: _avatarMenu, child: Container(padding: const EdgeInsets.all(5), decoration: BoxDecoration(color: bgOf(context), shape: BoxShape.circle, boxShadow: [BoxShadow(color: green.withValues(alpha: .16), blurRadius: 28, offset: const Offset(0, 10))]), child: ClipOval(child: SizedBox(width: 104, height: 104, child: Stack(fit: StackFit.expand, children: [Avatar(me.avatar, me.name, 104), cam(up == 'avatar')]))))))),
+        In(0, Center(child: Tap(onTap: _avatarMenu, child: Container(padding: const EdgeInsets.all(5), decoration: BoxDecoration(color: bgOf(context), shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .16), blurRadius: 28, offset: const Offset(0, 10))]), child: ClipOval(child: SizedBox(width: 104, height: 104, child: Stack(fit: StackFit.expand, children: [Avatar(me.avatar, me.name, 104), cam(up == 'avatar')]))))))),
         const SizedBox(height: 28),
         Padding(padding: const EdgeInsets.symmetric(horizontal: 24), child: Column(children: [
           In(1, Field(s.t('name'), name, max: 40)), const SizedBox(height: 16),
@@ -771,7 +771,7 @@ class _NotifState extends State<NotifPage> {
       ])));
     }
     return In(i, Tap(onTap: () => _open(n), child: Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(26)), child: Row(children: [
-      Stack(clipBehavior: Clip.none, children: [Avatar(n['avatar'], n['name'], 46), Positioned(right: -4, bottom: -4, child: Container(width: 22, height: 22, decoration: BoxDecoration(color: green, shape: BoxShape.circle, border: Border.all(color: bgOf(context), width: 2)), child: like ? const HIcon(HK.sorot, filled: true, size: 13, color: cream, hole: green) : cm ? const HIcon(HK.comment, size: 12, color: cream) : Icon(relk ? Icons.diversity_3_rounded : Icons.person_add_alt_1_rounded, size: 11, color: cream)))]),
+      Stack(clipBehavior: Clip.none, children: [Avatar(n['avatar'], n['name'], 46), Positioned(right: -4, bottom: -4, child: Container(width: 22, height: 22, decoration: BoxDecoration(color: btnBg(context), shape: BoxShape.circle, border: Border.all(color: bgOf(context), width: 2)), child: like ? const HIcon(HK.sorot, filled: true, size: 13, color: cream, hole: green) : cm ? const HIcon(HK.comment, size: 12, color: cream) : Icon(relk ? Icons.diversity_3_rounded : Icons.person_add_alt_1_rounded, size: 11, color: cream)))]),
       const SizedBox(width: 14),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text.rich(TextSpan(children: [TextSpan(text: n['name'], style: const TextStyle(fontWeight: FontWeight.w800)), TextSpan(text: '  ${s.notifText(k, '${n['extra'] ?? ''}')}')]), style: const TextStyle(fontSize: 15, height: 1.4)),

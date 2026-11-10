@@ -35,15 +35,15 @@ class _Life with WidgetsBindingObserver {
 }
 
 ThemeData theme(bool dark) {
-  final bg = dark ? const Color(0xFF0E1511) : const Color(0xFFFEFDF9);
-  final prim = dark ? const Color(0xFF8CC4A6) : green;
+  final bg = dark ? const Color(0xFF0B0B0B) : const Color(0xFFFFFFFF);
+  final prim = dark ? const Color(0xFFF2F2F2) : const Color(0xFF111111);
   return ThemeData(
     useMaterial3: true,
     brightness: dark ? Brightness.dark : Brightness.light,
     scaffoldBackgroundColor: bg,
     fontFamily: 'Outfit',
-    colorScheme: ColorScheme.fromSeed(seedColor: green, brightness: dark ? Brightness.dark : Brightness.light, surface: bg, primary: prim),
-    textTheme: Typography.material2021().black.apply(bodyColor: dark ? const Color(0xFFE9F1EA) : green, displayColor: dark ? const Color(0xFFE9F1EA) : green, fontFamily: 'Outfit'),
+    colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF111111), brightness: dark ? Brightness.dark : Brightness.light, surface: bg, primary: prim),
+    textTheme: Typography.material2021().black.apply(bodyColor: prim, displayColor: prim, fontFamily: 'Outfit'),
     splashFactory: NoSplash.splashFactory,
     highlightColor: Colors.transparent,
   );
@@ -60,7 +60,7 @@ class HulhupApp extends StatelessWidget {
           scrollBehavior: const MaterialScrollBehavior().copyWith(physics: const BouncingScrollPhysics()),
           builder: (ctx, child) {
             final dk = Theme.of(ctx).brightness == Brightness.dark;
-            final bg = dk ? const Color(0xFF0E1511) : const Color(0xFFFEFDF9);
+            final bg = dk ? const Color(0xFF0B0B0B) : const Color(0xFFFFFFFF);
             return AnnotatedRegion<SystemUiOverlayStyle>(
               value: SystemUiOverlayStyle(
                 statusBarColor: Colors.transparent,

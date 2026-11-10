@@ -136,7 +136,7 @@ class _RecordSheetState extends State<RecordSheet> {
     return Column(mainAxisSize: MainAxisSize.min, children: [
       Text(s.t('rec_title'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
       const SizedBox(height: 18),
-      Tap(onTap: _rec, child: AnimatedContainer(duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic, width: recording ? 84 : 112, height: recording ? 84 : 112, decoration: BoxDecoration(color: recording ? heart : green, borderRadius: BorderRadius.circular(recording ? 26 : 56), boxShadow: [BoxShadow(color: (recording ? heart : green).withValues(alpha: .3), blurRadius: 26, offset: const Offset(0, 10))]), child: Icon(recording ? Icons.stop_rounded : Icons.mic_rounded, color: cream, size: 40))),
+      Tap(onTap: _rec, child: AnimatedContainer(duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic, width: recording ? 84 : 112, height: recording ? 84 : 112, decoration: BoxDecoration(color: recording ? heart : btnBg(context), borderRadius: BorderRadius.circular(recording ? 26 : 56), boxShadow: [BoxShadow(color: (recording ? heart : green).withValues(alpha: .3), blurRadius: 26, offset: const Offset(0, 10))]), child: Icon(recording ? Icons.stop_rounded : Icons.mic_rounded, color: cream, size: 40))),
       const SizedBox(height: 14),
       Text('${mmss(ms ~/ 1000)} / 0:15', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
       const SizedBox(height: 4),
@@ -182,7 +182,7 @@ class FileBar extends StatelessWidget {
         margin: const EdgeInsets.only(top: 8), padding: const EdgeInsets.fromLTRB(6, 6, 8, 6),
         decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(24)),
         child: Row(children: [
-          Tap(onTap: () => s.playUrl(keyId, url, scope: scope).catchError((_) => toast(s.t('e_server'), bad: true)), child: AnimatedContainer(duration: const Duration(milliseconds: 250), width: 38, height: 38, decoration: BoxDecoration(color: on ? ink(context) : green, shape: BoxShape.circle), child: Icon(on ? Icons.pause_rounded : Icons.play_arrow_rounded, color: on ? bgOf(context) : cream, size: 22))),
+          Tap(onTap: () => s.playUrl(keyId, url, scope: scope).catchError((_) => toast(s.t('e_server'), bad: true)), child: AnimatedContainer(duration: const Duration(milliseconds: 250), width: 38, height: 38, decoration: BoxDecoration(color: on ? green : btnBg(context), shape: BoxShape.circle), child: Icon(on ? Icons.pause_rounded : Icons.play_arrow_rounded, color: on ? bgOf(context) : cream, size: 22))),
           Expanded(child: ValueListenableBuilder<int>(valueListenable: s.pos, builder: (_, ms, __) {
             final total = (on && s.dur > 0 ? s.dur : (secs > 0 ? secs * 1000 : 15000)).clamp(1, 1 << 30);
             return Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: on ? (ms / total).clamp(0.0, 1.0) : 0, minHeight: 5, backgroundColor: ink(context).withValues(alpha: .12), color: acc(context))));
@@ -407,10 +407,10 @@ class _PostCardState extends State<PostCard> {
       onTap: () => openPost(context, a), scale: .99,
       child: Container(
         margin: const EdgeInsets.only(bottom: 12), padding: const EdgeInsets.fromLTRB(16, 14, 8, 4),
-        decoration: BoxDecoration(color: card(context), borderRadius: BorderRadius.circular(28), border: Border.all(color: ink(context).withValues(alpha: .07)), boxShadow: [BoxShadow(color: green.withValues(alpha: .05), blurRadius: 18, offset: const Offset(0, 6))]),
+        decoration: BoxDecoration(color: card(context), borderRadius: BorderRadius.circular(28), border: Border.all(color: ink(context).withValues(alpha: .07)), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .05), blurRadius: 18, offset: const Offset(0, 6))]),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           OwnerRow(a, more: () => postMenu(context, a, onDeleted: widget.onDeleted)),
-          if (widget.showAudience) Padding(padding: const EdgeInsets.only(top: 8, right: 8), child: audChip(context, a.rand)),
+          Padding(padding: const EdgeInsets.only(top: 8, right: 8), child: audChip(context, a.rand, to: a.to)),
           if (text.isNotEmpty) Padding(padding: const EdgeInsets.fromLTRB(0, 10, 8, 0), child: MentionText(partial ? '$text …' : text, style: const TextStyle(fontSize: 15.5, height: 1.45))),
           if (partial) Tap(onTap: busy ? null : _expand, child: Padding(padding: const EdgeInsets.fromLTRB(0, 4, 8, 4), child: Text(busy ? '…' : s.t('read_more'), style: TextStyle(color: acc(context), fontWeight: FontWeight.w700, fontSize: 14)))),
           if (a.files.isNotEmpty) Padding(padding: const EdgeInsets.only(right: 8), child: audioBars(a, widget.scope)),
@@ -755,7 +755,7 @@ class _PostPageState extends State<PostPage> {
             child: TextField(controller: input, focusNode: focus, minLines: 1, maxLines: 5, textCapitalization: TextCapitalization.sentences, style: const TextStyle(fontSize: 15.5), cursorColor: ink(context), decoration: InputDecoration(border: InputBorder.none, hintText: s.t('comment_ph'), hintStyle: TextStyle(color: sub(context)))),
           )),
           const SizedBox(width: 8),
-          Tap(onTap: sending ? null : _send, child: Container(width: 46, height: 46, decoration: const BoxDecoration(color: green, shape: BoxShape.circle), child: sending ? const Padding(padding: EdgeInsets.all(13), child: CircularProgressIndicator(strokeWidth: 2.2, color: cream)) : const Icon(Icons.arrow_upward_rounded, color: cream, size: 22))),
+          Tap(onTap: sending ? null : _send, child: Container(width: 46, height: 46, decoration: BoxDecoration(color: btnBg(context), shape: BoxShape.circle), child: sending ? const Padding(padding: EdgeInsets.all(13), child: CircularProgressIndicator(strokeWidth: 2.2, color: cream)) : const Icon(Icons.arrow_upward_rounded, color: cream, size: 22))),
         ]),
       ])),
     );
@@ -942,7 +942,7 @@ class _ComposeState extends State<ComposePage> {
         for (var i = 0; i < clips.length; i++) Container(
           margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.fromLTRB(8, 8, 8, 8), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(24)),
           child: Row(children: [
-            Tap(onTap: () => _play(i), child: Container(width: 40, height: 40, decoration: BoxDecoration(color: previewing == i ? ink(context) : green, shape: BoxShape.circle), child: Icon(previewing == i ? Icons.pause_rounded : Icons.play_arrow_rounded, color: previewing == i ? bgOf(context) : cream, size: 22))),
+            Tap(onTap: () => _play(i), child: Container(width: 40, height: 40, decoration: BoxDecoration(color: previewing == i ? green : btnBg(context), shape: BoxShape.circle), child: Icon(previewing == i ? Icons.pause_rounded : Icons.play_arrow_rounded, color: previewing == i ? bgOf(context) : cream, size: 22))),
             const SizedBox(width: 12),
             Expanded(child: Text('Audio ${i + 1} · ${mmss(clips[i].secs)}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15))),
             Tap(onTap: () => setState(() { bgmIdx = bgmIdx == i ? -1 : i; }), child: Padding(padding: const EdgeInsets.all(8), child: Icon(Icons.music_note_rounded, size: 22, color: bgmIdx == i ? acc(context) : sub(context)))),

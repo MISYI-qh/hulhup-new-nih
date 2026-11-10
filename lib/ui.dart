@@ -14,8 +14,10 @@ final navKey = GlobalKey<NavigatorState>();
 bool isDark(BuildContext c) => Theme.of(c).brightness == Brightness.dark;
 Color ink(BuildContext c) => Theme.of(c).colorScheme.primary;
 Color sub(BuildContext c) => ink(c).withValues(alpha: .6);
-Color soft(BuildContext c) => isDark(c) ? const Color(0xFF17211B) : const Color(0xFFF5F3EA);
-Color card(BuildContext c) => isDark(c) ? const Color(0xFF1B2720) : Colors.white;
+Color soft(BuildContext c) => isDark(c) ? const Color(0xFF1A1A1A) : const Color(0xFFF4F4F4);
+Color card(BuildContext c) => isDark(c) ? const Color(0xFF141414) : Colors.white;
+/// Latar tombol bulat/ikon: hitam (terang) atau abu gelap (gelap). Hijau hanya untuk aksen kecil.
+Color btnBg(BuildContext c) => isDark(c) ? const Color(0xFF2E2E2E) : const Color(0xFF111111);
 Color bgOf(BuildContext c) => Theme.of(c).scaffoldBackgroundColor;
 
 Route<T> route<T>(Widget p, {String? name}) => PageRouteBuilder<T>(
@@ -77,13 +79,13 @@ class PBtn extends StatelessWidget {
   const PBtn(this.label, this.onTap, {super.key, this.icon, this.loading = false, this.ghost = false, this.color, this.fgc});
   @override
   Widget build(BuildContext context) {
-    final fg = fgc ?? (ghost ? ink(context) : cream);
-    final bg = ghost ? soft(context) : (color ?? green);
+    final fg = fgc ?? (ghost ? ink(context) : (color == null && isDark(context) ? const Color(0xFF111111) : Colors.white));
+    final bg = ghost ? soft(context) : (color ?? ink(context));
     return Tap(
       onTap: loading ? null : onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 220), height: 52,
-        decoration: BoxDecoration(color: onTap == null && !loading ? bg.withValues(alpha: .4) : bg, gradient: (!ghost && color == null && (onTap != null || loading)) ? const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF24603F), green]) : null, borderRadius: BorderRadius.circular(26)),
+        decoration: BoxDecoration(color: onTap == null && !loading ? bg.withValues(alpha: .4) : bg, borderRadius: BorderRadius.circular(26)),
         alignment: Alignment.center,
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 200),
@@ -183,7 +185,7 @@ Future<T?> sheet<T>(BuildContext c, Widget Function(BuildContext) b) => showModa
         padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
         child: Container(
           margin: const EdgeInsets.all(12), padding: const EdgeInsets.fromLTRB(20, 10, 20, 22),
-          decoration: BoxDecoration(color: card(ctx), borderRadius: BorderRadius.circular(32), boxShadow: [BoxShadow(color: green.withValues(alpha: .18), blurRadius: 40)]),
+          decoration: BoxDecoration(color: card(ctx), borderRadius: BorderRadius.circular(32), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .18), blurRadius: 40)]),
           child: SafeArea(top: false, child: Column(mainAxisSize: MainAxisSize.min, children: [
             Container(width: 38, height: 4, margin: const EdgeInsets.only(bottom: 16), decoration: BoxDecoration(color: ink(ctx).withValues(alpha: .18), borderRadius: BorderRadius.circular(2))),
             b(ctx),
@@ -209,7 +211,7 @@ Future<bool> confirm(BuildContext c, String title, String body, String yes, {boo
               Row(children: [
                 Expanded(child: PBtn(Store.i.t('cancel'), () => Navigator.pop(ctx, false), ghost: true)),
                 const SizedBox(width: 10),
-                Expanded(child: PBtn(yes, () => Navigator.pop(ctx, true), color: danger ? heart : green)),
+                Expanded(child: PBtn(yes, () => Navigator.pop(ctx, true), color: danger ? heart : null)),
               ]),
             ]),
           ),
@@ -254,7 +256,7 @@ class _ToastState extends State<_Toast> with SingleTickerProviderStateMixin {
         color: Colors.transparent,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
-          decoration: BoxDecoration(color: widget.bad ? const Color(0xFF7A2A25) : green, borderRadius: BorderRadius.circular(26), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .2), blurRadius: 24, offset: const Offset(0, 8))]),
+          decoration: BoxDecoration(color: widget.bad ? const Color(0xFF7A2A25) : const Color(0xFF1F1F1F), borderRadius: BorderRadius.circular(26), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .2), blurRadius: 24, offset: const Offset(0, 8))]),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             Icon(widget.bad ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded, color: cream, size: 20),
             const SizedBox(width: 10),
@@ -317,7 +319,7 @@ class Avatar extends StatelessWidget {
   const Avatar(this.url, this.name, this.size, {super.key});
   @override
   Widget build(BuildContext context) {
-    final init = Container(width: size, height: size, color: green, alignment: Alignment.center, child: Text(name.isEmpty ? '?' : name.characters.first.toUpperCase(), style: TextStyle(color: cream, fontWeight: FontWeight.w800, fontSize: size * .42)));
+    final init = Container(width: size, height: size, color: const Color(0xFF2B2B2B), alignment: Alignment.center, child: Text(name.isEmpty ? '?' : name.characters.first.toUpperCase(), style: TextStyle(color: cream, fontWeight: FontWeight.w800, fontSize: size * .42)));
     return ClipOval(child: SizedBox(width: size, height: size, child: url == null ? init : img(url!, fallback: init)));
   }
 }
@@ -612,11 +614,12 @@ IconData audIcon(String v, {bool filter = false}) => (filter && v == 'me' ? Icon
 String audLabel(String v, {bool filter = false}) => Store.i.t(filter && v == 'me' ? 'f_me' : 'a_$v');
 
 /// Label audiens satu post (hanya ditampilkan di profil pemilik): ikon + nama pilihan.
-Widget audChip(BuildContext context, String rand) {
+Widget audChip(BuildContext context, String rand, {List<String> to = const []}) {
   final l = audSplit(rand).isEmpty ? ['public'] : audSplit(rand);
+  final names = l.map((e) => e == 'accounts' && to.isNotEmpty ? '${audLabel(e)}: ${to.map((x) => '@$x').join(', ')}' : audLabel(e)).join(' · ');
   return Row(mainAxisSize: MainAxisSize.min, children: [
     Icon(audIcon(l.first), size: 14, color: sub(context)), const SizedBox(width: 5),
-    Flexible(child: Text(l.map((e) => audLabel(e)).join(' · '), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: sub(context), fontSize: 12.5, fontWeight: FontWeight.w600))),
+    Flexible(child: Text(names, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: sub(context), fontSize: 12.5, fontWeight: FontWeight.w600))),
   ]);
 }
 

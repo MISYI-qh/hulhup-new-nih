@@ -43,7 +43,7 @@ flutter:
         - asset: assets/fonts/Outfit-Bold.ttf
           weight: 700
 flutter_native_splash:
-  color: "#FEFDF9"
+  color: "#FFFFFF"
   color_dark: "#0E1511"
   image: assets/splash/logo.png
   image_dark: assets/splash/logo_dark.png
@@ -51,7 +51,7 @@ flutter_native_splash:
   branding_dark: assets/splash/brand_dark.png
   branding_bottom_padding: 56
   android_12:
-    color: "#FEFDF9"
+    color: "#FFFFFF"
     color_dark: "#0E1511"
     image: assets/splash/logo12.png
     image_dark: assets/splash/logo12_dark.png
@@ -69,8 +69,8 @@ flutter_launcher_icons:
   web:
     generate: true
     image_path: "assets/icon/icon.png"
-    background_color: "#FEFDF9"
-    theme_color: "#163F2B"
+    background_color: "#FFFFFF"
+    theme_color: "#FFFFFF"
   windows:
     generate: true
     image_path: "assets/icon/icon.png"
