@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'extra.dart';
+import 'routes.dart';
 import 'package:image_picker/image_picker.dart';
 import 'core.dart';
 import 'hups.dart';
