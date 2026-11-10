@@ -5,7 +5,8 @@ import 'routes.dart';
 import 'package:flutter/services.dart';
 import 'core.dart';
 
-const green = Color(0xFF163F2B);
+const green = Color(0xFF1DB954); // hijau merek (Acak, tombol putar aktif, logo): dipakai hemat
+const blue = Color(0xFF3897F0); // tautan, tag, tanda verifikasi
 const cream = Color(0xFFFBF6E9);
 const heart = Color(0xFFE0524A);
 const leaf = Color(0xFF2F8F5B);
@@ -355,7 +356,7 @@ class Empty extends StatelessWidget {
       ]))));
 }
 
-Color acc(BuildContext c) => isDark(c) ? const Color(0xFF5FC08F) : leaf;
+Color acc(BuildContext c) => isDark(c) ? const Color(0xFF7DB4FF) : const Color(0xFF2B6FDE);
 
 enum HK { sorot, comment, hups, acak, save, share, add }
 

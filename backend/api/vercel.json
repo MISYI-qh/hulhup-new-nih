@@ -13,11 +13,5 @@
       "source": "/(.*)",
       "destination": "/api/index.js"
     }
-  ],
-  "crons": [
-    {
-      "path": "/cron/reminder",
-      "schedule": "0 12 * * *"
-    }
   ]
 }

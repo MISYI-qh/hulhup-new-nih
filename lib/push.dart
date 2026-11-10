@@ -42,7 +42,6 @@ class Push {
       _token = t;
       await Api.req('POST', '/me/push', body: {'token': t, 'lang': lang, 'remind': Store.i.remind});
       active = true;
-      await Notifier.cancelReminders();
       if (!_hooked) {
         _hooked = true;
         m.onTokenRefresh.listen((n) async {

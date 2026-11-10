@@ -160,7 +160,7 @@ class _TapButtonState extends State<TapButton> with TickerProviderStateMixin {
             duration: const Duration(milliseconds: 150), width: 204, height: 204,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: const RadialGradient(center: Alignment(-.36, -.52), radius: 1.1, colors: [Color(0xFF3C7357), Color(0xFF235A3E), green, Color(0xFF0F2E1F)], stops: [0, .38, .75, 1]),
+              gradient: const RadialGradient(center: Alignment(-.36, -.52), radius: 1.1, colors: [Color(0xFF6BE79A), Color(0xFF38D072), green, Color(0xFF138A3E)], stops: [0, .38, .75, 1]),
               boxShadow: [BoxShadow(color: green.withValues(alpha: down ? .2 : .36), blurRadius: down ? 24 : 52, offset: Offset(0, down ? 10 : 26))],
             ),
             child: const Center(child: Logo(96, cream)),
@@ -251,7 +251,7 @@ class PopupBody extends StatelessWidget {
       if (a.pprof) Tap(onTap: () { Navigator.pop(context); go(context, ProfilePage(a.owner)); }, child: Row(children: [
         Avatar(a.ownerAvatar, a.ownerName, 46),
         const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Flexible(child: Text(a.ownerName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16))), if (a.ownerVerified) const Padding(padding: EdgeInsets.only(left: 4), child: Icon(Icons.verified_rounded, size: 16, color: Color(0xFF2F8F5B)))]), Text(a.created > 0 ? '${a.owner} · ${s.when(a.created)}' : a.owner, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: sub(context), fontSize: 13))])),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Flexible(child: Text(a.ownerName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16))), if (a.ownerVerified) const Padding(padding: EdgeInsets.only(left: 4), child: Icon(Icons.verified_rounded, size: 16, color: blue))]), Text(a.created > 0 ? '${a.owner} · ${s.when(a.created)}' : a.owner, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: sub(context), fontSize: 13))])),
         Icon(Icons.chevron_right_rounded, color: sub(context)),
       ])),
       if (!a.pprof && a.created > 0) Align(alignment: Alignment.centerLeft, child: Padding(padding: const EdgeInsets.only(bottom: 6), child: Text(s.when(a.created), style: TextStyle(color: sub(context), fontSize: 13)))),

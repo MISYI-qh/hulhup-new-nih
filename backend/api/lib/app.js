@@ -5,9 +5,10 @@ import { ApiErr, now, sha, token, hashPw, checkPw, dayStr, okBirth, ageOf, image
 import { storeFor, putAudio, getAudio, delAudio } from './blobs.js';
 import { randomInt } from 'node:crypto';
 import { pushLater, pushDiag, pushReminders } from './push.js';
+import { aiImage, aiAudio } from './aidetect.js';
 
 const MAX_IMG = 3 * 1024 * 1024, MAX_AUDIO = 1024 * 1024; // semua audio maks 1 MB; foto profil maks 3 MB
-const MAX_TEXT = 200000, MAX_POST_AUDIO = 3, MAX_CMT_AUDIO = 1, INLINE_TEXT = 3000, PREVIEW = 300;
+const MAX_TEXT = 200000, MAX_POST_TEXT = 1000, INLINE_TEXT = 3000, PREVIEW = 300; // post: 1 audio wajib + teks maks 1000; komentar: teks saja, panjang bebas
 const FILTERS = ['public', 'followers', 'following', 'both', 'friend', 'best', 'partner', 'family', 'relations', 'me'];
 const REL_TYPES = ['friend', 'best', 'partner', 'family'];
 const UN = /^[a-z0-9_]{3,20}$/;
@@ -101,13 +102,13 @@ async function uv(u, me, today) {
   return {
     rels,
     username: u.username, name: u.name, bio: u.bio, age: mine ? ageOf(u.birth) : 0, birth: mine ? u.birth : '',
-    avatar: avUrl(u), cover: cvUrl(u), taps: mine ? Number(u.taps) : 0, pvis: mine ? u.pvis : '', rvis: mine ? (u.rvis || 'public') : '',
+    avatar: avUrl(u), avatar_ai: u.av_ver > 0 && u.av_ai === true, cover: cvUrl(u), taps: mine ? Number(u.taps) : 0, pvis: mine ? u.pvis : '', rvis: mine ? (u.rvis || 'public') : '',
     streak: streakOf(u, today), days: mine ? u.days : 0,
     followers: u.followers, following: u.following, audios: r.audios, is_following: r.isf, is_me: mine, verified: u.verified,
   };
 }
 
-const AUD_SQL = `select a.id, a.descr, a.secs, a.pprof, a.rand, a.created, a.likes, a.owner, a.body_len, a.in_rand, a.in_hups, a.n_audio, a.comments, a.bgm, a.bgm_idx, a.body btext, u.username ou, u.name oname, u.av_ver oav, u.verified ov, u.pvis opvis,
+const AUD_SQL = `select a.id, a.descr, a.secs, a.pprof, a.rand, a.created, a.likes, a.owner, a.body_len, a.in_rand, a.in_hups, a.n_audio, a.comments, a.bgm, a.bgm_idx, a.ai, a.body btext, u.username ou, u.name oname, u.av_ver oav, u.av_ai oai, u.verified ov, u.pvis opvis,
   exists(select 1 from likes l where l.audio_id=a.id and l.user_id=$1) liked, exists(select 1 from saves sv where sv.post_id=a.id and sv.user_id=$1) saved from audios a join users u on u.id=a.owner`;
 
 function av(a) {
@@ -116,7 +117,7 @@ function av(a) {
   return {
     id: Number(a.id), desc: a.descr, secs: a.secs, popup: true, vis: 'public', url: files.length ? files[0].url : '', pprof: a.pprof, rand: a.rand,
     created: Number(a.created), likes: a.likes, liked: a.liked, owner: a.ou, owner_name: a.oname,
-    owner_avatar: a.oav > 0 ? `/users/${a.ou}/avatar?v=${a.oav}` : null, owner_verified: a.ov,
+    owner_avatar: a.oav > 0 ? `/users/${a.ou}/avatar?v=${a.oav}` : null, owner_avatar_ai: a.oav > 0 && a.oai === true, ai: a.ai === true, owner_verified: a.ov,
     long: Number(a.body_len || 0) > String(a.descr || '').length, in_rand: a.in_rand !== false, in_hups: a.in_hups === true,
     files, comments: a.comments || 0, saved: a.saved === true,
     bgm: a.bgm === true, bgm_idx: a.bgm_idx || 0, text: a.btext ?? null,
@@ -543,13 +544,13 @@ route('POST', /^\/audios$/, async (c) => {
     if (!to.length) throw new ApiErr('need_accounts');
   }
   const secs = Math.min(15, Math.max(1, parseInt(f.secs, 10) || 15));
-  const desc = String(f.desc ?? '').trim().slice(0, 200);
+  const desc = String(f.desc ?? '').trim().slice(0, MAX_POST_TEXT);
   const store = storeFor(secs);
   const key = await putAudio(store, body, mime);
   try {
     await tx(async (t) => {
-      const r = await t.query(`insert into audios(owner, descr, secs, store, blob_key, mime, rand, pprof, created) values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning id`,
-        [u.id, desc, secs, store, key, mime, rnd, f.pprof !== '0', now()]);
+      const r = await t.query(`insert into audios(owner, descr, secs, store, blob_key, mime, rand, pprof, created, in_rand, in_hups, ai) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,true,true,$10) returning id`,
+        [u.id, desc, secs, store, key, mime, rnd, f.pprof !== '0', now(), aiAudio(body)]);
       for (const id of to) await t.query('insert into audio_to(audio_id, user_id) values ($1,$2)', [r.rows[0].id, id]);
     });
   } catch (e) { await delAudio(store, key); throw e; }
@@ -588,7 +589,7 @@ route('POST', /^\/me\/(avatar|cover)$/, async (c, m) => {
   const col = m[1] === 'avatar' ? 'av_ver' : 'cv_ver';
   await tx(async (t) => {
     await t.query(`insert into photos(user_id, kind, mime, data) values ($1,$2,$3,$4) on conflict (user_id, kind) do update set mime=excluded.mime, data=excluded.data`, [u.id, m[1], mime, body]);
-    await t.query(`update users set ${col}=$2 where id=$1`, [u.id, now()]);
+    await t.query(`update users set ${col}=$2${m[1] === 'avatar' ? ', av_ai=$3' : ''} where id=$1`, m[1] === 'avatar' ? [u.id, now(), aiImage(body)] : [u.id, now()]);
   });
   return { ok: true };
 });
@@ -598,7 +599,7 @@ route('DELETE', /^\/me\/(avatar|cover)$/, async (c, m) => {
   const col = m[1] === 'avatar' ? 'av_ver' : 'cv_ver';
   await tx(async (t) => {
     await t.query('delete from photos where user_id=$1 and kind=$2', [u.id, m[1]]);
-    await t.query(`update users set ${col}=0 where id=$1`, [u.id]);
+    await t.query(`update users set ${col}=0${m[1] === 'avatar' ? ', av_ai=false' : ''} where id=$1`, [u.id]);
   });
   const r = await one('select * from users where id=$1', [u.id]);
   return { user: await uv(r, r, c.today) };
@@ -777,14 +778,9 @@ route('POST', /^\/posts$/, async (c) => {
   const u = c.need();
   await hit(`post:${u.id}`, 40, 3600);
   const b = c.body, text = okText(b.text);
-  if (text.length > MAX_TEXT) throw new ApiErr('too_long', 413);
-  const n = Math.min(MAX_POST_AUDIO, Math.max(0, parseInt(b.audios, 10) || 0));
-  if (!text && !n) throw new ApiErr('empty');
-  if (n > 1 && b.rand_on === true) throw new ApiErr('rand_one');
-  const bgm = n > 0 && b.bgm === true, bgmIdx = bgm ? Math.min(n - 1, Math.max(0, parseInt(b.bgm_idx, 10) || 0)) : 0;
-  let inRand = b.rand_on === true && n > 0 && !bgm, inHups = b.hups === true || n === 0 || bgm; // tulisan saja / backsound tidak masuk Acak
-  if (b.rand_on === true && n === 0 && b.hups !== true) throw new ApiErr('pick_place');
-  if (!inRand && !inHups) throw new ApiErr('pick_place');
+  if (text.length > MAX_POST_TEXT) throw new ApiErr('too_long', 413);
+  if (parseInt(b.audios, 10) !== 1) throw new ApiErr('need_audio'); // post wajib tepat 1 audio
+  const n = 1, bgm = false, bgmIdx = 0, inRand = true, inHups = true; // satu post tampil di Acak dan di Hups
   const rnd = parseAud(b.rand, false, true) ?? 'public';
   const mentions = [...new Set((text.match(/@([a-z0-9_]{3,20})/g) || []).map((x) => x.slice(1)))].slice(0, 10);
   let to = [];
@@ -804,7 +800,6 @@ route('POST', /^\/posts$/, async (c) => {
       return Number(r.rows[0].id);
     });
   } catch (e) { if (key) await delAudio('mongo', key); throw e; }
-  if (n === 0) await mentionNotify(id, u.id);
   return { ok: true, id };
 });
 
@@ -822,7 +817,7 @@ route('POST', /^\/posts\/(\d+)\/audio$/, async (c, m) => {
   const secs = Math.min(15, Math.max(1, parseInt(c.query.secs, 10) || 15));
   const store = storeFor(secs), key = await putAudio(store, body, mime);
   try {
-    if (have === 0) await q('update audios set store=$2, blob_key=$3, mime=$4, secs=$5 where id=$1', [a.id, store, key, mime, secs]);
+    if (have === 0) await q('update audios set store=$2, blob_key=$3, mime=$4, secs=$5, ai=$6 where id=$1', [a.id, store, key, mime, secs, aiAudio(body)]);
     else await q('insert into post_audios(post_id, idx, store, blob_key, mime, secs) values ($1,$2,$3,$4,$5,$6)', [a.id, have, store, key, mime, secs]);
     if (have + 1 >= a.n_audio) await q('update audios set pending=false where id=$1', [a.id]);
   } catch (e) { await delAudio(store, key); throw e; }
@@ -928,8 +923,8 @@ route('POST', /^\/posts\/(\d+)\/comments$/, async (c, m) => {
   const post = await openPost(m[1], c);
   const text = okText(c.body.text);
   if (text.length > MAX_TEXT) throw new ApiErr('too_long', 413);
-  const na = Math.min(MAX_CMT_AUDIO, Math.max(0, c.body.audios !== undefined ? parseInt(c.body.audios, 10) || 0 : (c.body.audio === true ? 1 : 0)));
-  if (!text && !na) throw new ApiErr('empty');
+  const na = 0; // komentar tidak boleh berisi audio
+  if (!text) throw new ApiErr('empty');
   let parent = null, parentOwner = null;
   if (c.body.parent) {
     const pr = await one('select id, owner from comments where id=$1 and post_id=$2 and not pending', [c.body.parent, post.id]);
@@ -954,6 +949,9 @@ route('POST', /^\/posts\/(\d+)\/comments$/, async (c, m) => {
 });
 
 route('POST', /^\/comments\/(\d+)\/audio$/, async (c, m) => {
+  c.need();
+  throw new ApiErr('no_comment_audio', 400);
+  // eslint-disable-next-line no-unreachable
   const u = c.need();
   await hit(`ca:${u.id}`, 90, 3600);
   const r = await one('select id, owner, post_id, pending, n_audio from comments where id=$1', [m[1]]);

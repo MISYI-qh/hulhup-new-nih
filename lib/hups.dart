@@ -1,3 +1,5 @@
+import 'dart:ui' show FontFeature;
+import 'dart:math' as math;
 // Hups: tulisan tanpa batas, 1 audio (bisa backsound), komentar bersarang, simpan, bagikan.
 import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
@@ -155,17 +157,52 @@ class _RecordSheetState extends State<RecordSheet> {
 }
 
 // ---------- pemutar kecil ----------
-/// Semua audio sebuah post: satu yang berstatus backsound tampil sebagai penanda, sisanya pemutar biasa.
+/// Audio sebuah post (satu), dengan tanda bila terdeteksi buatan AI.
 Widget audioBars(A a, Object? scope) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      for (var i = 0; i < a.files.length; i++)
-        (a.bgm && i == a.bgmIdx) ? BgmBar(a) : FileBar(fileKey(a, i), '${a.files[i]['url']}', (a.files[i]['secs'] as num?)?.toInt() ?? 0, scope: scope),
+      for (var i = 0; i < a.files.length; i++) FileBar(fileKey(a, i), '${a.files[i]['url']}', (a.files[i]['secs'] as num?)?.toInt() ?? 0, scope: scope),
+      if (a.ai) AiTag(Store.i.t('ai_audio')),
     ]);
 
 String bgmUrl(A a) => '${a.files[a.bgmIdx.clamp(0, a.files.length - 1)]['url']}';
 
 int fileKey(A a, int i) => i == 0 ? a.id : -(a.id * 20 + i);
 
-/// Pemutar satu audio: tombol putar, bilah waktu, dan tombol kecepatan (0.5×–2×) seperti di popup acak.
+/// Gelombang suara khas Hulhup: tinggi batang diturunkan dari kunci audio, jadi tiap post punya bentuknya sendiri.
+/// Bagian yang sudah terputar memakai warna tinta, batang yang sedang diputar memakai aksen.
+class WavePainter extends CustomPainter {
+  final int seed;
+  final double progress;
+  final Color played, rest, now;
+  const WavePainter(this.seed, this.progress, this.played, this.rest, this.now);
+  static List<double> shape(int seed, int n) {
+    var x = (seed * 2654435761 + 40503) & 0x7fffffff;
+    double rnd() { x = (x * 1103515245 + 12345) & 0x7fffffff; return x / 0x7fffffff; }
+    final raw = [for (var i = 0; i < n; i++) rnd()];
+    final out = <double>[];
+    for (var i = 0; i < n; i++) {
+      final a = raw[i], b = raw[(i + 1) % n], c = raw[(i + n - 1) % n];
+      final env = .55 + .45 * math.sin(math.pi * (i + .5) / n); // suara cenderung menggembung di tengah
+      out.add((.18 + .82 * (a * .6 + b * .2 + c * .2)) * env);
+    }
+    return out;
+  }
+  @override
+  void paint(Canvas canvas, Size size) {
+    const gap = 3.0, w = 3.0;
+    final n = ((size.width + gap) / (w + gap)).floor().clamp(8, 80);
+    final hs = shape(seed, n);
+    final cur = (progress * n).floor();
+    for (var i = 0; i < n; i++) {
+      final h = (size.height * hs[i]).clamp(4.0, size.height);
+      final r = RRect.fromRectAndRadius(Rect.fromCenter(center: Offset(i * (w + gap) + w / 2, size.height / 2), width: w, height: h), const Radius.circular(2));
+      canvas.drawRRect(r, Paint()..color = progress <= 0 ? rest : (i < cur ? played : (i == cur ? now : rest)));
+    }
+  }
+  @override
+  bool shouldRepaint(WavePainter o) => o.progress != progress || o.seed != seed || o.played != played || o.rest != rest || o.now != now;
+}
+
+/// Pemutar satu audio: tombol putar, gelombang suara, waktu, dan kecepatan (0.5×–2×).
 class FileBar extends StatelessWidget {
   final int keyId;
   final String url;
@@ -179,23 +216,74 @@ class FileBar extends StatelessWidget {
     return ListenableBuilder(listenable: s, builder: (_, __) {
       final on = s.playing == keyId;
       return Container(
-        margin: const EdgeInsets.only(top: 8), padding: const EdgeInsets.fromLTRB(6, 6, 8, 6),
-        decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(24)),
+        margin: const EdgeInsets.only(top: 10), padding: const EdgeInsets.fromLTRB(8, 8, 12, 8),
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: ink(context).withValues(alpha: on ? .5 : .12), width: on ? 1.4 : 1)),
         child: Row(children: [
-          Tap(onTap: () => s.playUrl(keyId, url, scope: scope).catchError((_) => toast(s.t('e_server'), bad: true)), child: AnimatedContainer(duration: const Duration(milliseconds: 250), width: 38, height: 38, decoration: BoxDecoration(color: on ? green : btnBg(context), shape: BoxShape.circle), child: Icon(on ? Icons.pause_rounded : Icons.play_arrow_rounded, color: on ? bgOf(context) : cream, size: 22))),
-          Expanded(child: ValueListenableBuilder<int>(valueListenable: s.pos, builder: (_, ms, __) {
+          Tap(onTap: () => s.playUrl(keyId, url, scope: scope).catchError((_) => toast(s.t('e_server'), bad: true)), child: AnimatedContainer(duration: const Duration(milliseconds: 220), width: 40, height: 40, decoration: BoxDecoration(color: on ? green : btnBg(context), borderRadius: BorderRadius.circular(on ? 12 : 20)), child: Icon(on ? Icons.pause_rounded : Icons.play_arrow_rounded, color: on ? bgOf(context) : cream, size: 22))),
+          const SizedBox(width: 12),
+          Expanded(child: SizedBox(height: 32, child: ValueListenableBuilder<int>(valueListenable: s.pos, builder: (_, ms, __) {
             final total = (on && s.dur > 0 ? s.dur : (secs > 0 ? secs * 1000 : 15000)).clamp(1, 1 << 30);
-            return Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: on ? (ms / total).clamp(0.0, 1.0) : 0, minHeight: 5, backgroundColor: ink(context).withValues(alpha: .12), color: acc(context))));
-          })),
-          ValueListenableBuilder<int>(valueListenable: s.pos, builder: (_, ms, __) => Text(on ? mmss(ms ~/ 1000) : (secs > 0 ? mmss(secs) : '·'), style: TextStyle(color: on ? ink(context) : sub(context), fontSize: 12.5, fontWeight: FontWeight.w700))),
+            return CustomPaint(painter: WavePainter(keyId, on ? (ms / total).clamp(0.0, 1.0) : 0, ink(context), ink(context).withValues(alpha: .2), green), size: Size.infinite);
+          }))),
+          const SizedBox(width: 10),
+          ValueListenableBuilder<int>(valueListenable: s.pos, builder: (_, ms, __) => Text(on ? mmss(ms ~/ 1000) : (secs > 0 ? mmss(secs) : '·'), style: TextStyle(color: on ? ink(context) : sub(context), fontSize: 12.5, fontWeight: FontWeight.w700, fontFeatures: const [FontFeature.tabularFigures()]))),
           const SizedBox(width: 6),
-          Tap(onTap: s.cycleRate, scale: .92, child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6), decoration: BoxDecoration(color: s.rate == 1.0 ? Colors.transparent : ink(context), borderRadius: BorderRadius.circular(14), border: Border.all(color: ink(context).withValues(alpha: s.rate == 1.0 ? .18 : 0))),
-            child: Text(rateText(s.rate), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: s.rate == 1.0 ? sub(context) : bgOf(context))),
-          )),
+          Tap(onTap: s.cycleRate, scale: .92, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6), child: Text(rateText(s.rate), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: s.rate == 1.0 ? sub(context) : acc(context))))),
         ]),
       );
     });
+  }
+}
+
+/// Penanda untuk audio yang terdeteksi buatan AI.
+class AiTag extends StatelessWidget {
+  final String label;
+  const AiTag(this.label, {super.key});
+  @override
+  Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(top: 8), child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Container(padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4), decoration: BoxDecoration(color: const Color(0xFF7C5CFF).withValues(alpha: .12), borderRadius: BorderRadius.circular(10)), child: Row(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.auto_awesome_rounded, size: 13, color: Color(0xFF7C5CFF)), const SizedBox(width: 5),
+          Text(label, style: const TextStyle(color: Color(0xFF7C5CFF), fontSize: 12, fontWeight: FontWeight.w700)),
+        ])),
+      ]));
+}
+
+/// Tempat audio pada form post: kosong = ajakan merekam/memilih; terisi = gelombang + putar + ganti/hapus.
+class _AudioSlot extends StatelessWidget {
+  final AudioClip? clip;
+  final bool playing;
+  final VoidCallback onPlay, onClear;
+  final VoidCallback? onPick;
+  const _AudioSlot({required this.clip, required this.playing, required this.onPlay, required this.onPick, required this.onClear});
+  @override
+  Widget build(BuildContext context) {
+    final s = Store.i, c = clip;
+    if (c == null) {
+      return Tap(onTap: onPick, scale: .98, child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 26, horizontal: 18), width: double.infinity,
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), border: Border.all(color: ink(context).withValues(alpha: .25), width: 1.4)),
+        child: Column(children: [
+          Container(width: 54, height: 54, decoration: BoxDecoration(color: btnBg(context), shape: BoxShape.circle), child: const Icon(Icons.mic_rounded, color: cream, size: 26)),
+          const SizedBox(height: 12),
+          Text(s.t('add_audio'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+          const SizedBox(height: 3),
+          Text(s.t('audio_req'), style: TextStyle(color: sub(context), fontSize: 12.5)),
+        ]),
+      ));
+    }
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 10, 6, 10),
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), border: Border.all(color: ink(context).withValues(alpha: .5), width: 1.4)),
+      child: Row(children: [
+        Tap(onTap: onPlay, child: Container(width: 44, height: 44, decoration: BoxDecoration(color: playing ? green : btnBg(context), borderRadius: BorderRadius.circular(playing ? 13 : 22)), child: Icon(playing ? Icons.pause_rounded : Icons.play_arrow_rounded, color: playing ? bgOf(context) : cream, size: 24))),
+        const SizedBox(width: 12),
+        Expanded(child: SizedBox(height: 34, child: CustomPaint(painter: WavePainter(c.bytes.length, 0, ink(context), ink(context).withValues(alpha: .35), green), size: Size.infinite))),
+        const SizedBox(width: 10),
+        Text(mmss(c.secs), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5)),
+        IconBtn(Icons.refresh_rounded, onPick ?? () {}, color: sub(context)),
+        IconBtn(Icons.close_rounded, onClear, color: sub(context)),
+      ]),
+    );
   }
 }
 
@@ -335,7 +423,7 @@ class OwnerRow extends StatelessWidget {
       Tap(onTap: () => go(context, ProfilePage(a.owner)), child: Avatar(a.ownerAvatar, a.ownerName, 42)),
       const SizedBox(width: 10),
       Expanded(child: Tap(onTap: () => go(context, ProfilePage(a.owner)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [Flexible(child: Text(a.ownerName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15.5))), if (a.ownerVerified) const Padding(padding: EdgeInsets.only(left: 4), child: Icon(Icons.verified_rounded, size: 15, color: leaf))]),
+        Row(children: [Flexible(child: Text(a.ownerName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15.5))), if (a.ownerVerified) const Padding(padding: EdgeInsets.only(left: 4), child: Icon(Icons.verified_rounded, size: 15, color: blue))]),
         Text('${a.owner} · ${s.when(a.created)}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: sub(context), fontSize: 12.5)),
       ]))),
       if (more != null) IconBtn(Icons.more_horiz_rounded, more!, color: sub(context)),
@@ -575,7 +663,6 @@ class _PostPageState extends State<PostPage> {
   String? error;
   final input = TextEditingController();
   final focus = FocusNode();
-  final clips = <AudioClip>[];
   Map? replyTo;
   String _autoTag = '';
   final sc = ScrollController();
@@ -636,25 +723,16 @@ class _PostPageState extends State<PostPage> {
     cmts = [for (final c in j['items'] as List) Map.from(c as Map)];
   }
 
-  Future<void> _addClip() async {
-    final s = Store.i;
-    if (clips.length >= 1) { toast(s.t('cmt_audio_max')); return; }
-    final c = await sheet<AudioClip>(context, (_) => const RecordSheet());
-    if (c != null && mounted) setState(() => clips.add(c));
-  }
-
   Future<void> _send() async {
     final s = Store.i, t = input.text.trim();
-    if (t.isEmpty && clips.isEmpty) return;
-    if (t == _autoTag.trim() && clips.isEmpty) return; // hanya tag, belum menulis apa-apa
+    if (t.isEmpty) return;
+    if (t == _autoTag.trim()) return; // hanya tag, belum menulis apa-apa
     setState(() => sending = true);
     int? id;
     try {
-      final j = await Api.req('POST', '/posts/${widget.id}/comments', body: {'text': t, 'parent': replyTo?['id'], 'audios': clips.length});
+      final j = await Api.req('POST', '/posts/${widget.id}/comments', body: {'text': t, 'parent': replyTo?['id']});
       id = (j['id'] as num).toInt();
-      for (final c in clips) { await Api.multi('/comments/$id/audio', c.bytes, 'a.${c.ext}', {'secs': '${c.secs}'}); }
       input.clear();
-      clips.clear();
       replyTo = null;
       _autoTag = '';
       await _comments();
@@ -743,13 +821,7 @@ class _PostPageState extends State<PostPage> {
           Expanded(child: Text(s.t('replying').replaceAll('{n}', '${replyTo!['name']}'), style: TextStyle(color: acc(context), fontWeight: FontWeight.w700, fontSize: 13))),
           Tap(onTap: () { final cur = input.text; if (cur.startsWith(_autoTag)) input.text = cur.substring(_autoTag.length); _autoTag = ''; setState(() => replyTo = null); }, child: Icon(Icons.close_rounded, size: 18, color: sub(context))),
         ])),
-        for (var i = 0; i < clips.length; i++) Padding(padding: const EdgeInsets.only(bottom: 6), child: Row(children: [
-          Icon(Icons.graphic_eq_rounded, size: 18, color: acc(context)), const SizedBox(width: 8),
-          Expanded(child: Text('Audio ${i + 1} · ${mmss(clips[i].secs)}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5))),
-          Tap(onTap: () => setState(() => clips.removeAt(i)), child: Icon(Icons.close_rounded, size: 18, color: sub(context))),
-        ])),
         Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Tap(onTap: _addClip, child: Padding(padding: const EdgeInsets.fromLTRB(4, 10, 10, 10), child: Icon(Icons.mic_none_rounded, size: 26, color: clips.isEmpty ? ink(context) : sub(context)))),
           Expanded(child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(24)),
             child: TextField(controller: input, focusNode: focus, minLines: 1, maxLines: 5, textCapitalization: TextCapitalization.sentences, style: const TextStyle(fontSize: 15.5), cursorColor: ink(context), decoration: InputDecoration(border: InputBorder.none, hintText: s.t('comment_ph'), hintStyle: TextStyle(color: sub(context)))),
@@ -834,7 +906,7 @@ class _CommentTileState extends State<CommentTile> {
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
             Flexible(child: Text('${c['name']}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5))),
-            if (c['verified'] == true) const Padding(padding: EdgeInsets.only(left: 3), child: Icon(Icons.verified_rounded, size: 14, color: leaf)),
+            if (c['verified'] == true) const Padding(padding: EdgeInsets.only(left: 3), child: Icon(Icons.verified_rounded, size: 14, color: blue)),
             if (isAuthor) Container(margin: const EdgeInsets.only(left: 6), padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2), decoration: BoxDecoration(color: ink(context), borderRadius: BorderRadius.circular(8)), child: Text(s.t('author'), style: TextStyle(color: bgOf(context), fontSize: 10.5, fontWeight: FontWeight.w800))),
             const SizedBox(width: 8),
             Flexible(child: Text(s.when((c['created'] as num).toInt()), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: sub(context), fontSize: 12))),
@@ -863,33 +935,32 @@ class ComposePage extends StatefulWidget {
 }
 
 class _ComposeState extends State<ComposePage> {
+  static const maxText = 1000;
   final text = TextEditingController();
-  final clips = <AudioClip>[];
+  AudioClip? clip;
   final pv = AudioPlayer();
-  int previewing = -1, bgmIdx = -1;
-  bool inRand = true, inHups = true, pprof = true, busy = false;
+  bool playing = false, pprof = true, busy = false;
   String rand = 'public';
   Map<String, Map> picked = {};
 
   @override
-  void initState() { super.initState(); pv.onPlayerComplete.listen((_) { if (mounted) setState(() => previewing = -1); }); }
+  void initState() { super.initState(); pv.onPlayerComplete.listen((_) { if (mounted) setState(() => playing = false); }); text.addListener(() { if (mounted) setState(() {}); }); }
   @override
   void dispose() { text.dispose(); pv.dispose(); super.dispose(); }
 
-  /// Acak hanya untuk post berisi audio dan bukan backsound; tulisan saja selalu hanya di Hups.
-  bool get _randOk => clips.length == 1 && bgmIdx < 0;
-
   Future<void> _add() async {
-    if (clips.length >= 3) { toast(Store.i.t('post_audio_max')); return; }
     final c = await sheet<AudioClip>(context, (_) => const RecordSheet());
     if (c == null || !mounted) return;
-    setState(() { clips.add(c); });
+    await pv.stop();
+    setState(() { clip = c; playing = false; });
   }
 
-  Future<void> _play(int i) async {
-    if (previewing == i) { await pv.stop(); setState(() => previewing = -1); return; }
-    setState(() => previewing = i);
-    await pv.play(BytesSource(clips[i].bytes, mimeType: mimeOf(clips[i].bytes)));
+  Future<void> _play() async {
+    final c = clip;
+    if (c == null) return;
+    if (playing) { await pv.stop(); setState(() => playing = false); return; }
+    setState(() => playing = true);
+    await pv.play(BytesSource(c.bytes, mimeType: mimeOf(c.bytes)));
   }
 
   Future<void> _pickAcc() async {
@@ -900,15 +971,16 @@ class _ComposeState extends State<ComposePage> {
 
   Future<void> _send() async {
     final s = Store.i, t = text.text.trim();
-    if (t.isEmpty && clips.isEmpty) { toast(s.t('e_empty'), bad: true); return; }
-    final toRand = _randOk && inRand, toHups = inHups || !toRand;
+    final c = clip;
+    if (c == null) { toast(s.t('e_need_audio'), bad: true); return; }
+    if (t.length > maxText) { toast(s.t('e_too_long'), bad: true); return; }
     if (audSplit(rand).contains('accounts') && picked.isEmpty) { toast(s.t('e_need_accounts'), bad: true); return; }
     setState(() => busy = true);
     int? id;
     try {
-      final j = await Api.req('POST', '/posts', body: {'text': t, 'audios': clips.length, 'bgm': bgmIdx >= 0, 'bgm_idx': bgmIdx < 0 ? 0 : bgmIdx, 'rand_on': toRand, 'hups': toHups, 'pprof': pprof, 'rand': audSplit(rand), 'to': picked.keys.toList()});
+      final j = await Api.req('POST', '/posts', body: {'text': t, 'audios': 1, 'pprof': pprof, 'rand': audSplit(rand), 'to': picked.keys.toList()});
       id = (j['id'] as num).toInt();
-      for (final c in clips) { await Api.multi('/posts/$id/audio', c.bytes, 'a.${c.ext}', {'secs': '${c.secs}'}); }
+      await Api.multi('/posts/$id/audio', c.bytes, 'a.${c.ext}', {'secs': '${c.secs}'});
       if (!mounted) return;
       Navigator.pop(context, true);
       toast(s.t('posted'));
@@ -932,30 +1004,17 @@ class _ComposeState extends State<ComposePage> {
     return Scaffold(body: Column(children: [
       TopBar(back: true, title: s.t('new_post')),
       Expanded(child: ListView(padding: const EdgeInsets.fromLTRB(22, 4, 22, 40), children: [
+        _AudioSlot(clip: clip, playing: playing, onPlay: _play, onPick: busy ? null : _add, onClear: () { pv.stop(); setState(() { clip = null; playing = false; }); }),
+        const SizedBox(height: 14),
         Container(
-          padding: const EdgeInsets.fromLTRB(18, 8, 18, 8), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(26)),
-          child: TextField(controller: text, minLines: 6, maxLines: 18, textCapitalization: TextCapitalization.sentences, style: const TextStyle(fontSize: 16.5, height: 1.5), cursorColor: ink(context), decoration: InputDecoration(border: InputBorder.none, hintText: s.t('write_hups'), hintStyle: TextStyle(color: sub(context)))),
+          padding: const EdgeInsets.fromLTRB(18, 8, 18, 8), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(22)),
+          child: TextField(controller: text, minLines: 4, maxLines: 12, maxLength: maxText, buildCounter: (_, {required currentLength, required isFocused, maxLength}) => Align(alignment: Alignment.centerRight, child: Padding(padding: const EdgeInsets.only(bottom: 4), child: Text('$currentLength/$maxLength', style: TextStyle(color: currentLength > (maxLength ?? 0) * .9 ? const Color(0xFFD9534F) : sub(context), fontSize: 12)))), textCapitalization: TextCapitalization.sentences, style: const TextStyle(fontSize: 16.5, height: 1.5), cursorColor: ink(context), decoration: InputDecoration(border: InputBorder.none, hintText: s.t('write_hups'), hintStyle: TextStyle(color: sub(context)))),
         ),
         const SizedBox(height: 6),
         MentionBar(text),
-        Padding(padding: const EdgeInsets.only(left: 6, bottom: 10), child: Text(s.t('tag_hint'), style: TextStyle(color: sub(context), fontSize: 12.5))),
-        for (var i = 0; i < clips.length; i++) Container(
-          margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.fromLTRB(8, 8, 8, 8), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(24)),
-          child: Row(children: [
-            Tap(onTap: () => _play(i), child: Container(width: 40, height: 40, decoration: BoxDecoration(color: previewing == i ? green : btnBg(context), shape: BoxShape.circle), child: Icon(previewing == i ? Icons.pause_rounded : Icons.play_arrow_rounded, color: previewing == i ? bgOf(context) : cream, size: 22))),
-            const SizedBox(width: 12),
-            Expanded(child: Text('Audio ${i + 1} · ${mmss(clips[i].secs)}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15))),
-            Tap(onTap: () => setState(() { bgmIdx = bgmIdx == i ? -1 : i; }), child: Padding(padding: const EdgeInsets.all(8), child: Icon(Icons.music_note_rounded, size: 22, color: bgmIdx == i ? acc(context) : sub(context)))),
-            IconBtn(Icons.close_rounded, () { pv.stop(); setState(() { clips.removeAt(i); previewing = -1; if (bgmIdx == i) { bgmIdx = -1; } else if (bgmIdx > i) { bgmIdx--; } }); }, color: sub(context)),
-          ]),
-        ),
-        if (clips.length < 3) PBtn(s.t('add_audio'), busy ? null : _add, ghost: true, icon: Icons.mic_none_rounded),
-        if (clips.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 10, left: 6), child: Text(s.t('bgm_note'), style: TextStyle(color: sub(context), fontSize: 12.5))),
-        const SizedBox(height: 14),
-        _row(s.t('in_rand'), inRand && _randOk, _randOk ? (v) => setState(() { inRand = v; }) : null, k: HK.acak, note: _randOk ? null : s.t('multi_no_rand')),
-        _row(s.t('in_hups'), inHups || !_randOk, _randOk ? (v) => setState(() { inHups = v; }) : null, k: HK.hups),
-        if (inRand && _randOk) _row(s.t('pprof'), pprof, (v) => setState(() => pprof = v)),
-        const SizedBox(height: 6),
+        Padding(padding: const EdgeInsets.only(left: 6, bottom: 14), child: Text(s.t('tag_hint'), style: TextStyle(color: sub(context), fontSize: 12.5))),
+        _row(s.t('pprof'), pprof, (v) => setState(() => pprof = v)),
+        const SizedBox(height: 2),
         Pick(s.t('who_see'), rand, (v) async {
           setState(() => rand = v);
           if (audSplit(v).contains('accounts') && picked.isEmpty) { await _pickAcc(); }

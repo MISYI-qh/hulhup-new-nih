@@ -89,7 +89,7 @@ class Notifier {
           channelDescription: 'Pengingat dan notifikasi dari Hulhup',
           importance: Importance.high, priority: Priority.high,
           icon: 'ic_stat_hulhup', largeIcon: const DrawableResourceAndroidBitmap('hulhup_large'),
-          color: const Color(0xFF163F2B), subText: sub,
+          color: const Color(0xFF1DB954), subText: sub,
         ),
         iOS: const DarwinNotificationDetails(),
       );
@@ -109,8 +109,14 @@ class Notifier {
       final n = DateTime.now();
       var at = DateTime(n.year, n.month, n.day, hour, minute);
       if (!at.isAfter(n)) at = DateTime(n.year, n.month, n.day + 1, hour, minute);
-      await _n.zonedSchedule(id, title, body, tz.TZDateTime.from(at, tz.UTC), _d(sub),
-          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle, matchDateTimeComponents: DateTimeComponents.time);
+      final when = tz.TZDateTime.from(at, tz.UTC);
+      try {
+        // Alarm tepat waktu (jam 19.00 pas), bukan "kira-kira" seperti penjadwal server atau alarm hemat daya.
+        await _n.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()?.requestExactAlarmsPermission();
+        await _n.zonedSchedule(id, title, body, when, _d(sub), androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle, matchDateTimeComponents: DateTimeComponents.time);
+      } catch (_) {
+        await _n.zonedSchedule(id, title, body, when, _d(sub), androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle, matchDateTimeComponents: DateTimeComponents.time);
+      }
     } catch (e) { lastError = 'daily: $e'; }
   }
 
