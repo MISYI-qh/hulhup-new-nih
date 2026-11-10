@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'extra.dart';
+import 'apk_web.dart' if (dart.library.io) 'apk_io.dart';
 import 'core.dart';
 import 'ui.dart';
 import 'pages.dart';
@@ -101,8 +102,11 @@ class _HomeState extends State<HomePage> {
   Widget build(BuildContext context) {
     final s = Store.i;
     return PopScope(
-      canPop: !menu,
-      onPopInvokedWithResult: (didPop, _) { if (!didPop && menu) setState(() => menu = false); },
+      canPop: !menu && mode == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        if (menu) { setState(() => menu = false); } else if (mode != 0) { setState(() => mode = 0); Store.i.homeMode = 0; syncHomeUrl(); }
+      },
       child: Scaffold(
       body: Stack(children: [
         Column(children: [
@@ -326,7 +330,7 @@ class _UpdateBody extends StatelessWidget {
       step(1, 'upd_s1'), step(2, 'upd_s2'), step(3, 'upd_s3'), step(4, 'upd_s4'),
       Text(s.t('upd_fail'), style: TextStyle(color: sub(context), fontSize: 12.5, height: 1.4)),
       const SizedBox(height: 16),
-      PBtn(s.t('upd_dl'), () => launchUrl(Uri.parse(kApkUrl), mode: LaunchMode.externalApplication), icon: Icons.download_rounded),
+      PBtn(s.t('upd_dl'), () => downloadApk(context, kApkUrl), icon: Icons.download_rounded),
     ]);
   }
 }
@@ -384,10 +388,51 @@ class _GetAppState extends State<_GetAppBody> {
       const SizedBox(height: 18),
       _step(1, s.t('ga_s1')), _step(2, s.t('ga_s2')), _step(3, s.t('ga_s3')), _step(4, s.t('ga_s4')), _step(5, s.t('ga_s5')),
       const SizedBox(height: 8),
-      PBtn(s.t('ga_btn'), () => launchUrl(Uri.parse(kApkUrl), mode: LaunchMode.externalApplication), icon: Icons.download_rounded),
-      if (size32.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: Center(child: Tap(onTap: () => launchUrl(Uri.parse(kApkUrl32), mode: LaunchMode.externalApplication), child: Padding(padding: const EdgeInsets.all(8), child: Text('${s.t('ga_32')} ($size32)', textAlign: TextAlign.center, style: TextStyle(color: sub(context), fontSize: 13, fontWeight: FontWeight.w600, decoration: TextDecoration.underline)))))),
+      PBtn(s.t('ga_btn'), () => downloadApk(context, kApkUrl), icon: Icons.download_rounded),
+      if (size32.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: Center(child: Tap(onTap: () => downloadApk(context, kApkUrl32), child: Padding(padding: const EdgeInsets.all(8), child: Text('${s.t('ga_32')} ($size32)', textAlign: TextAlign.center, style: TextStyle(color: sub(context), fontSize: 13, fontWeight: FontWeight.w600, decoration: TextDecoration.underline)))))),
       const SizedBox(height: 10),
       Text(s.t('ga_tip'), style: TextStyle(color: sub(context), fontSize: 13, height: 1.4)),
+    ]);
+  }
+}
+
+
+/// Unduh APK di tampilan sendiri: progres, status, dan ulangi jika gagal.
+Future<void> downloadApk(BuildContext context, String url) => sheet(context, (_) => _ApkDl(url));
+
+class _ApkDl extends StatefulWidget {
+  final String url;
+  const _ApkDl(this.url);
+  @override
+  State<_ApkDl> createState() => _ApkDlState();
+}
+
+class _ApkDlState extends State<_ApkDl> {
+  double p = 0;
+  bool done = false, failed = false;
+  @override
+  void initState() { super.initState(); _go(); }
+  Future<void> _go() async {
+    setState(() { p = 0; done = false; failed = false; });
+    try {
+      await fetchApk(widget.url, (v) { if (mounted) setState(() => p = v); });
+      if (mounted) setState(() => done = true);
+    } catch (_) { if (mounted) setState(() => failed = true); }
+  }
+  @override
+  Widget build(BuildContext context) {
+    final s = Store.i;
+    final msg = failed ? s.t('upd_fail') : done ? (kIsWeb ? s.t('apk_done_web') : s.t('upd_inst')) : '${s.t('apk_pct')} ${(p * 100).round()}%';
+    return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Center(child: Icon(failed ? Icons.error_outline_rounded : done ? Icons.check_circle_rounded : Icons.download_rounded, size: 40, color: failed ? heart : ink(context))),
+      const SizedBox(height: 12),
+      Center(child: Text(s.t('ga_title'), textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18))),
+      const SizedBox(height: 16),
+      ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: failed ? 0 : (done ? 1 : (p > 0 ? p : null)), minHeight: 8, color: green, backgroundColor: soft(context))),
+      const SizedBox(height: 12),
+      Center(child: Text(msg, textAlign: TextAlign.center, style: TextStyle(color: failed ? heart : sub(context), fontSize: 14, height: 1.4))),
+      const SizedBox(height: 16),
+      if (failed) PBtn(s.t('retry'), _go, icon: Icons.refresh_rounded) else if (done) PBtn(s.t('done'), () => Navigator.pop(context), ghost: true),
     ]);
   }
 }

@@ -12,11 +12,12 @@ import 'ui.dart';
 String? pathOf(Widget w) {
   if (w is HomePage) return w.mode0 == 1 ? '/hups' : '/';
   if (w is PostPage) return w.comment == null ? '/p/${w.id}' : '/p/${w.id}/c/${w.comment}';
-  if (w is ProfilePage) return w.u == null ? '/me' : '/u/${w.u}';
+  if (w is ProfilePage) return profilePath(w.u, w.tab0);
   if (w is FollowsPage) return '/u/${w.u}/${w.kind}';
   if (w is RelationsPage) return '/u/${w.u}/relations';
   if (w is NotifPage) return '/notifications';
-  if (w is SettingsPage) return '/settings';
+  if (w is SettingsPage) return w.section == null ? '/settings' : '/settings/${w.section}';
+  if (w is PwPage) return '/settings/password';
   if (w is SearchPage) return '/search';
   if (w is StreakPage) return '/streak';
   if (w is EditProfilePage) return '/settings/profile';
@@ -30,6 +31,20 @@ String? pathOf(Widget w) {
   if (w is SentPage) return w.to == null ? '/sent' : '/sent/${w.to}';
   if (w is TextPage && w.slug != null) return '/${w.slug}';
   return null;
+}
+
+const _tabNames = ['', 'hups', 'sorot', 'saved'];
+
+/// Alamat profil menurut tab: /u/nama, /u/nama/hups, dan (akun sendiri) /me/sorot, /me/saved.
+String profilePath(String? u, int tab) {
+  final base = u == null ? '/me' : '/u/$u';
+  return tab <= 0 || tab >= _tabNames.length ? base : '$base/${_tabNames[tab]}';
+}
+
+/// Ganti alamat di bilah peramban tanpa menambah riwayat.
+void syncUrl(String path) {
+  if (!kIsWeb) return;
+  SystemNavigator.routeInformationUpdated(uri: Uri.parse(path), replace: true);
 }
 
 Widget? pageFor(String name) {
@@ -47,13 +62,18 @@ Widget? pageFor(String name) {
       if (seg.length == 1) return null;
       if (seg.length == 2) return ProfilePage(seg[1]);
       if (seg[2] == 'relations') return RelationsPage(seg[1]);
+      if (seg[2] == 'acak') return ProfilePage(seg[1]);
+      if (seg[2] == 'hups') return ProfilePage(seg[1], tab0: 1);
       return FollowsPage(seg[1], seg[2]);
     case 'me':
-      return ProfilePage(s.me?.username);
+      final t = seg.length > 1 ? _tabNames.indexOf(seg[1]) : 0;
+      return ProfilePage(s.me?.username, tab0: t < 0 ? 0 : t);
     case 'notifications': return const NotifPage();
     case 'settings':
       if (seg.length > 1 && seg[1] == 'profile') return const EditProfilePage();
       if (seg.length > 1 && seg[1] == 'sessions') return const SessionsPage();
+      if (seg.length > 1 && seg[1] == 'password') return const PwPage();
+      if (seg.length > 1 && const ['account', 'notifications', 'language', 'appearance', 'security'].contains(seg[1])) return SettingsPage(section: seg[1]);
       return const SettingsPage();
     case 'search': return const SearchPage();
     case 'streak': return const StreakPage();

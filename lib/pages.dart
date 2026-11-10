@@ -126,7 +126,8 @@ class AudioRow extends StatelessWidget {
 
 class ProfilePage extends StatefulWidget {
   final String? u;
-  const ProfilePage(this.u, {super.key});
+  final int tab0;
+  const ProfilePage(this.u, {super.key, this.tab0 = 0});
   @override
   State<ProfilePage> createState() => _ProfileState();
 }
@@ -136,7 +137,7 @@ class _ProfileState extends State<ProfilePage> {
   List<A> list = [], likedList = [], savedList = [];
   bool loading = true, busy = false, locked = false;
   String? error;
-  int tab = 0;
+  late int tab = widget.tab0;
   Map rel = {'status': 'none', 'type': ''};
   List rels = [], relIn = [], relOut = [];
   bool get mine => widget.u != null && widget.u == Store.i.me?.username;
@@ -264,7 +265,7 @@ class _ProfileState extends State<ProfilePage> {
         else if (s.me != null) ...[PBtn(u.isFollowing ? s.t('unfollow') : s.t('follow'), _follow, loading: busy, ghost: u.isFollowing, icon: u.isFollowing ? Icons.check_rounded : Icons.person_add_alt_1_rounded), const SizedBox(height: 10), _relBtns(s), const SizedBox(height: 6), Center(child: Tap(onTap: () => reportSheet(context, user: u.username), child: Padding(padding: const EdgeInsets.all(10), child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.flag_outlined, size: 16, color: sub(context)), const SizedBox(width: 6), Text(s.t('report'), style: TextStyle(color: sub(context), fontSize: 13, fontWeight: FontWeight.w600))]))))],
       ]))),
       const SizedBox(height: 22),
-      Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Seg<int>([(0, s.t('rand_tab')), (1, s.t('hups')), if (mine) (2, s.t('sorot_tab')), if (mine) (3, s.t('saved_tab'))], tab, (v) => setState(() => tab = v))),
+      Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Seg<int>([(0, s.t('rand_tab')), (1, s.t('hups')), if (mine) (2, s.t('sorot_tab')), if (mine) (3, s.t('saved_tab'))], tab, (v) { setState(() => tab = v); syncUrl(profilePath(widget.u, v)); })),
       const SizedBox(height: 14),
       if (locked && !mine) Empty(Icons.lock_outline_rounded, s.t('locked'))
       else if (shown.isEmpty) Empty(Icons.graphic_eq_rounded, tab == 2 ? s.t('empty_liked') : tab == 3 ? s.t('empty_saved') : tab == 1 ? s.t('no_hups') : s.t('empty_audio'), custom: tab == 2 ? HIcon(HK.sorot, size: 30, color: sub(context)) : tab == 3 ? HIcon(HK.save, size: 30, color: sub(context)) : tab == 1 ? HIcon(HK.hups, size: 30, color: sub(context)) : HIcon(HK.acak, size: 30, color: sub(context)))
@@ -570,7 +571,8 @@ class _EditState extends State<EditProfilePage> {
 
 // ---------- pengaturan ----------
 class SettingsPage extends StatelessWidget {
-  const SettingsPage({super.key});
+  final String? section;
+  const SettingsPage({super.key, this.section});
   @override
   Widget build(BuildContext context) {
     final s = Store.i;
@@ -579,16 +581,16 @@ class SettingsPage extends StatelessWidget {
     return Scaffold(body: Column(children: [
       TopBar(back: true, title: s.t('settings')),
       Expanded(child: ListenableBuilder(listenable: s, builder: (_, __) => ListView(padding: const EdgeInsets.fromLTRB(24, 0, 24, 40), children: [
-        if (s.me != null) ...[
+        if (s.me != null && (section == null || section == 'account')) ...[
           label(s.t('account')),
           row(Icons.edit_outlined, s.t('edit_profile'), () => go(context, const EditProfilePage())),
-          row(Icons.key_rounded, s.t('change_pw'), () => sheet(context, (_) => const PwSheet())),
+          row(Icons.key_rounded, s.t('change_pw'), () => go(context, const PwPage())),
           const SizedBox(height: 6),
           Pick(s.t('pvis'), s.me!.pvis, (v) async { try { await s.setPvis(v); toast(s.t('saved')); } catch (e) { toast(s.err(e), bad: true); } }, opts: profileAud),
           const SizedBox(height: 14),
           Pick(s.t('rel_vis'), s.me!.rvis, (v) async { try { await s.setRvis(v); toast(s.t('saved')); } catch (e) { toast(s.err(e), bad: true); } }, opts: profileAud),
         ],
-        if (!kIsWeb) ...[
+        if (!kIsWeb && (section == null || section == 'notifications')) ...[
           label(s.t('notif')),
           Container(
             padding: const EdgeInsets.fromLTRB(18, 14, 16, 14), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(24)),
@@ -609,11 +611,9 @@ class SettingsPage extends StatelessWidget {
             toast(Notifier.lastError.isNotEmpty ? Notifier.lastError : s.t('test_sent'), bad: Notifier.lastError.isNotEmpty);
           }),
         ],
-        label(s.t('language')),
-        Seg<String>([('id', 'Indonesia'), ('en', 'English')], s.lang, s.setLang),
-        label(s.t('appearance')),
-        Seg<ThemeMode>([(ThemeMode.system, s.t('system')), (ThemeMode.light, s.t('light')), (ThemeMode.dark, s.t('dark'))], s.mode, s.setMode),
-        if (s.me != null) ...[
+        if (section == null || section == 'language') ...[label(s.t('language')), Seg<String>([('id', 'Indonesia'), ('en', 'English')], s.lang, s.setLang)],
+        if (section == null || section == 'appearance') ...[label(s.t('appearance')), Seg<ThemeMode>([(ThemeMode.system, s.t('system')), (ThemeMode.light, s.t('light')), (ThemeMode.dark, s.t('dark'))], s.mode, s.setMode)],
+        if (s.me != null && (section == null || section == 'security')) ...[
           label(''),
           row(Icons.key_rounded, s.t('rec_new'), () => newRecovery(context)),
           row(Icons.devices_other_rounded, s.t('logout_others'), () => go(context, const SessionsPage())),
@@ -626,6 +626,15 @@ class SettingsPage extends StatelessWidget {
       ]))),
     ]));
   }
+}
+
+class PwPage extends StatelessWidget {
+  const PwPage({super.key});
+  @override
+  Widget build(BuildContext context) => Scaffold(body: Column(children: [
+        TopBar(back: true, title: Store.i.t('change_pw')),
+        const Expanded(child: SingleChildScrollView(padding: EdgeInsets.fromLTRB(24, 8, 24, 40), child: PwSheet())),
+      ]));
 }
 
 class PwSheet extends StatefulWidget {
