@@ -217,3 +217,23 @@ test('notifikasi bisa dihapus semua atau dipilih; terkirim; lupa sandi', async (
   assert.equal((await call('GET', '/me', { token: rg.token })).error, 'unauthorized'); // sesi lama dicabut
   assert.equal((await call('POST', '/recover', { body: { username: 'lupaa', code: rg.recovery, password: 'baru1234' } })).error, 'bad_recovery'); // kode lama hangus
 });
+
+test('deteksi isi lewat layanan: AI -> ditandai, human/gagal -> tidak', async () => {
+  const { verdictOf, isAiImage, isAiAudio } = await import('../lib/aidetect.js');
+  assert.equal(verdictOf({ report: { ai_generated: { verdict: 'ai' } } }), true);
+  assert.equal(verdictOf({ report: { ai_generated: { verdict: 'human' } } }), false);
+  assert.equal(verdictOf({ report: { ai_generated: { verdict: 'unknown' } } }), null);
+  assert.equal(verdictOf({ is_ai: true }), true);
+  assert.equal(verdictOf(null), null);
+  const realFetch = globalThis.fetch;
+  process.env.AI_DETECT_KEY = 'k'; process.env.AI_DETECT_AUDIO_URL = 'https://x.test/a';
+  try {
+    globalThis.fetch = async (u) => ({ ok: true, json: async () => ({ report: { ai_generated: { verdict: String(u).includes('image') ? 'ai' : 'human' } } }) });
+    assert.equal(await isAiImage(Buffer.from('abc'), 'image/png'), true);
+    assert.equal(await isAiAudio(Buffer.from('abc'), 'audio/mpeg'), false);
+    globalThis.fetch = async () => { throw new Error('down'); }; // layanan mati: tidak menuduh
+    assert.equal(await isAiImage(Buffer.from('abc'), 'image/png'), false);
+    globalThis.fetch = async () => ({ ok: false, status: 500 });
+    assert.equal(await isAiAudio(Buffer.from('abc'), 'audio/mpeg'), false);
+  } finally { globalThis.fetch = realFetch; delete process.env.AI_DETECT_KEY; delete process.env.AI_DETECT_AUDIO_URL; }
+});

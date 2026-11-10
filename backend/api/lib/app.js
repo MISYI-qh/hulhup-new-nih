@@ -5,7 +5,7 @@ import { ApiErr, now, sha, token, hashPw, checkPw, dayStr, okBirth, ageOf, image
 import { storeFor, putAudio, getAudio, delAudio } from './blobs.js';
 import { randomInt } from 'node:crypto';
 import { pushLater, pushDiag, pushReminders } from './push.js';
-import { aiImage, aiAudio } from './aidetect.js';
+import { isAiImage, isAiAudio } from './aidetect.js';
 
 const MAX_IMG = 3 * 1024 * 1024, MAX_AUDIO = 1024 * 1024; // semua audio maks 1 MB; foto profil maks 3 MB
 const MAX_TEXT = 200000, MAX_POST_TEXT = 1000, INLINE_TEXT = 3000, PREVIEW = 300; // post: 1 audio wajib + teks maks 1000; komentar: teks saja, panjang bebas
@@ -546,11 +546,12 @@ route('POST', /^\/audios$/, async (c) => {
   const secs = Math.min(15, Math.max(1, parseInt(f.secs, 10) || 15));
   const desc = String(f.desc ?? '').trim().slice(0, MAX_POST_TEXT);
   const store = storeFor(secs);
+  const isAi = await isAiAudio(body, mime);
   const key = await putAudio(store, body, mime);
   try {
     await tx(async (t) => {
       const r = await t.query(`insert into audios(owner, descr, secs, store, blob_key, mime, rand, pprof, created, in_rand, in_hups, ai) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,true,true,$10) returning id`,
-        [u.id, desc, secs, store, key, mime, rnd, f.pprof !== '0', now(), aiAudio(body)]);
+        [u.id, desc, secs, store, key, mime, rnd, f.pprof !== '0', now(), isAi]);
       for (const id of to) await t.query('insert into audio_to(audio_id, user_id) values ($1,$2)', [r.rows[0].id, id]);
     });
   } catch (e) { await delAudio(store, key); throw e; }
@@ -587,9 +588,10 @@ route('POST', /^\/me\/(avatar|cover)$/, async (c, m) => {
   const mime = imageMime(body);
   if (!mime || mime === 'image/gif') throw new ApiErr('bad_file');
   const col = m[1] === 'avatar' ? 'av_ver' : 'cv_ver';
+  const avAi = m[1] === 'avatar' ? await isAiImage(body, mime) : false; // metadata + pemeriksaan isi gambar
   await tx(async (t) => {
     await t.query(`insert into photos(user_id, kind, mime, data) values ($1,$2,$3,$4) on conflict (user_id, kind) do update set mime=excluded.mime, data=excluded.data`, [u.id, m[1], mime, body]);
-    await t.query(`update users set ${col}=$2${m[1] === 'avatar' ? ', av_ai=$3' : ''} where id=$1`, m[1] === 'avatar' ? [u.id, now(), aiImage(body)] : [u.id, now()]);
+    await t.query(`update users set ${col}=$2${m[1] === 'avatar' ? ', av_ai=$3' : ''} where id=$1`, m[1] === 'avatar' ? [u.id, now(), avAi] : [u.id, now()]);
   });
   return { ok: true };
 });
@@ -816,8 +818,9 @@ route('POST', /^\/posts\/(\d+)\/audio$/, async (c, m) => {
   if (!mime) throw new ApiErr('bad_file');
   const secs = Math.min(15, Math.max(1, parseInt(c.query.secs, 10) || 15));
   const store = storeFor(secs), key = await putAudio(store, body, mime);
+  const isAi = have === 0 ? await isAiAudio(body, mime) : false;
   try {
-    if (have === 0) await q('update audios set store=$2, blob_key=$3, mime=$4, secs=$5, ai=$6 where id=$1', [a.id, store, key, mime, secs, aiAudio(body)]);
+    if (have === 0) await q('update audios set store=$2, blob_key=$3, mime=$4, secs=$5, ai=$6 where id=$1', [a.id, store, key, mime, secs, isAi]);
     else await q('insert into post_audios(post_id, idx, store, blob_key, mime, secs) values ($1,$2,$3,$4,$5,$6)', [a.id, have, store, key, mime, secs]);
     if (have + 1 >= a.n_audio) await q('update audios set pending=false where id=$1', [a.id]);
   } catch (e) { await delAudio(store, key); throw e; }
