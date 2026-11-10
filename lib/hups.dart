@@ -939,7 +939,7 @@ class _ComposeState extends State<ComposePage> {
   final text = TextEditingController();
   AudioClip? clip;
   final pv = AudioPlayer();
-  bool playing = false, pprof = true, busy = false, aiSelf = false;
+  bool playing = false, pprof = true, busy = false;
   String rand = 'public';
   Map<String, Map> picked = {};
 
@@ -978,7 +978,7 @@ class _ComposeState extends State<ComposePage> {
     setState(() => busy = true);
     int? id;
     try {
-      final j = await Api.req('POST', '/posts', body: {'text': t, 'audios': 1, 'ai_self': aiSelf, 'pprof': pprof, 'rand': audSplit(rand), 'to': picked.keys.toList()});
+      final j = await Api.req('POST', '/posts', body: {'text': t, 'audios': 1, 'pprof': pprof, 'rand': audSplit(rand), 'to': picked.keys.toList()});
       id = (j['id'] as num).toInt();
       await Api.multi('/posts/$id/audio', c.bytes, 'a.${c.ext}', {'secs': '${c.secs}'});
       if (!mounted) return;
@@ -1013,7 +1013,6 @@ class _ComposeState extends State<ComposePage> {
         const SizedBox(height: 6),
         MentionBar(text),
         Padding(padding: const EdgeInsets.only(left: 6, bottom: 14), child: Text(s.t('tag_hint'), style: TextStyle(color: sub(context), fontSize: 12.5))),
-        _row(s.t('ai_self'), aiSelf, (v) => setState(() => aiSelf = v), note: s.t('ai_self_note')),
         _row(s.t('pprof'), pprof, (v) => setState(() => pprof = v)),
         const SizedBox(height: 2),
         Pick(s.t('who_see'), rand, (v) async {

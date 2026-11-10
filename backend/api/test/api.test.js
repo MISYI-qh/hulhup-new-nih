@@ -172,11 +172,6 @@ test('penanda AI dari metadata (audio dan foto profil)', async () => {
   assert.equal((await call('GET', '/me', { token: a })).user.avatar_ai, true);
   assert.equal((await call('POST', '/me/avatar', { token: a, raw: png('tEXtSoftware\0Camera') })).ok, true);
   assert.equal((await call('GET', '/me', { token: a })).user.avatar_ai, false);
-  // pengakuan sendiri: tanda tetap muncul walau berkasnya bersih; tidak bisa menghapus tanda hasil metadata
-  assert.equal((await call('POST', '/me/avatar_ai', { token: a, body: { on: true } })).user.avatar_ai, true);
-  assert.equal((await call('POST', '/me/avatar_ai', { token: a, body: { on: false } })).user.avatar_ai, false);
-  const dec = await mkpost(a, 'mengaku AI', { ai_self: true });
-  assert.equal((await call('GET', `/posts/${dec.id}`, { token: a })).post.ai, true);
   // C2PA saja (kamera asli juga menulisnya) dan kata "audio" tidak boleh dianggap AI
   const real = Buffer.concat([mp3(300), Buffer.from('c2pa jumbf AudioHandler audio/mpeg soun'), Buffer.alloc(50, 3)]);
   const rp = await mkpost(a, 'rekaman biasa', {}, real);
@@ -245,4 +240,27 @@ test('deteksi isi lewat layanan: AI -> ditandai, human/gagal -> tidak', async ()
     globalThis.fetch = async () => ({ ok: false, status: 500 });
     assert.equal(await isAiAudio(Buffer.from('abc'), 'audio/mpeg'), false);
   } finally { globalThis.fetch = realFetch; delete process.env.AI_DETECT_KEY; delete process.env.AI_DETECT_AUDIO_URL; }
+});
+
+test('Deks: foto dan audio dinilai dari isinya', async () => {
+  const { analyzeImage, analyzeAudio } = await import('../lib/deks.js');
+  const { PNG } = await import('pngjs');
+  const png = (w, h, fn) => { const p = new PNG({ width: w, height: h }); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = (y * w + x) * 4, v = fn(x, y); p.data[i] = v; p.data[i + 1] = v; p.data[i + 2] = v; p.data[i + 3] = 255; } return PNG.sync.write(p); };
+  let seed = 7; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  // mulus + ukuran generator + tanpa keterangan -> ditandai
+  const smooth = analyzeImage(png(1024, 1024, (x, y) => 100 + (x + y) / 40));
+  assert.equal(smooth.ai, true, JSON.stringify(smooth));
+  // berderau (foto sensor) dan ukuran biasa -> tidak
+  const noisy = analyzeImage(png(1000, 750, (x, y) => 100 + (x + y) / 40 + (rnd() - 0.5) * 14));
+  assert.equal(noisy.ai, false, JSON.stringify(noisy));
+  // mulus saja (ukuran biasa) -> tidak cukup bukti
+  assert.equal(analyzeImage(png(1000, 750, (x, y) => 100 + (x + y) / 40)).ai, false);
+  const wav = (rate, fn, secs = 3) => { const n = rate * secs, b = Buffer.alloc(44 + n * 2); b.write('RIFF', 0); b.writeUInt32LE(36 + n * 2, 4); b.write('WAVEfmt ', 8); b.writeUInt32LE(16, 16); b.writeUInt16LE(1, 20); b.writeUInt16LE(1, 22); b.writeUInt32LE(rate, 24); b.writeUInt32LE(rate * 2, 28); b.writeUInt16LE(2, 32); b.writeUInt16LE(16, 34); b.write('data', 36); b.writeUInt32LE(n * 2, 40); for (let i = 0; i < n; i++) b.writeInt16LE(Math.round(fn(i / rate) * 32767), 44 + i * 2); return b; };
+  const tone = (t) => 0.3 * Math.sin(2 * Math.PI * 220 * t);
+  // suara bersih dengan jeda hening digital + 24 kHz -> ditandai
+  const tts = analyzeAudio(wav(24000, (t) => (Math.floor(t * 2) % 2 === 0 ? tone(t) : 0)));
+  assert.equal((await tts).ai, true, JSON.stringify(await tts));
+  // rekaman berderau ruangan, 44.1 kHz -> tidak
+  const mic = await analyzeAudio(wav(44100, (t) => (Math.floor(t * 2) % 2 === 0 ? tone(t) : 0) + (rnd() - 0.5) * 0.01));
+  assert.equal(mic.ai, false, JSON.stringify(mic));
 });
