@@ -970,7 +970,7 @@ class _SessionsState extends State<SessionsPage> {
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('${it['device']}', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15.5)),
               const SizedBox(height: 3),
-              Text(it['current'] == true ? s.t('sess_this') : '${s.t('sess_active')} ${s.when((it['last_seen'] as num).toInt())}', style: TextStyle(color: it['current'] == true ? const blue : sub(context), fontSize: 13, fontWeight: FontWeight.w600)),
+              Text(it['current'] == true ? s.t('sess_this') : '${s.t('sess_active')} ${s.when((it['last_seen'] as num).toInt())}', style: TextStyle(color: it['current'] == true ? blue : sub(context), fontSize: 13, fontWeight: FontWeight.w600)),
             ])),
             if (it['current'] != true) Tap(onTap: () => _out(it), child: Padding(padding: const EdgeInsets.all(10), child: Text(s.t('sess_out'), style: const TextStyle(color: heart, fontWeight: FontWeight.w800, fontSize: 14)))),
           ]),
