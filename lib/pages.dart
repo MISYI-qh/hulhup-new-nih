@@ -559,6 +559,10 @@ class _EditState extends State<EditProfilePage> {
         const SizedBox(height: 8),
         In(0, Center(child: Tap(onTap: _avatarMenu, child: Container(padding: const EdgeInsets.all(5), decoration: BoxDecoration(color: bgOf(context), shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .16), blurRadius: 28, offset: const Offset(0, 10))]), child: ClipOval(child: SizedBox(width: 104, height: 104, child: Stack(fit: StackFit.expand, children: [Avatar(me.avatar, me.name, 104), cam(up == 'avatar')]))))))),
         if (me.avatarAi) Center(child: AiTag(s.t('ai_photo'))),
+        if (me.avatar != null) Padding(padding: const EdgeInsets.fromLTRB(24, 14, 24, 0), child: Row(children: [
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(s.t('ai_self_photo'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15.5)), Text(s.t('ai_self_note'), style: TextStyle(color: sub(context), fontSize: 12.5))])),
+          Toggle(me.avatarAi, (v) async { try { await Api.req('POST', '/me/avatar_ai', body: {'on': v}); await s.refresh(); } catch (e) { toast(s.err(e), bad: true); } if (mounted) setState(() {}); }),
+        ])),
         const SizedBox(height: 28),
         Padding(padding: const EdgeInsets.symmetric(horizontal: 24), child: Column(children: [
           In(1, Field(s.t('name'), name, max: 40)), const SizedBox(height: 16),

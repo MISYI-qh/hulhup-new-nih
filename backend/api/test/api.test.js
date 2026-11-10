@@ -172,6 +172,15 @@ test('penanda AI dari metadata (audio dan foto profil)', async () => {
   assert.equal((await call('GET', '/me', { token: a })).user.avatar_ai, true);
   assert.equal((await call('POST', '/me/avatar', { token: a, raw: png('tEXtSoftware\0Camera') })).ok, true);
   assert.equal((await call('GET', '/me', { token: a })).user.avatar_ai, false);
+  // pengakuan sendiri: tanda tetap muncul walau berkasnya bersih; tidak bisa menghapus tanda hasil metadata
+  assert.equal((await call('POST', '/me/avatar_ai', { token: a, body: { on: true } })).user.avatar_ai, true);
+  assert.equal((await call('POST', '/me/avatar_ai', { token: a, body: { on: false } })).user.avatar_ai, false);
+  const dec = await mkpost(a, 'mengaku AI', { ai_self: true });
+  assert.equal((await call('GET', `/posts/${dec.id}`, { token: a })).post.ai, true);
+  // C2PA saja (kamera asli juga menulisnya) dan kata "audio" tidak boleh dianggap AI
+  const real = Buffer.concat([mp3(300), Buffer.from('c2pa jumbf AudioHandler audio/mpeg soun'), Buffer.alloc(50, 3)]);
+  const rp = await mkpost(a, 'rekaman biasa', {}, real);
+  assert.equal((await call('GET', `/posts/${rp.id}`, { token: a })).post.ai, false);
 });
 
 test('algoritma Hups: sorot + komentar + waktu', async () => {

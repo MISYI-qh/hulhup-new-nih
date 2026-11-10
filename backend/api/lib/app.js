@@ -102,13 +102,13 @@ async function uv(u, me, today) {
   return {
     rels,
     username: u.username, name: u.name, bio: u.bio, age: mine ? ageOf(u.birth) : 0, birth: mine ? u.birth : '',
-    avatar: avUrl(u), avatar_ai: u.av_ver > 0 && u.av_ai === true, cover: cvUrl(u), taps: mine ? Number(u.taps) : 0, pvis: mine ? u.pvis : '', rvis: mine ? (u.rvis || 'public') : '',
+    avatar: avUrl(u), avatar_ai: u.av_ver > 0 && (u.av_ai === true || u.av_ai_self === true), cover: cvUrl(u), taps: mine ? Number(u.taps) : 0, pvis: mine ? u.pvis : '', rvis: mine ? (u.rvis || 'public') : '',
     streak: streakOf(u, today), days: mine ? u.days : 0,
     followers: u.followers, following: u.following, audios: r.audios, is_following: r.isf, is_me: mine, verified: u.verified,
   };
 }
 
-const AUD_SQL = `select a.id, a.descr, a.secs, a.pprof, a.rand, a.created, a.likes, a.owner, a.body_len, a.in_rand, a.in_hups, a.n_audio, a.comments, a.bgm, a.bgm_idx, a.ai, a.body btext, u.username ou, u.name oname, u.av_ver oav, u.av_ai oai, u.verified ov, u.pvis opvis,
+const AUD_SQL = `select a.id, a.descr, a.secs, a.pprof, a.rand, a.created, a.likes, a.owner, a.body_len, a.in_rand, a.in_hups, a.n_audio, a.comments, a.bgm, a.bgm_idx, (a.ai or a.ai_self) ai, a.body btext, u.username ou, u.name oname, u.av_ver oav, (u.av_ai or u.av_ai_self) oai, u.verified ov, u.pvis opvis,
   exists(select 1 from likes l where l.audio_id=a.id and l.user_id=$1) liked, exists(select 1 from saves sv where sv.post_id=a.id and sv.user_id=$1) saved from audios a join users u on u.id=a.owner`;
 
 function av(a) {
@@ -596,12 +596,19 @@ route('POST', /^\/me\/(avatar|cover)$/, async (c, m) => {
   return { ok: true };
 });
 
+route('POST', /^\/me\/avatar_ai$/, async (c) => {
+  const u = c.need();
+  await q('update users set av_ai_self=$2 where id=$1', [u.id, c.body.on === true]);
+  const r = await one('select * from users where id=$1', [u.id]);
+  return { user: await uv(r, r, c.today) };
+});
+
 route('DELETE', /^\/me\/(avatar|cover)$/, async (c, m) => {
   const u = c.need();
   const col = m[1] === 'avatar' ? 'av_ver' : 'cv_ver';
   await tx(async (t) => {
     await t.query('delete from photos where user_id=$1 and kind=$2', [u.id, m[1]]);
-    await t.query(`update users set ${col}=0${m[1] === 'avatar' ? ', av_ai=false' : ''} where id=$1`, [u.id]);
+    await t.query(`update users set ${col}=0${m[1] === 'avatar' ? ', av_ai=false, av_ai_self=false' : ''} where id=$1`, [u.id]);
   });
   const r = await one('select * from users where id=$1', [u.id]);
   return { user: await uv(r, r, c.today) };
@@ -796,8 +803,8 @@ route('POST', /^\/posts$/, async (c) => {
   let id;
   try {
     id = await tx(async (t) => {
-      const r = await t.query(`insert into audios(owner, descr, secs, rand, pprof, created, body, body_key, body_len, in_rand, in_hups, n_audio, pending, bgm, mentions, bgm_idx) values ($1,$2,0,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) returning id`,
-        [u.id, cutPreview(text), rnd, b.pprof !== false, now(), body, key, text.length, inRand, inHups, n, n > 0, bgm, mentions.join(','), bgmIdx]);
+      const r = await t.query(`insert into audios(owner, descr, secs, rand, pprof, created, body, body_key, body_len, in_rand, in_hups, n_audio, pending, bgm, mentions, bgm_idx, ai_self) values ($1,$2,0,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) returning id`,
+        [u.id, cutPreview(text), rnd, b.pprof !== false, now(), body, key, text.length, inRand, inHups, n, n > 0, bgm, mentions.join(','), bgmIdx, b.ai_self === true]);
       for (const x of to) await t.query('insert into audio_to(audio_id, user_id) values ($1,$2)', [r.rows[0].id, x]);
       return Number(r.rows[0].id);
     });
