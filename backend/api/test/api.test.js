@@ -161,19 +161,21 @@ test('Hups: aturan post (1 audio wajib, teks maks 1000), komentar tanpa audio, t
 });
 
 test('penanda AI dari metadata (audio dan foto profil)', async () => {
+  const S = await import('../lib/deks/samples.js');
   const a = await reg('aiuser');
-  const tagged = Buffer.concat([mp3(500), Buffer.from('TXXX encoder=ElevenLabs text-to-speech'), Buffer.alloc(100, 2)]);
+  const tagged = S.mp3WithId3([['TXXX', S.id3Txxx('encoder', 'ElevenLabs text-to-speech')]]);
   const p = await mkpost(a, 'suara buatan', {}, tagged);
-  assert.equal((await call('GET', `/posts/${p.id}`, { token: a })).post.ai, true);
+  const got = (await call('GET', `/posts/${p.id}`, { token: a })).post;
+  assert.equal(got.ai, true); assert.equal(got.ai_kind, 'made');
+  const edited = await mkpost(a, 'suara diedit', {}, S.wav(Buffer.concat([(() => { const x = Buffer.from(S.xmpDst('compositeWithTrainedAlgorithmicMedia')); const h = Buffer.alloc(8); h.write('_PMX', 0); h.writeUInt32LE(x.length, 4); return Buffer.concat([h, x, x.length & 1 ? Buffer.from([0]) : Buffer.alloc(0)]); })()])));
+  assert.equal((await call('GET', `/posts/${edited.id}`, { token: a })).post.ai_kind, 'edited');
   const q1 = await mkpost(a, 'suara biasa');
   assert.equal((await call('GET', `/posts/${q1.id}`, { token: a })).post.ai, false);
-  const png = (extra) => Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(40, 0), Buffer.from(extra), Buffer.alloc(40, 0)]);
-  assert.equal((await call('POST', '/me/avatar', { token: a, raw: png('tEXtparameters\0Steps: 20, Sampler: Euler, Model: stable diffusion xl') })).ok, true);
+  assert.equal((await call('POST', '/me/avatar', { token: a, raw: S.pngWithText(S.plainPng(), 'parameters', 'x\nSteps: 20, Sampler: Euler a') })).ok, true);
   assert.equal((await call('GET', '/me', { token: a })).user.avatar_ai, true);
-  assert.equal((await call('POST', '/me/avatar', { token: a, raw: png('tEXtSoftware\0Camera') })).ok, true);
+  assert.equal((await call('POST', '/me/avatar', { token: a, raw: S.pngWithText(S.plainPng(), 'Software', 'Camera') })).ok, true);
   assert.equal((await call('GET', '/me', { token: a })).user.avatar_ai, false);
-  // C2PA saja (kamera asli juga menulisnya) dan kata "audio" tidak boleh dianggap AI
-  const real = Buffer.concat([mp3(300), Buffer.from('c2pa jumbf AudioHandler audio/mpeg soun'), Buffer.alloc(50, 3)]);
+  const real = S.mp3WithId3([['TIT2', S.id3Text('audio diary')], ['TXXX', S.id3Txxx('handler', 'AudioHandler soun c2pa jumbf')]]);
   const rp = await mkpost(a, 'rekaman biasa', {}, real);
   assert.equal((await call('GET', `/posts/${rp.id}`, { token: a })).post.ai, false);
 });
@@ -222,45 +224,39 @@ test('notifikasi bisa dihapus semua atau dipilih; terkirim; lupa sandi', async (
   assert.equal((await call('POST', '/recover', { body: { username: 'lupaa', code: rg.recovery, password: 'baru1234' } })).error, 'bad_recovery'); // kode lama hangus
 });
 
-test('deteksi isi lewat layanan: AI -> ditandai, human/gagal -> tidak', async () => {
-  const { verdictOf, isAiImage, isAiAudio } = await import('../lib/aidetect.js');
-  assert.equal(verdictOf({ report: { ai_generated: { verdict: 'ai' } } }), true);
-  assert.equal(verdictOf({ report: { ai_generated: { verdict: 'human' } } }), false);
-  assert.equal(verdictOf({ report: { ai_generated: { verdict: 'unknown' } } }), null);
-  assert.equal(verdictOf({ is_ai: true }), true);
-  assert.equal(verdictOf(null), null);
-  const realFetch = globalThis.fetch;
-  process.env.AI_DETECT_KEY = 'k'; process.env.AI_DETECT_AUDIO_URL = 'https://x.test/a';
-  try {
-    globalThis.fetch = async (u) => ({ ok: true, json: async () => ({ report: { ai_generated: { verdict: String(u).includes('image') ? 'ai' : 'human' } } }) });
-    assert.equal(await isAiImage(Buffer.from('abc'), 'image/png'), true);
-    assert.equal(await isAiAudio(Buffer.from('abc'), 'audio/mpeg'), false);
-    globalThis.fetch = async () => { throw new Error('down'); }; // layanan mati: tidak menuduh
-    assert.equal(await isAiImage(Buffer.from('abc'), 'image/png'), false);
-    globalThis.fetch = async () => ({ ok: false, status: 500 });
-    assert.equal(await isAiAudio(Buffer.from('abc'), 'audio/mpeg'), false);
-  } finally { globalThis.fetch = realFetch; delete process.env.AI_DETECT_KEY; delete process.env.AI_DETECT_AUDIO_URL; }
+test('Deks v2: contoh penanda alat asli (ditandai) dan contoh biasa (tidak ditandai)', async () => {
+  const { runSelfTest } = await import('../lib/deks/selftest.js');
+  const r = runSelfTest();
+  assert.equal(r.ok, true, JSON.stringify(r.failed));
+  assert.ok(r.total >= 30);
 });
 
-test('Deks: foto dan audio dinilai dari isinya', async () => {
-  const { analyzeImage, analyzeAudio } = await import('../lib/deks.js');
-  const { PNG } = await import('pngjs');
-  const png = (w, h, fn) => { const p = new PNG({ width: w, height: h }); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = (y * w + x) * 4, v = fn(x, y); p.data[i] = v; p.data[i + 1] = v; p.data[i + 2] = v; p.data[i + 3] = 255; } return PNG.sync.write(p); };
-  let seed = 7; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
-  // mulus + ukuran generator + tanpa keterangan -> ditandai
-  const smooth = analyzeImage(png(1024, 1024, (x, y) => 100 + (x + y) / 40));
-  assert.equal(smooth.ai, true, JSON.stringify(smooth));
-  // berderau (foto sensor) dan ukuran biasa -> tidak
-  const noisy = analyzeImage(png(1000, 750, (x, y) => 100 + (x + y) / 40 + (rnd() - 0.5) * 14));
-  assert.equal(noisy.ai, false, JSON.stringify(noisy));
-  // mulus saja (ukuran biasa) -> tidak cukup bukti
-  assert.equal(analyzeImage(png(1000, 750, (x, y) => 100 + (x + y) / 40)).ai, false);
-  const wav = (rate, fn, secs = 3) => { const n = rate * secs, b = Buffer.alloc(44 + n * 2); b.write('RIFF', 0); b.writeUInt32LE(36 + n * 2, 4); b.write('WAVEfmt ', 8); b.writeUInt32LE(16, 16); b.writeUInt16LE(1, 20); b.writeUInt16LE(1, 22); b.writeUInt32LE(rate, 24); b.writeUInt32LE(rate * 2, 28); b.writeUInt16LE(2, 32); b.writeUInt16LE(16, 34); b.write('data', 36); b.writeUInt32LE(n * 2, 40); for (let i = 0; i < n; i++) b.writeInt16LE(Math.round(fn(i / rate) * 32767), 44 + i * 2); return b; };
-  const tone = (t) => 0.3 * Math.sin(2 * Math.PI * 220 * t);
-  // suara bersih dengan jeda hening digital + 24 kHz -> ditandai
-  const tts = analyzeAudio(wav(24000, (t) => (Math.floor(t * 2) % 2 === 0 ? tone(t) : 0)));
-  assert.equal((await tts).ai, true, JSON.stringify(await tts));
-  // rekaman berderau ruangan, 44.1 kHz -> tidak
-  const mic = await analyzeAudio(wav(44100, (t) => (Math.floor(t * 2) % 2 === 0 ? tone(t) : 0) + (rnd() - 0.5) * 0.01));
-  assert.equal(mic.ai, false, JSON.stringify(mic));
+test('Deks v2: watermark Stable Diffusion terbaca dari PNG (fixture dari paket resmi invisible-watermark)', async () => {
+  const fs = await import('node:fs');
+  const { deksImage } = await import('../lib/deks/index.js');
+  for (const [f, name] of [['sd1', 'Stable Diffusion v1'], ['sd2', 'Stable Diffusion v2'], ['xl', 'SDXL']]) {
+    const rep = deksImage(fs.readFileSync(new URL(`./fixtures/wm-${f}.png`, import.meta.url)));
+    assert.equal(rep.ai, true, f);
+    assert.ok(rep.hits[0].why.includes(name), rep.hits[0].why);
+  }
+  assert.equal(deksImage(fs.readFileSync(new URL('./fixtures/wm-none.png', import.meta.url))).ai, false);
+});
+
+test('foto profil: paket DKS1 (berkas asli + foto tersimpan) dan tanda AI dari berkas asli', async () => {
+  const S = await import('../lib/deks/samples.js');
+  const tok = await reg('fotoai');
+  const pack = (meta, img) => { const h = Buffer.alloc(9); h.write('DKS1', 0); h[4] = 0; h.writeUInt32BE(meta.length, 5); return Buffer.concat([h, meta, img]); };
+  const small = S.plainJpeg(48, 48);
+  const orig = S.pngWithText(S.plainPng(), 'parameters', 'x\nSteps: 20, Sampler: Euler a');
+  const put = (body) => call('POST', '/me/avatar', { token: tok, raw: body });
+  assert.equal((await put(pack(orig, small))).ok, true);
+  let me = (await call('GET', '/me', { token: tok })).user;
+  assert.equal(me.avatar_ai, true); assert.equal(me.avatar_ai_kind, 'made');
+  // foto kamera biasa -> tidak ditandai, dan tanda lama hilang
+  assert.equal((await put(pack(S.plainJpeg(64, 64), small))).ok, true);
+  me = (await call('GET', '/me', { token: tok })).user;
+  assert.equal(me.avatar_ai, false); assert.equal(me.avatar_ai_kind, '');
+  // unggah polos (aplikasi lama) tetap jalan
+  assert.equal((await put(small)).ok, true);
+  assert.equal((await call('GET', '/deks/selftest')).ok, true);
 });

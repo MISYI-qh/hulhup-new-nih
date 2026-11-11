@@ -160,7 +160,7 @@ class _RecordSheetState extends State<RecordSheet> {
 /// Audio sebuah post (satu), dengan tanda bila terdeteksi buatan AI.
 Widget audioBars(A a, Object? scope) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       for (var i = 0; i < a.files.length; i++) FileBar(fileKey(a, i), '${a.files[i]['url']}', (a.files[i]['secs'] as num?)?.toInt() ?? 0, scope: scope),
-      if (a.ai) AiTag(Store.i.t('ai_audio')),
+      if (a.ai) AiTag(Store.i.t(a.aiKind == 'edited' ? 'ai_audio_edit' : 'ai_audio')),
     ]);
 
 String bgmUrl(A a) => '${a.files[a.bgmIdx.clamp(0, a.files.length - 1)]['url']}';

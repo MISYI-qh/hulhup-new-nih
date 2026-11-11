@@ -12,7 +12,6 @@
   "dependencies": {
     "jpeg-js": "^0.4.4",
     "mongodb": "^6.10.0",
-    "mpg123-decoder": "^1.0.3",
     "pg": "^8.13.0",
     "pngjs": "^7.0.0"
   },

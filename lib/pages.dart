@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'core.dart';
 import 'hups.dart';
 import 'notify.dart';
+import 'prepimg.dart';
 import 'ui.dart';
 
 Future<void> likeAudio(A a) async {
@@ -255,7 +256,7 @@ class _ProfileState extends State<ProfilePage> {
         Row(children: [Flexible(child: Text(u.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 24, letterSpacing: -.5))), if (u.verified) const Padding(padding: EdgeInsets.only(left: 6), child: Icon(Icons.verified_rounded, size: 22, color: blue))]),
         const SizedBox(height: 2),
         Text(u.username, style: TextStyle(color: sub(context), fontSize: 15)),
-        if (u.avatarAi) AiTag(Store.i.t('ai_photo')),
+        if (u.avatarAi) AiTag(Store.i.t(u.avatarAiKind == 'edited' ? 'ai_photo_edit' : 'ai_photo')),
         if (u.bio.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 12), child: MentionText(u.bio, style: const TextStyle(fontSize: 15, height: 1.45))),
         const SizedBox(height: 16),
         Wrap(spacing: 22, runSpacing: 8, children: [_stat(u.followers, s.t('followers'), 'followers'), _stat(u.following, s.t('following'), 'following'),
@@ -506,11 +507,20 @@ class _EditState extends State<EditProfilePage> {
 
   Future<void> _img(String kind) async {
     final s = Store.i;
-    final x = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: kind == 'avatar' ? 720 : 1600, imageQuality: 85);
+    // Foto profil: ambil berkas ASLI (metadata asal-usulnya ikut diperiksa Deks di server), lalu kirim bersama versi kecil yang disimpan.
+    final x = kind == 'avatar'
+        ? await ImagePicker().pickImage(source: ImageSource.gallery)
+        : await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1600, imageQuality: 85);
     if (x == null) return;
     setState(() => up = kind);
     try {
-      await Api.raw('/me/$kind', await x.readAsBytes(), x.mimeType ?? 'image/jpeg');
+      final orig = await x.readAsBytes();
+      if (kind == 'avatar') {
+        final small = await shrinkAvatar(orig);
+        await Api.raw('/me/avatar', Api.remote ? packAvatar(orig, small) : small, 'image/jpeg');
+      } else {
+        await Api.raw('/me/$kind', orig, x.mimeType ?? 'image/jpeg');
+      }
       await s.refresh();
     } catch (e) { toast(s.err(e), bad: true); }
     if (mounted) setState(() => up = null);
@@ -558,7 +568,7 @@ class _EditState extends State<EditProfilePage> {
       Expanded(child: ListView(padding: const EdgeInsets.only(bottom: 40), children: [
         const SizedBox(height: 8),
         In(0, Center(child: Tap(onTap: _avatarMenu, child: Container(padding: const EdgeInsets.all(5), decoration: BoxDecoration(color: bgOf(context), shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .16), blurRadius: 28, offset: const Offset(0, 10))]), child: ClipOval(child: SizedBox(width: 104, height: 104, child: Stack(fit: StackFit.expand, children: [Avatar(me.avatar, me.name, 104), cam(up == 'avatar')]))))))),
-        if (me.avatarAi) Center(child: AiTag(s.t('ai_photo'))),
+        if (me.avatarAi) Center(child: AiTag(s.t(me.avatarAiKind == 'edited' ? 'ai_photo_edit' : 'ai_photo'))),
         const SizedBox(height: 28),
         Padding(padding: const EdgeInsets.symmetric(horizontal: 24), child: Column(children: [
           In(1, Field(s.t('name'), name, max: 40)), const SizedBox(height: 16),
