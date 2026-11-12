@@ -21,7 +21,7 @@ class HomePage extends StatefulWidget {
 
 class _HomeState extends State<HomePage> {
   bool menu = false, _busy = false;
-  late int mode = widget.mode0; // 0 = Acak, 1 = Hups
+  late int mode = Store.i.online ? widget.mode0 : 0; // 0 = Acak, 1 = Hups (Hups butuh internet)
 
   @override
   void initState() { super.initState(); Store.i.homeMode = mode; }
@@ -78,7 +78,7 @@ class _HomeState extends State<HomePage> {
           final f = s.me == null ? 'public' : s.filter;
           return Stack(children: [
             HupsFeed(f, key: ValueKey('hf_$f${s.me?.username}')),
-            Positioned(right: 20, bottom: 14, child: Tap(onTap: () => go(context, s.me == null ? const AuthPage() : const ComposePage()), child: Container(width: 56, height: 56, decoration: BoxDecoration(color: btnBg(context), shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .35), blurRadius: 22, offset: const Offset(0, 10))]), child: const Center(child: HIcon(HK.add, size: 26, color: cream))))),
+            Positioned(right: 20, bottom: 14, child: Tap(onTap: () => { if (Store.i.needNet()) go(context, s.me == null ? const AuthPage() : const ComposePage()); }, child: Container(width: 56, height: 56, decoration: BoxDecoration(color: btnBg(context), shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .35), blurRadius: 22, offset: const Offset(0, 10))]), child: const Center(child: HIcon(HK.add, size: 26, color: cream))))),
           ]);
         })),
       ]);
@@ -86,7 +86,7 @@ class _HomeState extends State<HomePage> {
   Widget _switcher(Store s) {
     Widget seg(int i, HK k, String label) {
       final on = mode == i;
-      return Expanded(child: Tap(onTap: () { if (mode != i) { setState(() => mode = i); Store.i.homeMode = i; syncHomeUrl(); } }, scale: .97, child: AnimatedContainer(
+      return Expanded(child: Tap(onTap: () { if (i == 1 && !Store.i.needNet()) return; if (mode != i) { setState(() => mode = i); Store.i.homeMode = i; syncHomeUrl(); } }, scale: .97, child: AnimatedContainer(
         duration: const Duration(milliseconds: 260), curve: Curves.easeOutCubic, height: 44,
         decoration: BoxDecoration(color: on ? ink(context) : Colors.transparent, borderRadius: BorderRadius.circular(22)),
         child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [HIcon(k, size: 19, color: on ? bgOf(context) : sub(context)), const SizedBox(width: 8), Text(label, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: on ? bgOf(context) : sub(context)))]),
@@ -113,7 +113,7 @@ class _HomeState extends State<HomePage> {
           TopBar(
             lead: IconBtn(Icons.menu_rounded, () => setState(() => menu = true)),
             center: const Brand(),
-            actions: [IconBtn(Icons.search_rounded, () => go(context, const SearchPage())), ListenableBuilder(listenable: s, builder: (_, __) => IconBtn(Icons.person_outline_rounded, () => go(context, ProfilePage(s.me?.username)), dot: s.unread > 0))],
+            actions: [IconBtn(Icons.search_rounded, () { if (s.needNet()) go(context, const SearchPage()); }), ListenableBuilder(listenable: s, builder: (_, __) => IconBtn(Icons.person_outline_rounded, () => go(context, ProfilePage(s.me?.username)), dot: s.unread > 0))],
           ),
           ListenableBuilder(listenable: s, builder: (_, __) => !s.updateReady ? const SizedBox() : Padding(padding: const EdgeInsets.fromLTRB(20, 4, 20, 0), child: Tap(onTap: () => showUpdate(context), scale: .98, child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(18)),
@@ -160,10 +160,10 @@ class _TapButtonState extends State<TapButton> with TickerProviderStateMixin {
             duration: const Duration(milliseconds: 150), width: 204, height: 204,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: const RadialGradient(center: Alignment(-.36, -.52), radius: 1.1, colors: [Color(0xFFFFA566), Color(0xFFFF7A45), brand, Color(0xFFF23F6C)], stops: [0, .38, .75, 1]),
-              boxShadow: [BoxShadow(color: brand.withValues(alpha: down ? .2 : .36), blurRadius: down ? 24 : 52, offset: Offset(0, down ? 10 : 26))],
+              gradient: const RadialGradient(center: Alignment(-.36, -.52), radius: 1.1, colors: [Color(0xFF3A3A3A), Color(0xFF161616)], stops: [0, 1]),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: down ? .18 : .32), blurRadius: down ? 24 : 52, offset: Offset(0, down ? 10 : 26))],
             ),
-            child: const Center(child: Logo(84, Colors.white)),
+            child: const Center(child: Logo(88, Colors.white)),
           ),
         ),
       ),
@@ -205,7 +205,7 @@ class _SideMenuState extends State<SideMenu> {
   Widget build(BuildContext context) {
     final open = widget.open, close = widget.close;
     final s = Store.i;
-    Widget item(IconData i, String k, Widget Function() p) => Tap(onTap: () { close(); go(context, p()); }, child: Padding(padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8), child: Row(children: [Icon(i, size: 24, color: ink(context)), const SizedBox(width: 16), Text(s.t(k), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600))])));
+    Widget item(IconData i, String k, Widget Function() p, {bool net = false}) => Tap(onTap: () { if (net && !s.needNet()) return; close(); go(context, p()); }, child: Padding(padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8), child: Row(children: [Icon(i, size: 24, color: ink(context)), const SizedBox(width: 16), Text(s.t(k), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600))])));
     return Stack(children: [
       IgnorePointer(ignoring: !open, child: GestureDetector(onTap: close, child: AnimatedOpacity(opacity: open ? 1 : 0, duration: const Duration(milliseconds: 300), child: Container(color: Colors.black45)))),
       AnimatedPositioned(
@@ -215,8 +215,8 @@ class _SideMenuState extends State<SideMenu> {
           child: SafeArea(child: ListenableBuilder(listenable: s, builder: (_, __) => Padding(padding: const EdgeInsets.fromLTRB(20, 18, 20, 18), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Brand(),
             const SizedBox(height: 28),
-            Padding(padding: const EdgeInsets.only(bottom: 8), child: PBtn(s.t('create'), () { close(); go(context, s.me == null ? const AuthPage() : const ComposePage()); }, icon: Icons.add_rounded)),
-            item(Icons.tune_rounded, 'settings', () => const SettingsPage()),
+            Padding(padding: const EdgeInsets.only(bottom: 8), child: PBtn(s.t('create'), () { if (!s.needNet()) return; close(); go(context, s.me == null ? const AuthPage() : const ComposePage()); }, icon: Icons.add_rounded)),
+            item(Icons.tune_rounded, 'settings', () => const SettingsPage(), net: true),
             if (s.me != null) item(Icons.send_outlined, 'sent_title', () => const SentPage()),
             item(Icons.download_done_rounded, 'offline_t', () => const OfflinePage()),
             item(Icons.help_outline_rounded, 'faq', () => const FaqPage()),
@@ -262,7 +262,7 @@ class PopupBody extends StatelessWidget {
         child: ListenableBuilder(listenable: s, builder: (_, __) {
           final on = s.playing == a.id;
           return Row(children: [
-            Tap(onTap: () => s.play(a).catchError((_) => toast(s.t('e_server'), bad: true)), child: AnimatedContainer(duration: const Duration(milliseconds: 250), width: 44, height: 44, decoration: BoxDecoration(color: on ? brand : btnBg(context), shape: BoxShape.circle), child: AnimatedSwitcher(duration: const Duration(milliseconds: 200), child: Icon(on ? Icons.pause_rounded : Icons.play_arrow_rounded, key: ValueKey(on), color: on ? Colors.white : cream, size: 26)))),
+            Tap(onTap: () => s.play(a).catchError((_) => toast(s.t('e_server'), bad: true)), child: AnimatedContainer(duration: const Duration(milliseconds: 250), width: 44, height: 44, decoration: BoxDecoration(color: on ? brand : btnBg(context), shape: BoxShape.circle), child: AnimatedSwitcher(duration: const Duration(milliseconds: 200), child: Icon(on ? Icons.pause_rounded : Icons.play_arrow_rounded, key: ValueKey(on), color: on ? Colors.black : cream, size: 26)))),
             Expanded(child: ValueListenableBuilder<int>(valueListenable: s.pos, builder: (_, ms, __) {
               final total = (s.dur > 0 ? s.dur : a.secs * 1000).clamp(1, 1 << 30);
               return Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: (ms / total).clamp(0.0, 1.0), minHeight: 6, backgroundColor: ink(context).withValues(alpha: .12), color: ink(context))));

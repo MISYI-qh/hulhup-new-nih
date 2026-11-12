@@ -5,8 +5,7 @@ import 'routes.dart';
 import 'package:flutter/services.dart';
 import 'core.dart';
 
-const brand = Color(0xFFFF624F); // koral merek: aksen kecil saja, tampilan tetap dominan hitam-putih
-const brandGrad = LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFFFF8A3D), Color(0xFFFF624F), Color(0xFFF23F6C)]);
+const brand = Color(0xFFFFC400); // kuning merek (bola pada logo, tombol putar aktif): aksen kecil saja, tampilan tetap dominan hitam-putih
 const blue = Color(0xFF3897F0); // tautan, tag, tanda verifikasi
 const cream = Color(0xFFFBF6E9);
 const heart = Color(0xFFE0524A);
@@ -270,37 +269,39 @@ class _ToastState extends State<_Toast> with SingleTickerProviderStateMixin {
 }
 
 class _LogoPainter extends CustomPainter {
-  final Color color;
-  final double lift; // 0..1 tinggi loncatan titik
-  final double squash; // 0..1 gepeng saat mendarat
-  _LogoPainter(this.color, this.lift, this.squash);
+  final Color color, ball;
+  final double drop; // 0 = bola di atas cangkir, 1 = bola di dasar cangkir
+  final double squash; // 0..1 gepeng saat bola mendarat
+  _LogoPainter(this.color, this.ball, this.drop, this.squash);
   @override
   void paint(Canvas c, Size s) {
-    final k = s.height / .6, ox = s.width / 2 - .5 * k, oy = s.height / 2 - .5 * k;
-    Rect r(double l, double t, double rr, double b) => Rect.fromLTRB(ox + l * k, oy + t * k, ox + rr * k, oy + b * k);
-    final p = Paint()..color = color..isAntiAlias = true;
-    final rad = Radius.circular(.075 * k);
-    c.drawRRect(RRect.fromRectAndRadius(r(.27, .20, .42, .80), rad), p);
-    c.drawRRect(RRect.fromRectAndRadius(r(.58, .44, .73, .80), rad), p);
-    c.drawRRect(RRect.fromRectAndRadius(r(.27, .44, .73, .59), rad), p);
-    final cy = .285 - lift * .13, rx = .085 * (1 + squash * .18), ry = .085 * (1 - squash * .18);
-    c.drawOval(Rect.fromCenter(center: Offset(ox + .66 * k, oy + (cy + (.085 - ry)) * k), width: rx * 2 * k, height: ry * 2 * k), p);
+    final k = s.height / .805, ox = s.width / 2 - .5 * k, oy = s.height / 2 - .472 * k;
+    Offset o(double x, double y) => Offset(ox + x * k, oy + y * k);
+    final cup = Path()
+      ..moveTo(o(.30, .435).dx, o(.30, .435).dy)
+      ..lineTo(o(.30, .60).dx, o(.30, .60).dy)
+      ..arcTo(Rect.fromCircle(center: o(.5, .60), radius: .20 * k), pi, -pi, false)
+      ..lineTo(o(.70, .435).dx, o(.70, .435).dy);
+    c.drawPath(cup, Paint()..color = color..style = PaintingStyle.stroke..strokeWidth = .15 * k..strokeCap = StrokeCap.round..strokeJoin = StrokeJoin.round..isAntiAlias = true);
+    final cy = .17 + drop * .46, rx = .10 * (1 + squash * .22), ry = .10 * (1 - squash * .22);
+    c.drawOval(Rect.fromCenter(center: o(.5, cy + (.10 - ry)), width: rx * 2 * k, height: ry * 2 * k), Paint()..color = ball..isAntiAlias = true);
   }
   @override
-  bool shouldRepaint(_LogoPainter o) => o.color != color || o.lift != lift || o.squash != squash;
+  bool shouldRepaint(_LogoPainter o) => o.color != color || o.ball != ball || o.drop != drop || o.squash != squash;
 }
 
-/// Logo Hulhup: huruf H bulat dengan titik yang meloncat. size = tinggi tanda.
+/// Logo Hulhup: cangkir "u" dan bola yang meloncat masuk. size = tinggi tanda.
 class Logo extends StatelessWidget {
   final double size;
   final Color color;
-  final double lift;
-  const Logo(this.size, this.color, {super.key, this.lift = 0});
+  final Color ball;
+  final double drop;
+  const Logo(this.size, this.color, {super.key, this.ball = brand, this.drop = 0});
   @override
-  Widget build(BuildContext context) => SizedBox(width: size * .8, height: size, child: CustomPaint(painter: _LogoPainter(color, lift, 0)));
+  Widget build(BuildContext context) => SizedBox(width: size * .7, height: size, child: CustomPaint(painter: _LogoPainter(color, ball, drop, 0)));
 }
 
-/// Logo beranimasi: titik memantul terus. Dipakai untuk semua loading.
+/// Logo beranimasi: bola jatuh ke cangkir, gepeng sebentar, lalu meloncat keluar. Dipakai untuk semua loading.
 class LogoLoop extends StatefulWidget {
   final double size;
   final Color? color;
@@ -310,7 +311,7 @@ class LogoLoop extends StatefulWidget {
 }
 
 class _LogoLoopState extends State<LogoLoop> with SingleTickerProviderStateMixin {
-  late final AnimationController c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100))..repeat();
+  late final AnimationController c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))..repeat();
   @override
   void dispose() { c.dispose(); super.dispose(); }
   @override
@@ -318,9 +319,11 @@ class _LogoLoopState extends State<LogoLoop> with SingleTickerProviderStateMixin
     final col = widget.color ?? ink(context);
     return RepaintBoundary(child: AnimatedBuilder(animation: c, builder: (_, __) {
       final t = c.value;
-      final up = t < .62 ? Curves.easeOutCubic.transform(sin(t / .62 * pi).abs()) : 0.0;
-      final land = t >= .62 ? sin((t - .62) / .38 * pi) : 0.0;
-      return SizedBox(width: widget.size * .8, height: widget.size, child: CustomPaint(painter: _LogoPainter(col, up, land.toDouble())));
+      double drop, sq = 0;
+      if (t < .38) { drop = Curves.easeInQuad.transform(t / .38); }
+      else if (t < .52) { drop = 1; sq = sin((t - .38) / .14 * pi); }
+      else { drop = 1 - Curves.easeOutCubic.transform((t - .52) / .48); }
+      return SizedBox(width: widget.size * .7, height: widget.size, child: CustomPaint(painter: _LogoPainter(col, brand, drop, sq)));
     }));
   }
 }
@@ -354,7 +357,7 @@ class Brand extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final w = Row(mainAxisSize: MainAxisSize.min, children: [
-      Container(width: 30, height: 30, decoration: BoxDecoration(gradient: brandGrad, borderRadius: BorderRadius.circular(9)), alignment: Alignment.center, child: const Logo(18, Colors.white)),
+      Container(width: 30, height: 30, decoration: BoxDecoration(color: btnBg(context), borderRadius: BorderRadius.circular(9)), alignment: Alignment.center, child: const Logo(19, cream)),
       const SizedBox(width: 9),
       Text('Hulhup', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 21, letterSpacing: -.4, color: ink(context))),
       if (onTap != null) Icon(Icons.keyboard_arrow_down_rounded, size: 22, color: sub(context)),

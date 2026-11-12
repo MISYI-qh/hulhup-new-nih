@@ -299,6 +299,9 @@ route('GET', /^\/search$/, async (c) => {
   await hit(`srch:${c.me ? 'u' + c.me.id : c.ip}`, 60, 60);
   const s = String(c.query.q ?? '').trim().toLowerCase().slice(0, 50);
   if (!s) return { users: [], audios: [] };
+  if (c.me && s.length >= 2) { // ingat pencarian terakhir (dipakai peringkat Hups); simpan 20 terakhir saja
+    q('insert into search_log(user_id, sq, created) values ($1,$2,$3)', [c.me.id, s, now()]).then(() => q('delete from search_log where user_id=$1 and id not in (select id from search_log where user_id=$1 order by id desc limit 20)', [c.me.id])).catch(() => {});
+  }
   const esc = s.replace(/[\\%_]/g, (m) => '\\' + m);
   const users = await many(`select * from users where status='active' and (username like $1 or lower(name) like $2) order by username limit 30`, [esc + '%', '%' + esc + '%']);
   const vid = c.me ? Number(c.me.id) : 0;
@@ -860,8 +863,15 @@ route('GET', /^\/hups$/, async (c) => {
   await hit(`hups:${c.me ? 'u' + c.me.id : c.ip}`, 240, 60);
   const f = filterOf(c.query.f);
   const vid = c.me ? c.me.id : 0, off = Math.min(2000, Math.max(0, Number(c.query.next) || 0));
-  // Peringkat Hups: sorot + komentar (komentar lebih berat) dibagi usia post; makin baru makin besar peluang di atas.
-  const score = `((a.likes * 2.0 + a.comments * 3.0 + 1.0) / power(((${now()} - a.created) / 3600000.0) + 2.0, 1.45))`;
+  // Peringkat Hups (bobot tetap): waktu 35%, sorot 25%, komentar 25%, pencarian 15%. Tiap komponen bernilai 0..1.
+  //  waktu     : makin baru makin tinggi (meluruh, separuh nilai tiap ~25 jam)
+  //  sorot     : log(1+sorot) dibanding post terbaik di daftar yang sama (log agar satu post viral tidak menenggelamkan yang lain)
+  //  komentar  : cara hitung sama dengan sorot
+  //  pencarian : 1 bila penulis/isi post cocok dengan salah satu dari 20 pencarian terakhir si pembaca, selain itu 0
+  const score = `(0.35 * exp(-((${now()} - a.created) / 3600000.0) / 36.0)
+    + 0.25 * (ln(1 + a.likes) / greatest(ln(1 + max(a.likes) over ()), 1))
+    + 0.25 * (ln(1 + a.comments) / greatest(ln(1 + max(a.comments) over ()), 1))
+    + 0.15 * (case when exists(select 1 from (select sq from search_log where user_id=$1 order by id desc limit 20) z where position(z.sq in lower(coalesce(a.descr,'') || ' ' || coalesce(a.body,'') || ' ' || u.username || ' ' || u.name)) > 0) then 1 else 0 end))`;
   const rows = await many(
     `${AUD_SQL} where a.in_hups and not a.hidden and not a.pending and u.status='active' and (${audCond(f)} or (a.owner=$1 and ${HAS('public')} and '${f}'='public')) order by ${score} desc, a.id desc offset ${off} limit 21`,
     [vid]);

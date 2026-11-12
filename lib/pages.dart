@@ -103,7 +103,7 @@ class AudioRow extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.fromLTRB(12, 12, 6, 12),
         decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(26)),
         child: Row(children: [
-          if (a.url.isEmpty) Container(width: 46, height: 46, decoration: BoxDecoration(color: ink(context).withValues(alpha: .1), shape: BoxShape.circle), child: Center(child: HIcon(HK.hups, size: 22, color: ink(context)))) else Tap(onTap: () => s.play(a, scope: scope).catchError((_) => toast(s.t('e_server'), bad: true)), child: AnimatedContainer(duration: const Duration(milliseconds: 250), width: 46, height: 46, decoration: BoxDecoration(color: on ? ink(context) : brand, shape: BoxShape.circle), child: AnimatedSwitcher(duration: const Duration(milliseconds: 200), child: Icon(on ? Icons.pause_rounded : Icons.play_arrow_rounded, key: ValueKey(on), color: on ? Colors.white : cream, size: 26)))),
+          if (a.url.isEmpty) Container(width: 46, height: 46, decoration: BoxDecoration(color: ink(context).withValues(alpha: .1), shape: BoxShape.circle), child: Center(child: HIcon(HK.hups, size: 22, color: ink(context)))) else Tap(onTap: () => s.play(a, scope: scope).catchError((_) => toast(s.t('e_server'), bad: true)), child: AnimatedContainer(duration: const Duration(milliseconds: 250), width: 46, height: 46, decoration: BoxDecoration(color: on ? ink(context) : brand, shape: BoxShape.circle), child: AnimatedSwitcher(duration: const Duration(milliseconds: 200), child: Icon(on ? Icons.pause_rounded : Icons.play_arrow_rounded, key: ValueKey(on), color: on ? bgOf(context) : Colors.black, size: 26)))),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(a.desc.trim().isEmpty ? s.t('untitled') : a.desc.trim(), maxLines: 3, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: a.desc.trim().isEmpty ? sub(context) : null)),
@@ -220,6 +220,7 @@ class _ProfileState extends State<ProfilePage> {
   }
 
   Future<void> _edit() async {
+    if (!Store.i.needNet()) return;
     final r = await go<String>(context, const EditProfilePage());
     if (!mounted) return;
     if (r != null && r != widget.u) { Navigator.of(context).pushReplacement(route(ProfilePage(r))); return; }
@@ -596,7 +597,7 @@ class SettingsPage extends StatelessWidget {
       Expanded(child: ListenableBuilder(listenable: s, builder: (_, __) => ListView(padding: const EdgeInsets.fromLTRB(24, 0, 24, 40), children: [
         if (s.me != null && (section == null || section == 'account')) ...[
           label(s.t('account')),
-          row(Icons.edit_outlined, s.t('edit_profile'), () => go(context, const EditProfilePage())),
+          row(Icons.edit_outlined, s.t('edit_profile'), () { if (s.needNet()) go(context, const EditProfilePage()); }),
           row(Icons.key_rounded, s.t('change_pw'), () => go(context, const PwPage())),
           const SizedBox(height: 6),
           Pick(s.t('pvis'), s.me!.pvis, (v) async { try { await s.setPvis(v); toast(s.t('saved')); } catch (e) { toast(s.err(e), bad: true); } }, opts: profileAud),
@@ -777,7 +778,7 @@ class _NotifState extends State<NotifPage> {
     if (sys) {
       final txt = k == 'tired' ? s.t('r_body') : s.t(k == 'streak' ? 'n_streak' : 'n_missed').replaceAll('{n}', '${n['n']}');
       return In(i, Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(26)), child: Row(children: [
-        Container(width: 46, height: 46, decoration: const BoxDecoration(gradient: brandGrad, shape: BoxShape.circle), child: const Center(child: Logo(22, Colors.white))),
+        Container(width: 46, height: 46, decoration: BoxDecoration(color: btnBg(context), shape: BoxShape.circle), child: const Center(child: Logo(24, cream))),
         const SizedBox(width: 14),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Text(k == 'tired' ? s.t('r_title') : 'Hulhup', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)), const Spacer(), when]), const SizedBox(height: 2), Text(txt, style: const TextStyle(fontSize: 15, height: 1.4))])),
       ])));

@@ -219,7 +219,7 @@ class FileBar extends StatelessWidget {
         margin: const EdgeInsets.only(top: 10), padding: const EdgeInsets.fromLTRB(8, 8, 12, 8),
         decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: ink(context).withValues(alpha: on ? .5 : .12), width: on ? 1.4 : 1)),
         child: Row(children: [
-          Tap(onTap: () => s.playUrl(keyId, url, scope: scope).catchError((_) => toast(s.t('e_server'), bad: true)), child: AnimatedContainer(duration: const Duration(milliseconds: 220), width: 40, height: 40, decoration: BoxDecoration(color: on ? brand : btnBg(context), borderRadius: BorderRadius.circular(on ? 12 : 20)), child: Icon(on ? Icons.pause_rounded : Icons.play_arrow_rounded, color: on ? Colors.white : cream, size: 22))),
+          Tap(onTap: () => s.playUrl(keyId, url, scope: scope).catchError((_) => toast(s.t('e_server'), bad: true)), child: AnimatedContainer(duration: const Duration(milliseconds: 220), width: 40, height: 40, decoration: BoxDecoration(color: on ? brand : btnBg(context), borderRadius: BorderRadius.circular(on ? 12 : 20)), child: Icon(on ? Icons.pause_rounded : Icons.play_arrow_rounded, color: on ? Colors.black : cream, size: 22))),
           const SizedBox(width: 12),
           Expanded(child: SizedBox(height: 32, child: ValueListenableBuilder<int>(valueListenable: s.pos, builder: (_, ms, __) {
             final total = (on && s.dur > 0 ? s.dur : (secs > 0 ? secs * 1000 : 15000)).clamp(1, 1 << 30);
@@ -241,9 +241,9 @@ class AiTag extends StatelessWidget {
   const AiTag(this.label, {super.key});
   @override
   Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(top: 8), child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Container(padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4), decoration: BoxDecoration(color: const Color(0xFFF5A524).withValues(alpha: .12), borderRadius: BorderRadius.circular(10)), child: Row(mainAxisSize: MainAxisSize.min, children: [
-          const Icon(Icons.auto_awesome_rounded, size: 13, color: Color(0xFFF5A524)), const SizedBox(width: 5),
-          Text(label, style: const TextStyle(color: Color(0xFFF5A524), fontSize: 12, fontWeight: FontWeight.w700)),
+        Container(padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4), decoration: BoxDecoration(color: const Color(0xFF7C5CFF).withValues(alpha: .12), borderRadius: BorderRadius.circular(10)), child: Row(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.auto_awesome_rounded, size: 13, color: Color(0xFF7C5CFF)), const SizedBox(width: 5),
+          Text(label, style: const TextStyle(color: Color(0xFF7C5CFF), fontSize: 12, fontWeight: FontWeight.w700)),
         ])),
       ]));
 }
@@ -275,7 +275,7 @@ class _AudioSlot extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(10, 10, 6, 10),
       decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), border: Border.all(color: ink(context).withValues(alpha: .5), width: 1.4)),
       child: Row(children: [
-        Tap(onTap: onPlay, child: Container(width: 44, height: 44, decoration: BoxDecoration(color: playing ? brand : btnBg(context), borderRadius: BorderRadius.circular(playing ? 13 : 22)), child: Icon(playing ? Icons.pause_rounded : Icons.play_arrow_rounded, color: playing ? Colors.white : cream, size: 24))),
+        Tap(onTap: onPlay, child: Container(width: 44, height: 44, decoration: BoxDecoration(color: playing ? brand : btnBg(context), borderRadius: BorderRadius.circular(playing ? 13 : 22)), child: Icon(playing ? Icons.pause_rounded : Icons.play_arrow_rounded, color: playing ? Colors.black : cream, size: 24))),
         const SizedBox(width: 12),
         Expanded(child: SizedBox(height: 34, child: CustomPaint(painter: WavePainter(c.bytes.length, 0, ink(context), ink(context).withValues(alpha: .35), brand), size: Size.infinite))),
         const SizedBox(width: 10),

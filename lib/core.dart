@@ -740,6 +740,9 @@ class Store extends ChangeNotifier {
   String filter = 'public';
   void Function(String)? banner; // pemberitahuan di dalam aplikasi (diisi dari main)
   final offline = <A>[];
+  final acakCache = <A>[]; // audio Acak yang otomatis terunduh, dipakai saat tanpa internet
+  bool online = true;
+  StreamSubscription? _conn;
   final _rnd = Random.secure();
   int? _lastOff;
   int _nid = 0;
@@ -793,6 +796,14 @@ class Store extends ChangeNotifier {
       Notifier.show(200 + (_nid++ % 50), 'Hulhup', '$actor ${notifText(type, extra)} · @$to', t('notif'));
     };
     try { for (final j in jsonDecode(_sp.getString('offline') ?? '[]') as List) { offline.add(A.from(j as Map)); } } catch (_) {}
+    try { for (final j in jsonDecode(_sp.getString('acak_cache') ?? '[]') as List) { acakCache.add(A.from(j as Map)); } } catch (_) {}
+    try {
+      online = await _online();
+      _conn = Connectivity().onConnectivityChanged.listen((r) {
+        final on = r.any((e) => e != ConnectivityResult.none);
+        if (on != online) { online = on; notifyListeners(); if (on) refresh(); }
+      });
+    } catch (_) {}
     _p.onPositionChanged.listen((d) => pos.value = d.inMilliseconds);
     _p.onDurationChanged.listen((d) => dur = d.inMilliseconds);
     _p.onPlayerComplete.listen((_) { playing = null; _scope = null; if (dur > 0) pos.value = dur; notifyListeners(); });
@@ -803,14 +814,24 @@ class Store extends ChangeNotifier {
       if (Api.hasSession) {
         final j = await Api.req('GET', '/me');
         me = U.from(j['user']);
+        try { await _sp.setString('me_cache', jsonEncode(j['user'])); } catch (_) {}
         unread = j['unread'] ?? 0;
         unreadSocial = j['unread_social'] ?? 0;
         if (unreadSocial < _pushed) { _pushed = unreadSocial; _sp.setInt('pushed', _pushed); }
       }
       final st = await Api.req('GET', '/stats');
-      if (st['tapf'] is Map) tapf = {for (final e in (st['tapf'] as Map).entries) '${e.key}': (e.value as num).toInt()};
+      if (st['tapf'] is Map) {
+        tapf = {for (final e in (st['tapf'] as Map).entries) '${e.key}': (e.value as num).toInt()};
+        try { await _sp.setString('tapf_cache', jsonEncode(tapf)); } catch (_) {}
+      }
     } on ApiErr catch (e) {
       if (e.code == 'unauthorized') await _clear();
+    } catch (_) {
+      // Tanpa internet: pakai data terakhir yang tersimpan supaya aplikasi tetap bisa dibuka.
+      try {
+        if (me == null && Api.hasSession) { final c = _sp.getString('me_cache'); if (c != null) me = U.from(jsonDecode(c) as Map); }
+        if (tapf.isEmpty) { final c = _sp.getString('tapf_cache'); if (c != null) tapf = {for (final e in (jsonDecode(c) as Map).entries) '${e.key}': (e.value as num).toInt()}; }
+      } catch (_) {}
     }
     notifyListeners();
   }
@@ -962,8 +983,8 @@ class Store extends ChangeNotifier {
   }
 
   A? _pickOffline() {
-    if (offline.isEmpty) return null;
-    var c = offline;
+    var c = [...offline, ...acakCache.where((a) => !offline.any((o) => o.id == a.id))];
+    if (c.isEmpty) return null;
     if (c.length > 1 && _lastOff != null) c = c.where((a) => a.id != _lastOff).toList();
     final a = c[_rnd.nextInt(c.length)];
     _lastOff = a.id;
@@ -979,13 +1000,37 @@ class Store extends ChangeNotifier {
       final j = await Api.req('GET', '/random?f=$f');
       if (me != null && j['taps'] != null) tapf[f] = (j['taps'] as num).toInt();
       notifyListeners();
-      return j['audio'] == null ? null : A.from(j['audio']);
+      final got = j['audio'] == null ? null : A.from(j['audio']);
+      if (got != null) _cacheAcak(got);
+      return got;
     } on ApiErr {
       rethrow;
     } catch (_) {
       fromOffline = true;
       return _pickOffline();
     }
+  }
+
+  /// Unduh diam-diam audio Acak yang baru didengar (maks 40 terakhir) agar Acak tetap jalan tanpa internet. Hanya di HP.
+  Future<void> _cacheAcak(A a) async {
+    try {
+      if (kIsWeb || a.url.isEmpty || acakCache.any((c) => c.id == a.id) || offline.any((c) => c.id == a.id)) return;
+      final b = await Api.bytes(a.url);
+      if (b == null || !await saveOffline('rc${a.id}.audio', b)) return;
+      final j = a.toJson();
+      j['url'] = 'file:rc${a.id}.audio';
+      j['files'] = [{'url': 'file:rc${a.id}.audio', 'secs': a.secs}];
+      acakCache.insert(0, A.from(j));
+      while (acakCache.length > 40) { final o = acakCache.removeLast(); await deleteOffline('rc${o.id}.audio'); }
+      await _sp.setString('acak_cache', jsonEncode(acakCache.map((o) => o.toJson()).toList()));
+    } catch (_) {}
+  }
+
+  /// Fitur yang butuh internet (pencarian, pengaturan, edit profil, Hups): beri tahu bila sedang offline.
+  bool needNet() {
+    if (online) return true;
+    banner?.call(t('need_net'));
+    return false;
   }
 
   bool isOffline(int id) => offline.any((o) => o.id == id);
@@ -1194,7 +1239,7 @@ const S = <String, List<String>>{
   'preview': ['Dengar', 'Listen'], 'done': ['Selesai', 'Done'], 'retry': ['Coba lagi', 'Retry'], 'untitled': ['Audio tanpa deskripsi', 'Audio without description'],
   'e_rate_limited': ['Terlalu sering, coba lagi sebentar lagi', 'Too many requests, try again shortly'],
   'e_banned': ['Akun ini dibatasi', 'This account is restricted'],
-  'e_network': ['Tidak terhubung ke server', 'Cannot reach the server'], 'e_server': ['Terjadi kesalahan', 'Something went wrong'],
+  'need_net': ['Butuh internet untuk ini. Acak tetap bisa dipakai.', 'This needs internet. Random still works.'], 'e_network': ['Tidak terhubung ke server', 'Cannot reach the server'], 'e_server': ['Terjadi kesalahan', 'Something went wrong'],
   'e_unauthorized': ['Sesi berakhir, silakan masuk lagi', 'Session expired, please sign in again'],
   'e_username_taken': ['Nama pengguna sudah dipakai', 'Username is already taken'],
   'e_bad_credentials': ['Nama pengguna atau kata sandi salah', 'Wrong username or password'],

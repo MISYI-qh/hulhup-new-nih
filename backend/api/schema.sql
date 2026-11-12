@@ -259,3 +259,6 @@ ALTER TABLE audios ADD COLUMN IF NOT EXISTS ai_kind TEXT NOT NULL DEFAULT '';
 ALTER TABLE audios ADD COLUMN IF NOT EXISTS deks TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS av_ai_kind TEXT NOT NULL DEFAULT '';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS av_deks TEXT;
+
+create table if not exists search_log (id bigserial primary key, user_id bigint not null, sq text not null, created bigint not null);
+create index if not exists search_log_user on search_log(user_id, id desc);
