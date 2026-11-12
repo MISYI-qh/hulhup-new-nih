@@ -298,18 +298,24 @@ route('GET', /^\/random$/, async (c) => {
 route('GET', /^\/search$/, async (c) => {
   await hit(`srch:${c.me ? 'u' + c.me.id : c.ip}`, 60, 60);
   const s = String(c.query.q ?? '').trim().toLowerCase().slice(0, 50);
-  if (!s) return { users: [], audios: [] };
+  if (!s || !s.replace(/[@#\s]/g, '')) return { users: [], audios: [] };
   if (c.me && s.length >= 2) { // ingat pencarian terakhir (dipakai peringkat Hups); simpan 20 terakhir saja
     q('insert into search_log(user_id, sq, created) values ($1,$2,$3)', [c.me.id, s, now()]).then(() => q('delete from search_log where user_id=$1 and id not in (select id from search_log where user_id=$1 order by id desc limit 20)', [c.me.id])).catch(() => {});
   }
-  const esc = s.replace(/[\\%_]/g, (m) => '\\' + m);
-  const users = await many(`select * from users where status='active' and (username like $1 or lower(name) like $2) order by username limit 30`, [esc + '%', '%' + esc + '%']);
+  const esc = (x) => x.replace(/[\\%_]/g, (m) => '\\' + m);
+  const terms = [...new Set(s.replace(/^[@#]/, '').split(/\s+/).map((x) => x.replace(/^[@#]/, '')).filter(Boolean))].slice(0, 5);
+  const users = [];
+  {
+    const where = terms.map((_, i) => `(lower(username) like $${i + 1} or lower(name) like $${i + 1} or lower(bio) like $${i + 1})`).join(' and ');
+    users.push(...await many(`select * from users where status='active' and ${where} order by (lower(username) like $${terms.length + 1}) desc, username limit 30`, [...terms.map((x) => '%' + esc(x) + '%'), esc(terms[0]) + '%']));
+  }
   const vid = c.me ? Number(c.me.id) : 0;
-  const rows = await many(`${AUD_SQL} where not a.hidden and not a.pending and u.status='active' and (lower(a.descr) like $2 or lower(coalesce(a.body,'')) like $2) order by a.id desc limit 80`, [vid, '%' + esc + '%']);
+  const pc = terms.map((_, i) => `(lower(a.descr) like $${i + 2} or lower(coalesce(a.body,'')) like $${i + 2} or lower(u.username) like $${i + 2} or lower(u.name) like $${i + 2} or lower(a.mentions) like $${i + 2} or exists(select 1 from comments cm where cm.post_id=a.id and not cm.pending and lower(cm.body) like $${i + 2}))`).join(' and ');
+  const rows = await many(`${AUD_SQL} where not a.hidden and not a.pending and u.status='active' and ${pc} order by a.id desc limit 120`, [vid, ...terms.map((x) => '%' + esc(x) + '%')]);
   const audios = [];
   for (const a of rows) {
     if (await canOpen({ id: a.id, owner: a.owner, rand: a.rand, hidden: false, pending: false, ostatus: 'active', pvis: a.opvis }, vid)) audios.push(av(a));
-    if (audios.length >= 30) break;
+    if (audios.length >= 40) break;
   }
   return { users: users.map(mini), audios };
 });
@@ -529,8 +535,9 @@ for (const [kind, table, col] of [['play', 'post_plays', 'plays'], ['view', 'pos
   route('POST', new RegExp(`^\\/audios\\/(\\d+)\\/${kind}$`), async (c, m) => {
     const u = c.need();
     await hit(`${kind}:${u.id}`, 600, 60);
-    const a = await one('select id, hidden from audios where id=$1', [m[1]]);
+    const a = await one('select id, hidden, bgm, n_audio from audios where id=$1', [m[1]]);
     if (!a || a.hidden) throw new ApiErr('not_found', 404);
+    if (kind === 'play' && (a.bgm || !(a.n_audio > 0))) return { plays: 0, views: 0, counted: false }; // teks saja dan backsound tidak punya hitungan putar
     return tx(async (t) => {
       const r = await t.query(`insert into ${table}(post_id, user_id) values ($1,$2) on conflict do nothing`, [a.id, u.id]);
       if (r.rowCount) await t.query(`update audios set ${col}=${col}+1 where id=$1`, [a.id]);

@@ -448,7 +448,7 @@ class PostActions extends StatelessWidget {
         ActBtn(HK.save, () => savePost(a), on: a.saved),
         ActBtn(HK.share, () => sharePost(a)),
       ]),
-      Padding(padding: const EdgeInsets.fromLTRB(8, 0, 8, 6), child: Text('${fmt(a.views)} ${s.t('views')} · ${fmt(a.plays)} ${s.t('plays')}', style: TextStyle(fontSize: 12.5, color: sub(context), fontWeight: FontWeight.w500))),
+      Padding(padding: const EdgeInsets.fromLTRB(8, 0, 8, 6), child: Text(a.files.isNotEmpty && !a.bgm ? '${fmt(a.views)} ${s.t('views')} · ${fmt(a.plays)} ${s.t('plays')}' : '${fmt(a.views)} ${s.t('views')}', style: TextStyle(fontSize: 12.5, color: sub(context), fontWeight: FontWeight.w500))),
     ]));
   }
 }

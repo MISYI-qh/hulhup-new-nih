@@ -125,6 +125,10 @@ test('Hups: aturan post (1 audio wajib, teks maks 1000), komentar tanpa audio, t
   const panjang = await call('POST', '/posts', { token: a, body: { text: 'a'.repeat(5000), audios: 0 } });
   assert.ok(panjang.id, JSON.stringify(panjang));
   const bg = await mkpost(a, 'dengan backsound', { bgm: true });
+  const sr = await call('GET', '/search?q=' + encodeURIComponent('backsound'), { token: a });
+  assert.ok(sr.audios.some((x) => x.id === bg.id), 'cari isi post');
+  const sr2 = await call('GET', '/search?q=' + encodeURIComponent('hanya teks'), { token: null });
+  assert.ok(Array.isArray(sr2.audios));
   assert.equal((await call('GET', `/posts/${bg.id}`, { token: a })).post.bgm, true);
   assert.equal((await call('POST', '/posts', { token: a, body: { text: 'dua audio', audios: 2 } })).error, 'need_audio');
   assert.equal((await call('POST', '/posts', { token: a, body: { text: 'tiga audio', audios: 3 } })).error, 'need_audio');
