@@ -45,7 +45,7 @@ flutter:
           weight: 700
 flutter_native_splash:
   color: "#FFFFFF"
-  color_dark: "#0E1511"
+  color_dark: "#0B0B0B"
   image: assets/splash/logo.png
   image_dark: assets/splash/logo_dark.png
   branding: assets/splash/brand.png
@@ -53,7 +53,7 @@ flutter_native_splash:
   branding_bottom_padding: 56
   android_12:
     color: "#FFFFFF"
-    color_dark: "#0E1511"
+    color_dark: "#0B0B0B"
     image: assets/splash/logo12.png
     image_dark: assets/splash/logo12_dark.png
     branding: assets/splash/brand.png
@@ -65,7 +65,7 @@ flutter_launcher_icons:
   ios: true
   image_path: "assets/icon/icon.png"
   remove_alpha_ios: true
-  adaptive_icon_background: "#163F2B"
+  adaptive_icon_background: "#FF624F"
   adaptive_icon_foreground: "assets/icon/foreground.png"
   web:
     generate: true

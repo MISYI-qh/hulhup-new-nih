@@ -103,7 +103,7 @@ class AudioRow extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.fromLTRB(12, 12, 6, 12),
         decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(26)),
         child: Row(children: [
-          if (a.url.isEmpty) Container(width: 46, height: 46, decoration: BoxDecoration(color: ink(context).withValues(alpha: .1), shape: BoxShape.circle), child: Center(child: HIcon(HK.hups, size: 22, color: ink(context)))) else Tap(onTap: () => s.play(a, scope: scope).catchError((_) => toast(s.t('e_server'), bad: true)), child: AnimatedContainer(duration: const Duration(milliseconds: 250), width: 46, height: 46, decoration: BoxDecoration(color: on ? ink(context) : green, shape: BoxShape.circle), child: AnimatedSwitcher(duration: const Duration(milliseconds: 200), child: Icon(on ? Icons.pause_rounded : Icons.play_arrow_rounded, key: ValueKey(on), color: on ? bgOf(context) : cream, size: 26)))),
+          if (a.url.isEmpty) Container(width: 46, height: 46, decoration: BoxDecoration(color: ink(context).withValues(alpha: .1), shape: BoxShape.circle), child: Center(child: HIcon(HK.hups, size: 22, color: ink(context)))) else Tap(onTap: () => s.play(a, scope: scope).catchError((_) => toast(s.t('e_server'), bad: true)), child: AnimatedContainer(duration: const Duration(milliseconds: 250), width: 46, height: 46, decoration: BoxDecoration(color: on ? ink(context) : brand, shape: BoxShape.circle), child: AnimatedSwitcher(duration: const Duration(milliseconds: 200), child: Icon(on ? Icons.pause_rounded : Icons.play_arrow_rounded, key: ValueKey(on), color: on ? Colors.white : cream, size: 26)))),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(a.desc.trim().isEmpty ? s.t('untitled') : a.desc.trim(), maxLines: 3, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: a.desc.trim().isEmpty ? sub(context) : null)),
@@ -248,7 +248,7 @@ class _ProfileState extends State<ProfilePage> {
 
   Widget _body(BuildContext context, Store s) {
     final u = user!, shown = switch (tab) { 1 => list.where((e) => e.inHups).toList(), 2 => likedList, 3 => savedList, _ => list.where((e) => e.inRand).toList() };
-    return RefreshIndicator(color: ink(context), backgroundColor: card(context), onRefresh: _load, child: ListView(padding: const EdgeInsets.only(bottom: 40), children: [
+    return LogoRefresh(onRefresh: _load, child: ListView(padding: const EdgeInsets.only(bottom: 40), children: [
       const SizedBox(height: 10),
       In(0, Padding(padding: const EdgeInsets.symmetric(horizontal: 24), child: Align(alignment: Alignment.centerLeft, child: Container(padding: const EdgeInsets.all(5), decoration: BoxDecoration(color: bgOf(context), shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .16), blurRadius: 28, offset: const Offset(0, 10))]), child: Tap(onTap: u.avatar == null ? null : () => go(context, ImageViewer(u.avatar!, u.name)), scale: .96, child: Avatar(u.avatar, u.name, 96)))))),
       const SizedBox(height: 16),
@@ -415,7 +415,7 @@ class _StreakState extends State<StreakPage> {
       final isToday = dt == today, past = first != null && !dt.isBefore(first) && dt.isBefore(today), miss = past && !inn;
       if (inn) inCount++;
       if (miss) missed.add(dt);
-      final Color? bg = inn ? green : (miss ? heart.withValues(alpha: .16) : null);
+      final Color? bg = inn ? brand : (miss ? heart.withValues(alpha: .16) : null);
       final Color fg = inn ? cream : (miss ? heart : (dt.isAfter(today) || first == null || dt.isBefore(first) ? sub(context).withValues(alpha: .5) : ink(context)));
       cells.add(Container(
         margin: const EdgeInsets.all(3),
@@ -442,7 +442,7 @@ class _StreakState extends State<StreakPage> {
       const SizedBox(height: 6),
       GridView.count(crossAxisCount: 7, shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), children: cells),
       const SizedBox(height: 10),
-      Wrap(spacing: 18, runSpacing: 8, children: [legend(green, s.t('cal_in')), legend(heart, s.t('cal_miss')), legend(ink(context), s.t('cal_today'), ring: true)]),
+      Wrap(spacing: 18, runSpacing: 8, children: [legend(brand, s.t('cal_in')), legend(heart, s.t('cal_miss')), legend(ink(context), s.t('cal_today'), ring: true)]),
       const SizedBox(height: 18),
       Text(s.t('cal_month').replaceAll('{a}', '$inCount').replaceAll('{b}', '${missed.length}'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
       const SizedBox(height: 14),
@@ -777,13 +777,13 @@ class _NotifState extends State<NotifPage> {
     if (sys) {
       final txt = k == 'tired' ? s.t('r_body') : s.t(k == 'streak' ? 'n_streak' : 'n_missed').replaceAll('{n}', '${n['n']}');
       return In(i, Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(26)), child: Row(children: [
-        Container(width: 46, height: 46, decoration: const BoxDecoration(color: green, shape: BoxShape.circle), child: const Center(child: Logo(30, cream))),
+        Container(width: 46, height: 46, decoration: const BoxDecoration(gradient: brandGrad, shape: BoxShape.circle), child: const Center(child: Logo(22, Colors.white))),
         const SizedBox(width: 14),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Text(k == 'tired' ? s.t('r_title') : 'Hulhup', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)), const Spacer(), when]), const SizedBox(height: 2), Text(txt, style: const TextStyle(fontSize: 15, height: 1.4))])),
       ])));
     }
     return In(i, Tap(onTap: () => _open(n), child: Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(26)), child: Row(children: [
-      Stack(clipBehavior: Clip.none, children: [Avatar(n['avatar'], n['name'], 46), Positioned(right: -4, bottom: -4, child: Container(width: 22, height: 22, decoration: BoxDecoration(color: btnBg(context), shape: BoxShape.circle, border: Border.all(color: bgOf(context), width: 2)), child: like ? const HIcon(HK.sorot, filled: true, size: 13, color: cream, hole: green) : cm ? const HIcon(HK.comment, size: 12, color: cream) : Icon(relk ? Icons.diversity_3_rounded : Icons.person_add_alt_1_rounded, size: 11, color: cream)))]),
+      Stack(clipBehavior: Clip.none, children: [Avatar(n['avatar'], n['name'], 46), Positioned(right: -4, bottom: -4, child: Container(width: 22, height: 22, decoration: BoxDecoration(color: btnBg(context), shape: BoxShape.circle, border: Border.all(color: bgOf(context), width: 2)), child: like ? const HIcon(HK.sorot, filled: true, size: 13, color: cream, hole: brand) : cm ? const HIcon(HK.comment, size: 12, color: cream) : Icon(relk ? Icons.diversity_3_rounded : Icons.person_add_alt_1_rounded, size: 11, color: cream)))]),
       const SizedBox(width: 14),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text.rich(TextSpan(children: [TextSpan(text: n['name'], style: const TextStyle(fontWeight: FontWeight.w800)), TextSpan(text: '  ${s.notifText(k, '${n['extra'] ?? ''}')}')]), style: const TextStyle(fontSize: 15, height: 1.4)),
@@ -923,7 +923,7 @@ class _RelationsState extends State<RelationsPage> {
     final empty = rels.isEmpty && relIn.isEmpty && relOut.isEmpty;
     return Scaffold(body: Column(children: [
       TopBar(back: true, title: s.t('rel_title')),
-      Expanded(child: loading ? const Loader() : error != null ? Empty(Icons.cloud_off_rounded, error!) : RefreshIndicator(color: ink(context), backgroundColor: card(context), onRefresh: _load, child: ListView(padding: const EdgeInsets.fromLTRB(20, 4, 20, 40), children: [
+      Expanded(child: loading ? const Loader() : error != null ? Empty(Icons.cloud_off_rounded, error!) : LogoRefresh(onRefresh: _load, child: ListView(padding: const EdgeInsets.fromLTRB(20, 4, 20, 40), children: [
         if (locked) Empty(Icons.lock_outline_rounded, s.t('rel_locked')) else if (empty) Empty(Icons.diversity_3_rounded, s.t('rel_none')),
         if (relIn.isNotEmpty) ...[head(s.t('rel_in')), for (var i = 0; i < relIn.length; i++) row(relIn[i], i, act: [
           IconBtn(Icons.check_rounded, () => _relReq(() => Api.req('POST', '/relations/${relIn[i]['username']}/accept'), s.t('rel_made'))),
@@ -970,7 +970,7 @@ class _SessionsState extends State<SessionsPage> {
     final list = items;
     return Scaffold(body: Column(children: [
       TopBar(back: true, title: s.t('sess_t')),
-      Expanded(child: list == null && error == null ? const Loader() : error != null ? Empty(Icons.cloud_off_rounded, error!, action: SizedBox(width: 160, child: PBtn(s.t('retry'), () { setState(() => error = null); _load(); }))) : RefreshIndicator(color: ink(context), backgroundColor: card(context), onRefresh: _load, child: ListView(padding: const EdgeInsets.fromLTRB(20, 8, 20, 40), children: [
+      Expanded(child: list == null && error == null ? const Loader() : error != null ? Empty(Icons.cloud_off_rounded, error!, action: SizedBox(width: 160, child: PBtn(s.t('retry'), () { setState(() => error = null); _load(); }))) : LogoRefresh(onRefresh: _load, child: ListView(padding: const EdgeInsets.fromLTRB(20, 8, 20, 40), children: [
         for (final it in list!) Container(
           margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
           decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(24)),

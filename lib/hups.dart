@@ -138,7 +138,7 @@ class _RecordSheetState extends State<RecordSheet> {
     return Column(mainAxisSize: MainAxisSize.min, children: [
       Text(s.t('rec_title'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
       const SizedBox(height: 18),
-      Tap(onTap: _rec, child: AnimatedContainer(duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic, width: recording ? 84 : 112, height: recording ? 84 : 112, decoration: BoxDecoration(color: recording ? heart : btnBg(context), borderRadius: BorderRadius.circular(recording ? 26 : 56), boxShadow: [BoxShadow(color: (recording ? heart : green).withValues(alpha: .3), blurRadius: 26, offset: const Offset(0, 10))]), child: Icon(recording ? Icons.stop_rounded : Icons.mic_rounded, color: cream, size: 40))),
+      Tap(onTap: _rec, child: AnimatedContainer(duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic, width: recording ? 84 : 112, height: recording ? 84 : 112, decoration: BoxDecoration(color: recording ? heart : btnBg(context), borderRadius: BorderRadius.circular(recording ? 26 : 56), boxShadow: [BoxShadow(color: (recording ? heart : brand).withValues(alpha: .3), blurRadius: 26, offset: const Offset(0, 10))]), child: Icon(recording ? Icons.stop_rounded : Icons.mic_rounded, color: cream, size: 40))),
       const SizedBox(height: 14),
       Text('${mmss(ms ~/ 1000)} / 0:15', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
       const SizedBox(height: 4),
@@ -219,11 +219,11 @@ class FileBar extends StatelessWidget {
         margin: const EdgeInsets.only(top: 10), padding: const EdgeInsets.fromLTRB(8, 8, 12, 8),
         decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: ink(context).withValues(alpha: on ? .5 : .12), width: on ? 1.4 : 1)),
         child: Row(children: [
-          Tap(onTap: () => s.playUrl(keyId, url, scope: scope).catchError((_) => toast(s.t('e_server'), bad: true)), child: AnimatedContainer(duration: const Duration(milliseconds: 220), width: 40, height: 40, decoration: BoxDecoration(color: on ? green : btnBg(context), borderRadius: BorderRadius.circular(on ? 12 : 20)), child: Icon(on ? Icons.pause_rounded : Icons.play_arrow_rounded, color: on ? bgOf(context) : cream, size: 22))),
+          Tap(onTap: () => s.playUrl(keyId, url, scope: scope).catchError((_) => toast(s.t('e_server'), bad: true)), child: AnimatedContainer(duration: const Duration(milliseconds: 220), width: 40, height: 40, decoration: BoxDecoration(color: on ? brand : btnBg(context), borderRadius: BorderRadius.circular(on ? 12 : 20)), child: Icon(on ? Icons.pause_rounded : Icons.play_arrow_rounded, color: on ? Colors.white : cream, size: 22))),
           const SizedBox(width: 12),
           Expanded(child: SizedBox(height: 32, child: ValueListenableBuilder<int>(valueListenable: s.pos, builder: (_, ms, __) {
             final total = (on && s.dur > 0 ? s.dur : (secs > 0 ? secs * 1000 : 15000)).clamp(1, 1 << 30);
-            return CustomPaint(painter: WavePainter(keyId, on ? (ms / total).clamp(0.0, 1.0) : 0, ink(context), ink(context).withValues(alpha: .2), green), size: Size.infinite);
+            return CustomPaint(painter: WavePainter(keyId, on ? (ms / total).clamp(0.0, 1.0) : 0, ink(context), ink(context).withValues(alpha: .2), brand), size: Size.infinite);
           }))),
           const SizedBox(width: 10),
           ValueListenableBuilder<int>(valueListenable: s.pos, builder: (_, ms, __) => Text(on ? mmss(ms ~/ 1000) : (secs > 0 ? mmss(secs) : '·'), style: TextStyle(color: on ? ink(context) : sub(context), fontSize: 12.5, fontWeight: FontWeight.w700, fontFeatures: const [FontFeature.tabularFigures()]))),
@@ -241,9 +241,9 @@ class AiTag extends StatelessWidget {
   const AiTag(this.label, {super.key});
   @override
   Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(top: 8), child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Container(padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4), decoration: BoxDecoration(color: const Color(0xFF7C5CFF).withValues(alpha: .12), borderRadius: BorderRadius.circular(10)), child: Row(mainAxisSize: MainAxisSize.min, children: [
-          const Icon(Icons.auto_awesome_rounded, size: 13, color: Color(0xFF7C5CFF)), const SizedBox(width: 5),
-          Text(label, style: const TextStyle(color: Color(0xFF7C5CFF), fontSize: 12, fontWeight: FontWeight.w700)),
+        Container(padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4), decoration: BoxDecoration(color: const Color(0xFFF5A524).withValues(alpha: .12), borderRadius: BorderRadius.circular(10)), child: Row(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.auto_awesome_rounded, size: 13, color: Color(0xFFF5A524)), const SizedBox(width: 5),
+          Text(label, style: const TextStyle(color: Color(0xFFF5A524), fontSize: 12, fontWeight: FontWeight.w700)),
         ])),
       ]));
 }
@@ -275,9 +275,9 @@ class _AudioSlot extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(10, 10, 6, 10),
       decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), border: Border.all(color: ink(context).withValues(alpha: .5), width: 1.4)),
       child: Row(children: [
-        Tap(onTap: onPlay, child: Container(width: 44, height: 44, decoration: BoxDecoration(color: playing ? green : btnBg(context), borderRadius: BorderRadius.circular(playing ? 13 : 22)), child: Icon(playing ? Icons.pause_rounded : Icons.play_arrow_rounded, color: playing ? bgOf(context) : cream, size: 24))),
+        Tap(onTap: onPlay, child: Container(width: 44, height: 44, decoration: BoxDecoration(color: playing ? brand : btnBg(context), borderRadius: BorderRadius.circular(playing ? 13 : 22)), child: Icon(playing ? Icons.pause_rounded : Icons.play_arrow_rounded, color: playing ? Colors.white : cream, size: 24))),
         const SizedBox(width: 12),
-        Expanded(child: SizedBox(height: 34, child: CustomPaint(painter: WavePainter(c.bytes.length, 0, ink(context), ink(context).withValues(alpha: .35), green), size: Size.infinite))),
+        Expanded(child: SizedBox(height: 34, child: CustomPaint(painter: WavePainter(c.bytes.length, 0, ink(context), ink(context).withValues(alpha: .35), brand), size: Size.infinite))),
         const SizedBox(width: 10),
         Text(mmss(c.secs), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5)),
         IconBtn(Icons.refresh_rounded, onPick ?? () {}, color: sub(context)),
@@ -633,7 +633,7 @@ class _HupsFeedState extends State<HupsFeed> with WidgetsBindingObserver {
     final s = Store.i;
     if (loading) return const Loader();
     if (error != null) return Empty(Icons.cloud_off_rounded, error!, action: SizedBox(width: 160, child: PBtn(s.t('retry'), () { setState(() => loading = true); _load(); })));
-    return RefreshIndicator(color: ink(context), backgroundColor: card(context), onRefresh: _load, child: items.isEmpty
+    return LogoRefresh(onRefresh: _load, child: items.isEmpty
         ? ListView(children: [SizedBox(height: 80), Empty(Icons.forum_outlined, s.t('no_hups'), custom: HIcon(HK.hups, size: 32, color: sub(context)))])
         : ListView.builder(
             controller: sc, physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(16, 6, 16, 110), itemCount: items.length,

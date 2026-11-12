@@ -89,7 +89,7 @@ class Notifier {
           channelDescription: 'Pengingat dan notifikasi dari Hulhup',
           importance: Importance.high, priority: Priority.high,
           icon: 'ic_stat_hulhup', largeIcon: const DrawableResourceAndroidBitmap('hulhup_large'),
-          color: const Color(0xFF1DB954), subText: sub,
+          color: const Color(0xFFFF624F), subText: sub,
         ),
         iOS: const DarwinNotificationDetails(),
       );

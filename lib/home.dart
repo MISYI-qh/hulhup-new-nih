@@ -160,10 +160,10 @@ class _TapButtonState extends State<TapButton> with TickerProviderStateMixin {
             duration: const Duration(milliseconds: 150), width: 204, height: 204,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: const RadialGradient(center: Alignment(-.36, -.52), radius: 1.1, colors: [Color(0xFF6BE79A), Color(0xFF38D072), green, Color(0xFF138A3E)], stops: [0, .38, .75, 1]),
-              boxShadow: [BoxShadow(color: green.withValues(alpha: down ? .2 : .36), blurRadius: down ? 24 : 52, offset: Offset(0, down ? 10 : 26))],
+              gradient: const RadialGradient(center: Alignment(-.36, -.52), radius: 1.1, colors: [Color(0xFFFFA566), Color(0xFFFF7A45), brand, Color(0xFFF23F6C)], stops: [0, .38, .75, 1]),
+              boxShadow: [BoxShadow(color: brand.withValues(alpha: down ? .2 : .36), blurRadius: down ? 24 : 52, offset: Offset(0, down ? 10 : 26))],
             ),
-            child: const Center(child: Logo(96, cream)),
+            child: const Center(child: Logo(84, Colors.white)),
           ),
         ),
       ),
@@ -262,7 +262,7 @@ class PopupBody extends StatelessWidget {
         child: ListenableBuilder(listenable: s, builder: (_, __) {
           final on = s.playing == a.id;
           return Row(children: [
-            Tap(onTap: () => s.play(a).catchError((_) => toast(s.t('e_server'), bad: true)), child: AnimatedContainer(duration: const Duration(milliseconds: 250), width: 44, height: 44, decoration: BoxDecoration(color: on ? green : btnBg(context), shape: BoxShape.circle), child: AnimatedSwitcher(duration: const Duration(milliseconds: 200), child: Icon(on ? Icons.pause_rounded : Icons.play_arrow_rounded, key: ValueKey(on), color: on ? bgOf(context) : cream, size: 26)))),
+            Tap(onTap: () => s.play(a).catchError((_) => toast(s.t('e_server'), bad: true)), child: AnimatedContainer(duration: const Duration(milliseconds: 250), width: 44, height: 44, decoration: BoxDecoration(color: on ? brand : btnBg(context), shape: BoxShape.circle), child: AnimatedSwitcher(duration: const Duration(milliseconds: 200), child: Icon(on ? Icons.pause_rounded : Icons.play_arrow_rounded, key: ValueKey(on), color: on ? Colors.white : cream, size: 26)))),
             Expanded(child: ValueListenableBuilder<int>(valueListenable: s.pos, builder: (_, ms, __) {
               final total = (s.dur > 0 ? s.dur : a.secs * 1000).clamp(1, 1 << 30);
               return Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: (ms / total).clamp(0.0, 1.0), minHeight: 6, backgroundColor: ink(context).withValues(alpha: .12), color: ink(context))));
@@ -428,7 +428,7 @@ class _ApkDlState extends State<_ApkDl> {
       const SizedBox(height: 12),
       Center(child: Text(s.t('ga_title'), textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18))),
       const SizedBox(height: 16),
-      ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: failed ? 0 : (done ? 1 : (p > 0 ? p : null)), minHeight: 8, color: green, backgroundColor: soft(context))),
+      ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: failed ? 0 : (done ? 1 : (p > 0 ? p : null)), minHeight: 8, color: brand, backgroundColor: soft(context))),
       const SizedBox(height: 12),
       Center(child: Text(msg, textAlign: TextAlign.center, style: TextStyle(color: failed ? heart : sub(context), fontSize: 14, height: 1.4))),
       const SizedBox(height: 16),

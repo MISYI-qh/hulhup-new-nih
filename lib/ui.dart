@@ -5,11 +5,10 @@ import 'routes.dart';
 import 'package:flutter/services.dart';
 import 'core.dart';
 
-const green = Color(0xFF1DB954); // hijau merek (Acak, tombol putar aktif, logo): dipakai hemat
+const brand = Color(0xFFFF624F); // hijau merek (Acak, tombol putar aktif, logo): dipakai hemat
 const blue = Color(0xFF3897F0); // tautan, tag, tanda verifikasi
 const cream = Color(0xFFFBF6E9);
 const heart = Color(0xFFE0524A);
-const leaf = Color(0xFF2F8F5B);
 final navKey = GlobalKey<NavigatorState>();
 
 bool isDark(BuildContext c) => Theme.of(c).brightness == Brightness.dark;
@@ -17,7 +16,7 @@ Color ink(BuildContext c) => Theme.of(c).colorScheme.primary;
 Color sub(BuildContext c) => ink(c).withValues(alpha: .6);
 Color soft(BuildContext c) => isDark(c) ? const Color(0xFF1A1A1A) : const Color(0xFFF4F4F4);
 Color card(BuildContext c) => isDark(c) ? const Color(0xFF141414) : Colors.white;
-/// Latar tombol bulat/ikon: hitam (terang) atau abu gelap (gelap). Hijau hanya untuk aksen kecil.
+/// Latar tombol bulat/ikon: hitam (terang) atau abu gelap (gelap). Koral hanya untuk aksen kecil.
 Color btnBg(BuildContext c) => isDark(c) ? const Color(0xFF2E2E2E) : const Color(0xFF111111);
 Color bgOf(BuildContext c) => Theme.of(c).scaffoldBackgroundColor;
 
@@ -269,15 +268,82 @@ class _ToastState extends State<_Toast> with SingleTickerProviderStateMixin {
   }
 }
 
+class _HPainter extends CustomPainter {
+  final Color color;
+  final double lift; // 0..1 tinggi loncatan titik
+  final double squash; // 0..1 gepeng saat mendarat
+  _HPainter(this.color, this.lift, this.squash);
+  @override
+  void paint(Canvas c, Size s) {
+    final k = s.height / .6, ox = s.width / 2 - .5 * k, oy = s.height / 2 - .5 * k;
+    Rect r(double l, double t, double rr, double b) => Rect.fromLTRB(ox + l * k, oy + t * k, ox + rr * k, oy + b * k);
+    final p = Paint()..color = color..isAntiAlias = true;
+    final rad = Radius.circular(.075 * k);
+    c.drawRRect(RRect.fromRectAndRadius(r(.27, .20, .42, .80), rad), p);
+    c.drawRRect(RRect.fromRectAndRadius(r(.58, .44, .73, .80), rad), p);
+    c.drawRRect(RRect.fromRectAndRadius(r(.27, .44, .73, .59), rad), p);
+    final cy = .285 - lift * .13, rx = .085 * (1 + squash * .18), ry = .085 * (1 - squash * .18);
+    c.drawOval(Rect.fromCenter(center: Offset(ox + .66 * k, oy + (cy + (.085 - ry)) * k), width: rx * 2 * k, height: ry * 2 * k), p);
+  }
+  @override
+  bool shouldRepaint(_HPainter o) => o.color != color || o.lift != lift || o.squash != squash;
+}
+
+/// Logo Hulhup: huruf H bulat dengan titik yang meloncat. size = tinggi tanda.
 class Logo extends StatelessWidget {
   final double size;
   final Color color;
-  const Logo(this.size, this.color, {super.key});
+  final double lift;
+  const Logo(this.size, this.color, {super.key, this.lift = 0});
+  @override
+  Widget build(BuildContext context) => SizedBox(width: size * .8, height: size, child: CustomPaint(painter: _HPainter(color, lift, 0)));
+}
+
+/// Logo beranimasi: titik memantul terus. Dipakai untuk semua loading.
+class LogoLoop extends StatefulWidget {
+  final double size;
+  final Color? color;
+  const LogoLoop({super.key, this.size = 44, this.color});
+  @override
+  State<LogoLoop> createState() => _LogoLoopState();
+}
+
+class _LogoLoopState extends State<LogoLoop> with SingleTickerProviderStateMixin {
+  late final AnimationController c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100))..repeat();
+  @override
+  void dispose() { c.dispose(); super.dispose(); }
   @override
   Widget build(BuildContext context) {
-    Widget bar(double h) => Container(width: size * .088, height: size * h, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(size)));
-    Widget dot() => Container(width: size * .118, height: size * .118, decoration: BoxDecoration(color: color, shape: BoxShape.circle));
-    return SizedBox(width: size, height: size, child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [dot(), bar(.34), bar(.56), bar(.31), dot()]));
+    final col = widget.color ?? ink(context);
+    return RepaintBoundary(child: AnimatedBuilder(animation: c, builder: (_, __) {
+      final t = c.value;
+      final up = t < .62 ? Curves.easeOutCubic.transform(sin(t / .62 * pi).abs()) : 0.0;
+      final land = t >= .62 ? sin((t - .62) / .38 * pi) : 0.0;
+      return SizedBox(width: widget.size * .8, height: widget.size, child: CustomPaint(painter: _HPainter(col, up, land.toDouble())));
+    }));
+  }
+}
+
+/// Tarik-untuk-muat dengan logo Hulhup: titik naik mengikuti tarikan, memantul saat memuat.
+class LogoRefresh extends StatefulWidget {
+  final Future<void> Function() onRefresh;
+  final Widget child;
+  const LogoRefresh({super.key, required this.onRefresh, required this.child});
+  @override
+  State<LogoRefresh> createState() => _LogoRefreshState();
+}
+
+class _LogoRefreshState extends State<LogoRefresh> {
+  RefreshIndicatorStatus? st;
+  @override
+  Widget build(BuildContext context) {
+    final show = st == RefreshIndicatorStatus.armed || st == RefreshIndicatorStatus.snap || st == RefreshIndicatorStatus.refresh;
+    return Stack(children: [
+      Positioned(top: 10, left: 0, right: 0, child: IgnorePointer(child: AnimatedOpacity(
+        opacity: st == null || st == RefreshIndicatorStatus.done || st == RefreshIndicatorStatus.canceled ? 0 : 1, duration: const Duration(milliseconds: 180),
+        child: AnimatedScale(scale: show ? 1 : .6, duration: const Duration(milliseconds: 220), curve: Curves.easeOutBack, child: const Center(child: LogoLoop(size: 34)))))),
+      RefreshIndicator.noSpinner(onStatusChange: (v) { if (mounted) setState(() => st = v); }, onRefresh: widget.onRefresh, child: widget.child),
+    ]);
   }
 }
 
@@ -287,7 +353,7 @@ class Brand extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final w = Row(mainAxisSize: MainAxisSize.min, children: [
-      Container(width: 30, height: 30, decoration: const BoxDecoration(color: green, shape: BoxShape.circle), child: const Logo(30, cream)),
+      Container(width: 30, height: 30, decoration: BoxDecoration(gradient: brandGrad, borderRadius: BorderRadius.circular(9)), alignment: Alignment.center, child: const Logo(18, Colors.white)),
       const SizedBox(width: 9),
       Text('Hulhup', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 21, letterSpacing: -.4, color: ink(context))),
       if (onTap != null) Icon(Icons.keyboard_arrow_down_rounded, size: 22, color: sub(context)),
@@ -339,7 +405,7 @@ class In extends StatelessWidget {
 class Loader extends StatelessWidget {
   const Loader({super.key});
   @override
-  Widget build(BuildContext context) => Center(child: SizedBox(width: 30, height: 30, child: CircularProgressIndicator(strokeWidth: 2.8, strokeCap: StrokeCap.round, color: ink(context))));
+  Widget build(BuildContext context) => const Center(child: LogoLoop(size: 46));
 }
 
 class Empty extends StatelessWidget {
@@ -511,7 +577,7 @@ class CoverBox extends StatelessWidget {
     return SizedBox(height: h, width: double.infinity, child: Stack(fit: StackFit.expand, children: [
       url == null
           ? Container(decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF163F2B), Color(0xFF2F6048), Color(0xFF5B9A7A)])), child: Align(alignment: const Alignment(.9, -.6), child: Container(width: 240, height: 240, decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [Colors.white.withValues(alpha: .16), Colors.transparent])))))
-          : AnimatedSwitcher(duration: const Duration(milliseconds: 500), child: SizedBox.expand(key: ValueKey(url), child: img(url!, fallback: Container(color: green)))),
+          : AnimatedSwitcher(duration: const Duration(milliseconds: 500), child: SizedBox.expand(key: ValueKey(url), child: img(url!, fallback: Container(color: brand)))),
       DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [bg.withValues(alpha: .9), bg.withValues(alpha: 0), bg.withValues(alpha: 0), bg.withValues(alpha: .8), bg], stops: const [0, .22, .5, .86, 1]))),
       if (over != null) over!,
     ]));
