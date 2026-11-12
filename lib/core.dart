@@ -742,7 +742,8 @@ class Store extends ChangeNotifier {
   final offline = <A>[];
   final acakCache = <A>[]; // audio Acak yang otomatis terunduh, dipakai saat tanpa internet
   bool online = true;
-  StreamSubscription? _conn;
+  StreamSubscription<List<ConnectivityResult>>? _conn;
+  void closeConn() { _conn?.cancel(); _conn = null; }
   final _rnd = Random.secure();
   int? _lastOff;
   int _nid = 0;
