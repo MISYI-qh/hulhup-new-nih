@@ -220,7 +220,7 @@ class FileBar extends StatelessWidget {
         margin: const EdgeInsets.only(top: 10), padding: const EdgeInsets.fromLTRB(8, 8, 12, 8),
         decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: ink(context).withValues(alpha: on ? .5 : .12), width: on ? 1.4 : 1)),
         child: Row(children: [
-          Tap(onTap: () { if (!on) onStart?.call(); return s.playUrl(keyId, url, scope: scope).catchError((_) => toast(s.t('e_server'), bad: true)); }, child: AnimatedContainer(duration: const Duration(milliseconds: 220), width: 40, height: 40, decoration: BoxDecoration(color: on ? brand : btnBg(context), borderRadius: BorderRadius.circular(on ? 12 : 20)), child: Icon(on ? Icons.pause_rounded : Icons.play_arrow_rounded, color: on ? Colors.white : cream, size: 22))),
+          Tap(onTap: () { if (!on) onStart?.call(); s.playUrl(keyId, url, scope: scope).catchError((_) => toast(s.t('e_server'), bad: true)); }, child: AnimatedContainer(duration: const Duration(milliseconds: 220), width: 40, height: 40, decoration: BoxDecoration(color: on ? brand : btnBg(context), borderRadius: BorderRadius.circular(on ? 12 : 20)), child: Icon(on ? Icons.pause_rounded : Icons.play_arrow_rounded, color: on ? Colors.white : cream, size: 22))),
           const SizedBox(width: 12),
           Expanded(child: SizedBox(height: 32, child: ValueListenableBuilder<int>(valueListenable: s.pos, builder: (_, ms, __) {
             final total = (on && s.dur > 0 ? s.dur : (secs > 0 ? secs * 1000 : 15000)).clamp(1, 1 << 30);
