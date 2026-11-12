@@ -5,7 +5,8 @@ import 'routes.dart';
 import 'package:flutter/services.dart';
 import 'core.dart';
 
-const brand = Color(0xFFFF624F); // hijau merek (Acak, tombol putar aktif, logo): dipakai hemat
+const brand = Color(0xFFFF624F); // koral merek: aksen kecil saja, tampilan tetap dominan hitam-putih
+const brandGrad = LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFFFF8A3D), Color(0xFFFF624F), Color(0xFFF23F6C)]);
 const blue = Color(0xFF3897F0); // tautan, tag, tanda verifikasi
 const cream = Color(0xFFFBF6E9);
 const heart = Color(0xFFE0524A);
