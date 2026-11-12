@@ -36,7 +36,7 @@ class _HomeState extends State<HomePage> {
       if (a == null) { toast(s.t(s.fromOffline ? 'no_net_empty' : (s.me != null && s.filter != 'public') ? 'nofilter' : 'nobody')); return; }
       if (s.fromOffline) toast(s.t('no_net'));
       s.countView(a);
-      if (a.url.isNotEmpty) s.play(a, force: true).catchError((_) => toast(s.t('e_server'), bad: true));
+      if (a.url.isNotEmpty && !(a.bgm && s.bgmMuted)) s.play(a, force: true).catchError((_) => toast(s.t('e_server'), bad: true));
       sheet(context, (_) => PopupBody(a)).then((_) { if (s.playing == a.id) s.stop(); });
     } catch (e) {
       toast(s.err(e), bad: true);

@@ -21,7 +21,7 @@ function unpack(body) {
   return { meta: null, img: body };
 }
 const logDeks = (who, rep) => { try { console.log('deks', who, brief(rep)); } catch { /* */ } };
-const MAX_TEXT = 200000, MAX_POST_TEXT = 1000, INLINE_TEXT = 3000, PREVIEW = 300; // post: 1 audio wajib + teks maks 1000; komentar: teks saja, panjang bebas
+const MAX_TEXT = 200000, MAX_POST_TEXT = 200000, INLINE_TEXT = 3000, PREVIEW = 300; // post: 1 audio wajib + teks maks 1000; komentar: teks saja, panjang bebas
 const FILTERS = ['public', 'followers', 'following', 'both', 'friend', 'best', 'partner', 'family', 'relations', 'me'];
 const REL_TYPES = ['friend', 'best', 'partner', 'family'];
 const UN = /^[a-z0-9_]{3,20}$/;
@@ -279,7 +279,7 @@ route('GET', /^\/random$/, async (c) => {
   await hit(`rnd:${c.me ? 'u' + c.me.id : c.ip}`, 120, 60);
   const f = filterOf(c.query.f);
   const vid = c.me ? c.me.id : 0, last = Number(c.query.last) || 0;
-  const base = `from audios a join users u on u.id=a.owner where not a.hidden and not a.pending and a.in_rand and a.n_audio>0 and u.status='active' and (${audCond(f)} or (a.owner=$1 and ${HAS('public')} and '${f}'='public'))`;
+  const base = `from audios a join users u on u.id=a.owner where not a.hidden and not a.pending and a.in_rand and u.status='active' and (${audCond(f)} or (a.owner=$1 and ${HAS('public')} and '${f}'='public'))`;
   let n = (await one(`select count(*)::int n ${base} and a.id<>$2`, [vid, last])).n;
   let excl = true;
   if (n === 0) { n = (await one(`select count(*)::int n ${base} and ($2=$2)`, [vid, last])).n; excl = false; }
@@ -817,8 +817,10 @@ route('POST', /^\/posts$/, async (c) => {
   await hit(`post:${u.id}`, 40, 3600);
   const b = c.body, text = okText(b.text);
   if (text.length > MAX_POST_TEXT) throw new ApiErr('too_long', 413);
-  if (parseInt(b.audios, 10) !== 1) throw new ApiErr('need_audio'); // post wajib tepat 1 audio
-  const n = 1, bgm = false, bgmIdx = 0, inRand = true, inHups = true; // satu post tampil di Acak dan di Hups
+  const n = b.audios === undefined ? 0 : parseInt(b.audios, 10); // 0 = hanya teks, 1 = satu audio (biasa atau backsound)
+  if (n !== 0 && n !== 1) throw new ApiErr('need_audio');
+  if (n === 0 && !text) throw new ApiErr('empty');
+  const bgm = n === 1 && b.bgm === true, bgmIdx = 0, inRand = true, inHups = true; // satu post tampil di Acak dan di Hups
   const rnd = parseAud(b.rand, false, true) ?? 'public';
   const mentions = [...new Set((text.match(/@([a-z0-9_]{3,20})/g) || []).map((x) => x.slice(1)))].slice(0, 10);
   let to = [];
@@ -838,6 +840,7 @@ route('POST', /^\/posts$/, async (c) => {
       return Number(r.rows[0].id);
     });
   } catch (e) { if (key) await delAudio('mongo', key); throw e; }
+  if (n === 0) await mentionNotify(id, u.id);
   return { ok: true, id };
 });
 

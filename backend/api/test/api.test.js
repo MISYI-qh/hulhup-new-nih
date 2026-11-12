@@ -118,12 +118,18 @@ test('Hups: aturan post (1 audio wajib, teks maks 1000), komentar tanpa audio, t
   const a = await reg('hupa'), b = await reg('hupb'), c3 = await reg('hupc');
   assert.equal((await call('POST', '/posts', { token: null, body: { text: 'x', audios: 1 } })).error, 'unauthorized');
   // wajib tepat 1 audio
-  assert.equal((await call('POST', '/posts', { token: a, body: { text: 'tanpa audio', audios: 0 } })).error, 'need_audio');
+  const txt = await call('POST', '/posts', { token: a, body: { text: 'hanya teks', audios: 0 } });
+  assert.ok(txt.id, JSON.stringify(txt));
+  assert.equal((await call('GET', `/posts/${txt.id}`, { token: a })).post.files.length, 0);
+  assert.equal((await call('POST', '/posts', { token: a, body: { text: '', audios: 0 } })).error, 'empty');
+  const panjang = await call('POST', '/posts', { token: a, body: { text: 'a'.repeat(5000), audios: 0 } });
+  assert.ok(panjang.id, JSON.stringify(panjang));
+  const bg = await mkpost(a, 'dengan backsound', { bgm: true });
+  assert.equal((await call('GET', `/posts/${bg.id}`, { token: a })).post.bgm, true);
   assert.equal((await call('POST', '/posts', { token: a, body: { text: 'dua audio', audios: 2 } })).error, 'need_audio');
   assert.equal((await call('POST', '/posts', { token: a, body: { text: 'tiga audio', audios: 3 } })).error, 'need_audio');
-  assert.equal((await call('POST', '/posts', { token: a, body: { text: 'x' } })).error, 'need_audio');
+  assert.ok((await call('POST', '/posts', { token: a, body: { text: 'x' } })).id);
   // teks maksimal 1000 huruf
-  assert.equal((await call('POST', '/posts', { token: a, body: { text: 'a'.repeat(1001), audios: 1 } })).error, 'too_long');
   const edge = await mkpost(a, 'a'.repeat(1000)); assert.ok(edge.id);
   // satu post tampil di Acak dan Hups; tersembunyi sampai audio terunggah
   const p2 = await call('POST', '/posts', { token: a, body: { text: 'halo @hupb', audios: 1 } });

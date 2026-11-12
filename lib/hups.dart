@@ -480,24 +480,21 @@ class PostCard extends StatefulWidget {
 }
 
 class _PostCardState extends State<PostCard> {
-  String? full;
-  bool busy = false;
 
   @override
   void initState() { super.initState(); Store.i.countView(widget.a); }
 
-  /// Teks panjang di Hups tampil lengkap: tombol "Selengkapnya" membuka seluruh teks di tempat.
-  Future<void> _expand() async {
-    setState(() => busy = true);
-    try { full = (await Api.req('GET', '/posts/${widget.a.id}'))['text'] as String?; } catch (e) { toast(Store.i.err(e), bad: true); }
-    if (mounted) setState(() => busy = false);
+  /// Teks di kartu dipangkas 6 baris supaya tinggi kartu seragam; teks lengkap ada di halaman post.
+  static const _style = TextStyle(fontSize: 15.5, height: 1.45);
+  bool _over(String t, double w) {
+    final tp = TextPainter(text: TextSpan(text: t, style: _style), maxLines: 6, textDirection: TextDirection.ltr)..layout(maxWidth: w);
+    return tp.didExceedMaxLines;
   }
 
   @override
   Widget build(BuildContext context) {
     final s = Store.i, a = widget.a;
-    final text = (full ?? a.text ?? a.desc).trim();
-    final partial = full == null && a.text == null && a.long;
+    final text = (a.text ?? a.desc).trim();
     return Tap(
       onTap: () => openPost(context, a), scale: .99,
       child: Container(
@@ -506,9 +503,14 @@ class _PostCardState extends State<PostCard> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           OwnerRow(a, more: () => postMenu(context, a, onDeleted: widget.onDeleted)),
           Padding(padding: const EdgeInsets.only(top: 8, right: 8), child: audChip(context, a.rand, to: a.to)),
-          if (text.isNotEmpty) Padding(padding: const EdgeInsets.fromLTRB(0, 10, 8, 0), child: MentionText(partial ? '$text …' : text, style: const TextStyle(fontSize: 15.5, height: 1.45))),
-          if (partial) Tap(onTap: busy ? null : _expand, child: Padding(padding: const EdgeInsets.fromLTRB(0, 4, 8, 4), child: Text(busy ? '…' : s.t('read_more'), style: TextStyle(color: acc(context), fontWeight: FontWeight.w700, fontSize: 14)))),
-          if (a.files.isNotEmpty) Padding(padding: const EdgeInsets.only(right: 8), child: audioBars(a, widget.scope)),
+          if (text.isNotEmpty) Padding(padding: const EdgeInsets.fromLTRB(0, 10, 8, 0), child: LayoutBuilder(builder: (ctx, bc) {
+            final over = a.long || _over(text, bc.maxWidth);
+            return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              MentionText(text, maxLines: 6, style: _style),
+              if (over) Padding(padding: const EdgeInsets.only(top: 4), child: Text(s.t('read_more'), style: TextStyle(color: acc(context), fontWeight: FontWeight.w700, fontSize: 14))),
+            ]);
+          })),
+          if (a.files.isNotEmpty) Padding(padding: const EdgeInsets.only(right: 8), child: a.bgm ? BgmBar(a) : audioBars(a, widget.scope)),
           const SizedBox(height: 4),
           PostActions(a),
         ]),
@@ -851,7 +853,7 @@ class _PostPageState extends State<PostPage> {
       Expanded(child: loading && p == null ? const Loader() : error != null && p == null ? Empty(Icons.lock_outline_rounded, error!) : ListView(controller: sc, padding: const EdgeInsets.fromLTRB(18, 4, 18, 24), children: [
         OwnerRow(p!),
         if (text.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 14), child: MentionText(text, selectable: true, style: const TextStyle(fontSize: 17, height: 1.55))),
-        if (p.files.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: audioBars(p, this)),
+        if (p.files.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: p.bgm ? BgmBar(p) : audioBars(p, this)),
         const SizedBox(height: 10),
         PostActions(p, onComments: () { focus.requestFocus(); }),
         Divider(color: ink(context).withValues(alpha: .08), height: 24),
@@ -944,11 +946,10 @@ class ComposePage extends StatefulWidget {
 }
 
 class _ComposeState extends State<ComposePage> {
-  static const maxText = 1000;
   final text = TextEditingController();
   AudioClip? clip;
   final pv = AudioPlayer();
-  bool playing = false, pprof = true, busy = false;
+  bool playing = false, pprof = true, busy = false, bgm = false;
   String rand = 'public';
   Map<String, Map> picked = {};
 
@@ -981,15 +982,14 @@ class _ComposeState extends State<ComposePage> {
   Future<void> _send() async {
     final s = Store.i, t = text.text.trim();
     final c = clip;
-    if (c == null) { toast(s.t('e_need_audio'), bad: true); return; }
-    if (t.length > maxText) { toast(s.t('e_too_long'), bad: true); return; }
+    if (c == null && t.isEmpty) { toast(s.t('e_empty'), bad: true); return; }
     if (audSplit(rand).contains('accounts') && picked.isEmpty) { toast(s.t('e_need_accounts'), bad: true); return; }
     setState(() => busy = true);
     int? id;
     try {
-      final j = await Api.req('POST', '/posts', body: {'text': t, 'audios': 1, 'pprof': pprof, 'rand': audSplit(rand), 'to': picked.keys.toList()});
+      final j = await Api.req('POST', '/posts', body: {'text': t, 'audios': c == null ? 0 : 1, if (c != null) 'bgm': bgm, 'pprof': pprof, 'rand': audSplit(rand), 'to': picked.keys.toList()});
       id = (j['id'] as num).toInt();
-      await Api.multi('/posts/$id/audio', c.bytes, 'a.${c.ext}', {'secs': '${c.secs}'});
+      if (c != null) await Api.multi('/posts/$id/audio', c.bytes, 'a.${c.ext}', {'secs': '${c.secs}'});
       if (!mounted) return;
       Navigator.pop(context, true);
       toast(s.t('posted'));
@@ -1013,11 +1013,12 @@ class _ComposeState extends State<ComposePage> {
     return Scaffold(body: Column(children: [
       TopBar(back: true, title: s.t('new_post')),
       Expanded(child: ListView(padding: const EdgeInsets.fromLTRB(22, 4, 22, 40), children: [
-        _AudioSlot(clip: clip, playing: playing, onPlay: _play, onPick: busy ? null : _add, onClear: () { pv.stop(); setState(() { clip = null; playing = false; }); }),
+        _AudioSlot(clip: clip, playing: playing, onPlay: _play, onPick: busy ? null : _add, onClear: () { pv.stop(); setState(() { clip = null; playing = false; bgm = false; }); }),
+        if (clip != null) Padding(padding: const EdgeInsets.only(top: 14), child: _row(s.t('bgm_label'), bgm, (v) => setState(() => bgm = v), note: s.t('bgm_note'))),
         const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.fromLTRB(18, 8, 18, 8), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(22)),
-          child: TextField(controller: text, minLines: 4, maxLines: 12, maxLength: maxText, buildCounter: (_, {required currentLength, required isFocused, maxLength}) => Align(alignment: Alignment.centerRight, child: Padding(padding: const EdgeInsets.only(bottom: 4), child: Text('$currentLength/$maxLength', style: TextStyle(color: currentLength > (maxLength ?? 0) * .9 ? const Color(0xFFD9534F) : sub(context), fontSize: 12)))), textCapitalization: TextCapitalization.sentences, style: const TextStyle(fontSize: 16.5, height: 1.5), cursorColor: ink(context), decoration: InputDecoration(border: InputBorder.none, hintText: s.t('write_hups'), hintStyle: TextStyle(color: sub(context)))),
+          child: TextField(controller: text, minLines: 4, maxLines: 12, textCapitalization: TextCapitalization.sentences, style: const TextStyle(fontSize: 16.5, height: 1.5), cursorColor: ink(context), decoration: InputDecoration(border: InputBorder.none, hintText: s.t('write_hups'), hintStyle: TextStyle(color: sub(context)))),
         ),
         const SizedBox(height: 6),
         MentionBar(text),
