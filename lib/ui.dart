@@ -268,45 +268,48 @@ class _ToastState extends State<_Toast> with SingleTickerProviderStateMixin {
   }
 }
 
-class _FacePainter extends CustomPainter {
-  final Color color, face;
-  final double lift, squash, open; // lift 0..1 tinggi loncat, squash 0..1 gepeng saat mendarat, open = bukaan mulut
-  final bool shadow;
-  _FacePainter(this.color, this.face, {this.lift = 0, this.squash = 0, this.open = 1, this.shadow = false});
+const brandDeep = Color(0xFF4330D0);
+
+/// Dua mata yang mengintip dari balik dinding. [w] = lebar tanda. rise 0..1 (0 = bersembunyi), look -1..1 arah pandang, blink 0..1.
+class _PeekPainter extends CustomPainter {
+  final Color eye, pupil, wall;
+  final double rise, look, blink;
+  _PeekPainter(this.eye, this.pupil, this.wall, {this.rise = 1, this.look = .3, this.blink = 0});
   @override
   void paint(Canvas c, Size s) {
-    final d = s.width, cx = s.width / 2, bottom = s.height - (shadow ? .1 * d : 0);
-    if (shadow) {
-      final w = d * (.62 - .22 * lift + .1 * squash);
-      c.drawOval(Rect.fromCenter(center: Offset(cx, s.height - .05 * d), width: w, height: d * .09), Paint()..color = color.withValues(alpha: .18 - .08 * lift));
-    }
-    final sx = 1 + .12 * squash - .03 * lift, sy = 1 - .12 * squash + .05 * lift;
-    c.save();
-    c.translate(cx, bottom - lift * .34 * d);
-    c.scale(sx, sy);
-    final p = Paint()..color = color..isAntiAlias = true, f = Paint()..color = face..isAntiAlias = true;
-    c.drawCircle(Offset(0, -d / 2), d / 2, p);
+    final u = s.width / .72, cx = s.width / 2, cy = s.height / 2;
+    Offset o(double x, double y) => Offset(cx + x * u, cy + y * u);
+    final ep = Paint()..color = eye..isAntiAlias = true, pp = Paint()..color = pupil..isAntiAlias = true;
+    final lift = (1 - rise) * .26, ry = .15 * (1 - .92 * blink);
     for (final k in [-1, 1]) {
-      c.drawOval(Rect.fromCenter(center: Offset(k * .15 * d, -d / 2 - .08 * d), width: .10 * d, height: .14 * d), f);
+      final ec = o(k * .15, -.06 + lift);
+      c.drawOval(Rect.fromCenter(center: ec, width: .25 * u, height: ry * 2 * u), ep);
+      final pr = .055 * u;
+      c.drawOval(Rect.fromCenter(center: ec + Offset((.022 + look * .03) * u, -.035 * u * (1 - blink)), width: pr * 2, height: pr * 2 * (1 - .9 * blink)), pp);
     }
-    c.drawOval(Rect.fromCenter(center: Offset(0, -d / 2 + .17 * d), width: .22 * d, height: .28 * d * open), f);
-    c.restore();
+    c.drawRRect(RRect.fromRectAndRadius(Rect.fromLTRB(o(-.36, 0).dx, o(0, 0).dy, o(.36, 0).dx, o(0, .21).dy), Radius.circular(.07 * u)), Paint()..color = wall..isAntiAlias = true);
   }
   @override
-  bool shouldRepaint(_FacePainter o) => o.color != color || o.face != face || o.lift != lift || o.squash != squash || o.open != open;
+  bool shouldRepaint(_PeekPainter o) => o.rise != rise || o.look != look || o.blink != blink || o.eye != eye || o.pupil != pupil || o.wall != wall;
 }
 
-/// Logo Hulhup: wajah bulat yang berseru "hups!". size = diameter; [color] kepala, [face] mata dan mulut.
+/// Logo Hulhup (tanda saja, tanpa ubin). Tampil di atas latar ungu: mata putih, dinding ungu tua.
 class Logo extends StatelessWidget {
-  final double size;
-  final Color color;
-  final Color? face;
-  const Logo(this.size, this.color, {super.key, this.face});
+  final double width;
+  const Logo(this.width, {super.key});
   @override
-  Widget build(BuildContext context) => SizedBox(width: size, height: size, child: CustomPaint(painter: _FacePainter(color, face ?? brand)));
+  Widget build(BuildContext context) => SizedBox(width: width, height: width * .5 / .72, child: CustomPaint(painter: _PeekPainter(Colors.white, brand, brandDeep)));
 }
 
-/// Logo beranimasi: wajah meloncat, mulut membuka ("hups!"), mendarat gepeng. Dipakai untuk semua loading.
+/// Ubin logo (seperti ikon aplikasi): ungu, sudut membulat, tanda di tengah.
+class LogoTile extends StatelessWidget {
+  final double size;
+  const LogoTile(this.size, {super.key});
+  @override
+  Widget build(BuildContext context) => Container(width: size, height: size, decoration: BoxDecoration(color: brand, borderRadius: BorderRadius.circular(size * .225)), alignment: Alignment.center, child: Logo(size * .6));
+}
+
+/// Loading: ubin logo, mata naik mengintip, menengok kiri-kanan, berkedip, lalu turun lagi. Dipakai untuk semua loading.
 class LogoLoop extends StatefulWidget {
   final double size;
   const LogoLoop({super.key, this.size = 44});
@@ -315,18 +318,23 @@ class LogoLoop extends StatefulWidget {
 }
 
 class _LogoLoopState extends State<LogoLoop> with SingleTickerProviderStateMixin {
-  late final AnimationController c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100))..repeat();
+  late final AnimationController c = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400))..repeat();
   @override
   void dispose() { c.dispose(); super.dispose(); }
   @override
   Widget build(BuildContext context) {
-    final bgc = bgOf(context);
+    final z = widget.size;
     return RepaintBoundary(child: AnimatedBuilder(animation: c, builder: (_, __) {
       final t = c.value;
-      double lift = 0, sq = 0, open = .75;
-      if (t < .55) { final u = t / .55; lift = sin(u * pi); open = .75 + .45 * lift; }
-      else if (t < .7) { sq = sin((t - .55) / .15 * pi); open = .75 - .2 * sq; }
-      return SizedBox(width: widget.size, height: widget.size * 1.45, child: CustomPaint(painter: _FacePainter(brand, bgc, lift: lift, squash: sq, open: open, shadow: true)));
+      double ramp(double a, double b) => ((t - a) / (b - a)).clamp(0.0, 1.0);
+      final rise = Curves.easeOutBack.transform(ramp(.04, .22)) * (1 - Curves.easeInCubic.transform(ramp(.84, .98)));
+      final look = t < .30 ? .3 : t < .34 ? .3 - 1.3 * ramp(.30, .34) : t < .48 ? -1.0 : t < .54 ? -1 + 2 * ramp(.48, .54) : t < .66 ? 1.0 : t < .72 ? 1 - .7 * ramp(.66, .72) : .3;
+      final blink = (t > .74 && t < .82) ? sin((t - .74) / .08 * pi) : 0.0;
+      return SizedBox(width: z, height: z, child: Container(
+        decoration: BoxDecoration(color: brand, borderRadius: BorderRadius.circular(z * .225)),
+        alignment: Alignment.center,
+        child: ClipRRect(borderRadius: BorderRadius.circular(z * .1), child: SizedBox(width: z * .6, height: z * .6 * .5 / .72, child: CustomPaint(painter: _PeekPainter(Colors.white, brand, brandDeep, rise: rise.clamp(0.0, 1.05), look: look, blink: blink)))),
+      ));
     }));
   }
 }
@@ -348,7 +356,7 @@ class _LogoRefreshState extends State<LogoRefresh> {
     return Stack(children: [
       Positioned(top: 10, left: 0, right: 0, child: IgnorePointer(child: AnimatedOpacity(
         opacity: st == null || st == RefreshIndicatorStatus.done || st == RefreshIndicatorStatus.canceled ? 0 : 1, duration: const Duration(milliseconds: 180),
-        child: AnimatedScale(scale: show ? 1 : .6, duration: const Duration(milliseconds: 220), curve: Curves.easeOutBack, child: const Center(child: LogoLoop(size: 30)))))),
+        child: AnimatedScale(scale: show ? 1 : .6, duration: const Duration(milliseconds: 220), curve: Curves.easeOutBack, child: const Center(child: LogoLoop(size: 34)))))),
       RefreshIndicator.noSpinner(onStatusChange: (v) { if (mounted) setState(() => st = v); }, onRefresh: widget.onRefresh, child: widget.child),
     ]);
   }
@@ -360,7 +368,7 @@ class Brand extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final w = Row(mainAxisSize: MainAxisSize.min, children: [
-      Container(width: 30, height: 30, decoration: BoxDecoration(color: brand, borderRadius: BorderRadius.circular(9)), alignment: Alignment.center, child: const Logo(21, Colors.white, face: brand)),
+      const LogoTile(30),
       const SizedBox(width: 9),
       Text('Hulhup', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 21, letterSpacing: -.4, color: ink(context))),
       if (onTap != null) Icon(Icons.keyboard_arrow_down_rounded, size: 22, color: sub(context)),

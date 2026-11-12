@@ -164,7 +164,7 @@ class _TapButtonState extends State<TapButton> with TickerProviderStateMixin {
               color: brand,
               boxShadow: [BoxShadow(color: brand.withValues(alpha: down ? .22 : .38), blurRadius: down ? 24 : 52, offset: Offset(0, down ? 10 : 26))],
             ),
-            child: const Center(child: Logo(104, Colors.white, face: brand)),
+            child: const Center(child: Logo(104)),
           ),
         ),
       ),

@@ -139,7 +139,7 @@ class _ProfileState extends State<ProfilePage> {
   List<A> list = [], likedList = [], savedList = [];
   bool loading = true, busy = false, locked = false;
   String? error;
-  late int tab = widget.tab0;
+  late int tab = widget.tab0 == 1 ? 0 : widget.tab0; // 0 = postingan (Acak dan Hups digabung), 2 = sorot, 3 = tersimpan
   Map rel = {'status': 'none', 'type': ''};
   List rels = [], relIn = [], relOut = [];
   bool get mine => widget.u != null && widget.u == Store.i.me?.username;
@@ -213,12 +213,6 @@ class _ProfileState extends State<ProfilePage> {
     return PBtn('${s.t('a_$ty')} · ${s.t('rel_end')}', () => _relEnd(widget.u!, user!.name), ghost: true, icon: audIcon(ty));
   }
 
-  Future<void> _del(A a) async {
-    final s = Store.i;
-    if (!await confirm(context, s.t('delete'), s.t('delete_audio_q'), s.t('delete'), danger: true)) return;
-    try { await Api.req('DELETE', '/audios/${a.id}'); setState(() { list.remove(a); likedList.remove(a); savedList.remove(a); }); } catch (e) { toast(s.err(e), bad: true); }
-  }
-
   Future<void> _edit() async {
     if (!Store.i.needNet()) return;
     final r = await go<String>(context, const EditProfilePage());
@@ -248,7 +242,7 @@ class _ProfileState extends State<ProfilePage> {
   }
 
   Widget _body(BuildContext context, Store s) {
-    final u = user!, shown = switch (tab) { 1 => list.where((e) => e.inHups).toList(), 2 => likedList, 3 => savedList, _ => list.where((e) => e.inRand).toList() };
+    final u = user!, shown = switch (tab) { 2 => likedList, 3 => savedList, _ => list };
     return LogoRefresh(onRefresh: _load, child: ListView(padding: const EdgeInsets.only(bottom: 40), children: [
       const SizedBox(height: 10),
       In(0, Padding(padding: const EdgeInsets.symmetric(horizontal: 24), child: Align(alignment: Alignment.centerLeft, child: Container(padding: const EdgeInsets.all(5), decoration: BoxDecoration(color: bgOf(context), shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .16), blurRadius: 28, offset: const Offset(0, 10))]), child: Tap(onTap: u.avatar == null ? null : () => go(context, ImageViewer(u.avatar!, u.name)), scale: .96, child: Avatar(u.avatar, u.name, 96)))))),
@@ -269,11 +263,11 @@ class _ProfileState extends State<ProfilePage> {
         else if (s.me != null) ...[PBtn(u.isFollowing ? s.t('unfollow') : s.t('follow'), _follow, loading: busy, ghost: u.isFollowing, icon: u.isFollowing ? Icons.check_rounded : Icons.person_add_alt_1_rounded), const SizedBox(height: 10), _relBtns(s), const SizedBox(height: 6), Center(child: Tap(onTap: () => reportSheet(context, user: u.username), child: Padding(padding: const EdgeInsets.all(10), child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.flag_outlined, size: 16, color: sub(context)), const SizedBox(width: 6), Text(s.t('report'), style: TextStyle(color: sub(context), fontSize: 13, fontWeight: FontWeight.w600))]))))],
       ]))),
       const SizedBox(height: 22),
-      Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Seg<int>([(0, s.t('rand_tab')), (1, s.t('hups')), if (mine) (2, s.t('sorot_tab')), if (mine) (3, s.t('saved_tab'))], tab, (v) { setState(() => tab = v); syncUrl(profilePath(widget.u, v)); })),
+      Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Seg<int>([(0, s.t('posts_tab')), if (mine) (2, s.t('sorot_tab')), if (mine) (3, s.t('saved_tab'))], tab, (v) { setState(() => tab = v); syncUrl(profilePath(widget.u, v)); })),
       const SizedBox(height: 14),
       if (locked && !mine) Empty(Icons.lock_outline_rounded, s.t('locked'))
-      else if (shown.isEmpty) Empty(Icons.graphic_eq_rounded, tab == 2 ? s.t('empty_liked') : tab == 3 ? s.t('empty_saved') : tab == 1 ? s.t('no_hups') : s.t('empty_audio'), custom: tab == 2 ? HIcon(HK.sorot, size: 30, color: sub(context)) : tab == 3 ? HIcon(HK.save, size: 30, color: sub(context)) : tab == 1 ? HIcon(HK.hups, size: 30, color: sub(context)) : HIcon(HK.acak, size: 30, color: sub(context)))
-      else Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Column(children: [for (var i = 0; i < shown.length; i++) In(i < 8 ? i : 0, tab == 0 ? AudioRow(shown[i], key: ValueKey('0_${shown[i].id}'), scope: this, mine: mine, onDelete: mine ? () => _del(shown[i]) : null) : PostCard(shown[i], key: ValueKey('${tab}_${shown[i].id}'), scope: this, onDeleted: () => setState(() { list.removeWhere((e) => e.id == shown[i].id); likedList.removeWhere((e) => e.id == shown[i].id); savedList.removeWhere((e) => e.id == shown[i].id); })))])),
+      else if (shown.isEmpty) Empty(Icons.graphic_eq_rounded, tab == 2 ? s.t('empty_liked') : tab == 3 ? s.t('empty_saved') : s.t('no_posts'), custom: tab == 2 ? HIcon(HK.sorot, size: 30, color: sub(context)) : tab == 3 ? HIcon(HK.save, size: 30, color: sub(context)) : HIcon(HK.hups, size: 30, color: sub(context)))
+      else Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Column(children: [for (var i = 0; i < shown.length; i++) In(i < 8 ? i : 0, PostCard(shown[i], key: ValueKey('${tab}_${shown[i].id}'), scope: this, onDeleted: () => setState(() { list.removeWhere((e) => e.id == shown[i].id); likedList.removeWhere((e) => e.id == shown[i].id); savedList.removeWhere((e) => e.id == shown[i].id); })))])),
     ]));
   }
 }
@@ -778,7 +772,7 @@ class _NotifState extends State<NotifPage> {
     if (sys) {
       final txt = k == 'tired' ? s.t('r_body') : s.t(k == 'streak' ? 'n_streak' : 'n_missed').replaceAll('{n}', '${n['n']}');
       return In(i, Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(26)), child: Row(children: [
-        Container(width: 46, height: 46, decoration: BoxDecoration(color: brand, shape: BoxShape.circle), child: const Center(child: Logo(26, Colors.white, face: brand))),
+        Container(width: 46, height: 46, decoration: BoxDecoration(color: brand, shape: BoxShape.circle), child: const Center(child: Logo(26))),
         const SizedBox(width: 14),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Text(k == 'tired' ? s.t('r_title') : 'Hulhup', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)), const Spacer(), when]), const SizedBox(height: 2), Text(txt, style: const TextStyle(fontSize: 15, height: 1.4))])),
       ])));

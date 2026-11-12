@@ -1253,7 +1253,7 @@ const S = <String, List<String>>{
   'preview': ['Dengar', 'Listen'], 'done': ['Selesai', 'Done'], 'retry': ['Coba lagi', 'Retry'], 'untitled': ['Audio tanpa deskripsi', 'Audio without description'],
   'e_rate_limited': ['Terlalu sering, coba lagi sebentar lagi', 'Too many requests, try again shortly'],
   'e_banned': ['Akun ini dibatasi', 'This account is restricted'],
-  'views': ['dilihat', 'views'], 'plays': ['diputar', 'plays'], 'need_net': ['Butuh internet untuk ini. Acak tetap bisa dipakai.', 'This needs internet. Random still works.'], 'e_network': ['Tidak terhubung ke server', 'Cannot reach the server'], 'e_server': ['Terjadi kesalahan', 'Something went wrong'],
+  'posts_tab': ['Postingan', 'Posts'], 'no_posts': ['Belum ada postingan', 'No posts yet'], 'views': ['dilihat', 'views'], 'plays': ['diputar', 'plays'], 'need_net': ['Butuh internet untuk ini. Acak tetap bisa dipakai.', 'This needs internet. Random still works.'], 'e_network': ['Tidak terhubung ke server', 'Cannot reach the server'], 'e_server': ['Terjadi kesalahan', 'Something went wrong'],
   'e_unauthorized': ['Sesi berakhir, silakan masuk lagi', 'Session expired, please sign in again'],
   'e_username_taken': ['Nama pengguna sudah dipakai', 'Username is already taken'],
   'e_bad_credentials': ['Nama pengguna atau kata sandi salah', 'Wrong username or password'],
