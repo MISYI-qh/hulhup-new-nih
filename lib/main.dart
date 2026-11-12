@@ -14,6 +14,7 @@ Future<void> main() async {
   try { await Notifier.init().timeout(const Duration(seconds: 3)); } catch (_) {}
   // Status masuk benar di layar pertama, tapi tidak boleh menahan layar pembuka bila internet mati atau lambat.
   try { await Store.i.refresh().timeout(const Duration(seconds: 3)); } catch (_) {}
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   runApp(const HulhupApp());
   WidgetsBinding.instance.addObserver(_Life());
   _boot();

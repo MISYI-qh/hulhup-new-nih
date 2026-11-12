@@ -140,18 +140,17 @@ class TapButton extends StatefulWidget {
 }
 
 class _TapButtonState extends State<TapButton> with TickerProviderStateMixin {
-  late final idle = AnimationController(vsync: this, duration: const Duration(seconds: 5))..repeat();
   late final burst = AnimationController(vsync: this, duration: const Duration(milliseconds: 1000));
   late final mark = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100));
   int variant = -1;
   bool down = false;
   @override
-  void dispose() { idle.dispose(); burst.dispose(); mark.dispose(); super.dispose(); }
+  void dispose() { burst.dispose(); mark.dispose(); super.dispose(); }
   @override
   Widget build(BuildContext context) {
     final ring = ink(context);
     return SizedBox(width: 330, height: 330, child: Stack(alignment: Alignment.center, children: [
-      AnimatedBuilder(animation: Listenable.merge([idle, burst]), builder: (_, __) => CustomPaint(size: const Size(330, 330), painter: _Rings(idle.value, burst.value, ring))),
+      AnimatedBuilder(animation: burst, builder: (_, __) => CustomPaint(size: const Size(330, 330), painter: _Rings(0, burst.value, ring))),
       GestureDetector(
         onTapDown: (_) => setState(() => down = true),
         onTapCancel: () => setState(() => down = false),
@@ -181,13 +180,13 @@ class _Rings extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final o = size.center(Offset.zero);
-    for (var i = 0; i < 3; i++) {
-      final k = (t + i / 3) % 1;
-      canvas.drawCircle(o, 106 + k * 56, Paint()..style = PaintingStyle.stroke..strokeWidth = 1.2..color = c.withValues(alpha: (1 - k) * .16));
-    }
     if (b > 0 && b < 1) {
-      final e = Curves.easeOutCubic.transform(b);
-      canvas.drawCircle(o, 102 + e * 62, Paint()..style = PaintingStyle.stroke..strokeWidth = 2.4..color = c.withValues(alpha: (1 - b) * .4));
+      for (var i = 0; i < 3; i++) {
+        final k = ((b * 1.4 - i * .18)).clamp(0.0, 1.0);
+        if (k <= 0 || k >= 1) continue;
+        final e = Curves.easeOutCubic.transform(k);
+        canvas.drawCircle(o, 104 + e * 60, Paint()..style = PaintingStyle.stroke..strokeWidth = 2.2 - i * .5..color = c.withValues(alpha: (1 - k) * (.34 - i * .08)));
+      }
     }
   }
   @override
@@ -222,14 +221,14 @@ class _SideMenuState extends State<SideMenu> {
             item(Icons.tune_rounded, 'settings', () => const SettingsPage(), net: true),
             if (s.me != null) item(Icons.send_outlined, 'sent_title', () => const SentPage()),
             item(Icons.download_done_rounded, 'offline_t', () => const OfflinePage()),
-            item(Icons.help_outline_rounded, 'faq', () => const FaqPage()),
+            if (!kIsWeb) Tap(onTap: () { close(); () async { final up = await s.checkUpdate(force: true); if (up) { showUpdate(context); } else { toast(s.t('upd_none')); } }(); }, child: Padding(padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8), child: Row(children: [Icon(Icons.system_update_rounded, size: 24, color: ink(context)), const SizedBox(width: 16), Text(s.t('upd_menu'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600))]))),
             Tap(onTap: () => setState(() => more = !more), child: Padding(padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8), child: Row(children: [Icon(Icons.more_horiz_rounded, size: 24, color: ink(context)), const SizedBox(width: 16), Expanded(child: Text(s.t('more'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600))), AnimatedRotation(turns: more ? .5 : 0, duration: const Duration(milliseconds: 200), child: Icon(Icons.expand_more_rounded, size: 24, color: sub(context)))]))),
             AnimatedSize(duration: const Duration(milliseconds: 220), curve: Curves.easeOutCubic, alignment: Alignment.topCenter, child: more ? Padding(padding: const EdgeInsets.only(left: 16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               item(Icons.info_outline_rounded, 'about', () => TextPage(s.t('about'), s.t('about_t'), slug: 'about')),
+              item(Icons.help_outline_rounded, 'faq', () => const FaqPage()),
               item(Icons.rule_rounded, 'policy', () => TextPage(s.t('policy'), s.t('policy_t'), slug: 'policy')),
               item(Icons.lock_outline_rounded, 'privacy', () => TextPage(s.t('privacy'), s.t('privacy_t'), slug: 'privacy')),
               if (!kIsWeb) Tap(onTap: () { close(); launchUrl(Uri.parse('https://hulhup.my.id'), mode: LaunchMode.externalApplication); }, child: Padding(padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8), child: Row(children: [Icon(Icons.language_rounded, size: 24, color: ink(context)), const SizedBox(width: 16), Text(s.t('website'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600))]))),
-              if (!kIsWeb) Tap(onTap: () { close(); () async { final up = await s.checkUpdate(force: true); if (up) { showUpdate(context); } else { toast(s.t('upd_none')); } }(); }, child: Padding(padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8), child: Row(children: [Icon(Icons.system_update_rounded, size: 24, color: ink(context)), const SizedBox(width: 16), Text(s.t('upd_menu'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600))]))),
               if (kIsWeb) item(Icons.android_rounded, 'get_app', () => const GetAppPage()),
             ])) : const SizedBox(width: double.infinity)),
             const Spacer(),

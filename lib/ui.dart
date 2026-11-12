@@ -307,6 +307,17 @@ class Logo extends StatelessWidget {
   Widget build(BuildContext context) => SizedBox(width: width, height: width * .5 / .72, child: CustomPaint(painter: _PeekPainter(Colors.white, brand, brandDeep)));
 }
 
+/// Tanda logo tanpa bingkai, warna mengikuti tema.
+class LogoMark extends StatelessWidget {
+  final double width;
+  const LogoMark(this.width, {super.key});
+  @override
+  Widget build(BuildContext context) {
+    final m = markColors(context);
+    return SizedBox(width: width, height: width * .5 / .72, child: CustomPaint(painter: _PeekPainter(m[0], m[1], m[2])));
+  }
+}
+
 /// Ubin logo (seperti ikon aplikasi): ungu, sudut membulat, tanda di tengah.
 class LogoTile extends StatelessWidget {
   final double size;
@@ -370,8 +381,8 @@ class Brand extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final w = Row(mainAxisSize: MainAxisSize.min, children: [
-      const LogoTile(30),
-      const SizedBox(width: 9),
+      const LogoMark(40),
+      const SizedBox(width: 10),
       Text('Hulhup', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 21, letterSpacing: -.4, color: ink(context))),
       if (onTap != null) Icon(Icons.keyboard_arrow_down_rounded, size: 22, color: sub(context)),
     ]);
@@ -809,7 +820,8 @@ Future<void> reportSheet(BuildContext context, {int? audio, String? user, int? c
 });
 
 
-/// Layar pembuka setelah splash: mata mengintip lalu "membaca" tulisan Hulhup, kemudian memudar ke aplikasi. Hanya sekali tiap aplikasi dibuka.
+/// Layar pembuka setelah splash. Mulai dari logo yang sama dengan splash (tidak muncul tiba-tiba): mata menunduk lalu
+/// naik, gelombang halus memancar, lalu tulisan Hulhup terbuka huruf demi huruf sementara mata ikut "membaca" ke kanan.
 class Intro extends StatefulWidget {
   final Widget child;
   static bool done = false;
@@ -819,7 +831,7 @@ class Intro extends StatefulWidget {
 }
 
 class _IntroState extends State<Intro> with SingleTickerProviderStateMixin {
-  late final AnimationController c = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400));
+  late final AnimationController c = AnimationController(vsync: this, duration: const Duration(milliseconds: 3400));
   late bool show = !Intro.done;
   @override
   void initState() {
@@ -832,30 +844,56 @@ class _IntroState extends State<Intro> with SingleTickerProviderStateMixin {
   Widget build(BuildContext context) {
     if (!show) return widget.child;
     final fg = ink(context), bg = bgOf(context), mc = markColors(context);
-    final word = TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.w700, fontSize: 48, letterSpacing: -1.2, color: fg, height: 1);
+    final word = TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.w700, fontSize: 52, letterSpacing: -1.2, color: fg, height: 1);
+    const letters = ['H', 'u', 'l', 'h', 'u', 'p'];
     return Stack(children: [
       widget.child,
       Positioned.fill(child: AnimatedBuilder(animation: c, builder: (_, __) {
         final t = c.value;
         double ramp(double a, double b) => ((t - a) / (b - a)).clamp(0.0, 1.0);
-        final rise = Curves.easeOutBack.transform(ramp(.05, .22));
-        final read = Curves.easeInOut.transform(ramp(.24, .70));
-        final look = .25 + .75 * read;
-        final blink = (t > .76 && t < .84) ? sin((t - .76) / .08 * pi) : 0.0;
-        final fade = 1 - Curves.easeIn.transform(ramp(.90, 1));
-        return Opacity(opacity: fade, child: ColoredBox(color: bg, child: Center(child: Row(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.center, children: [
-          SizedBox(width: 70, height: 70 * .5 / .72, child: CustomPaint(painter: _PeekPainter(mc[0], mc[1], mc[2], rise: rise.clamp(0.0, 1.05), look: look, blink: blink))),
-          const SizedBox(width: 12),
-          Stack(children: [
-            Opacity(opacity: 0, child: Text('Hulhup', style: word)),
-            ClipRect(child: Align(alignment: Alignment.centerLeft, widthFactor: read, child: Text('Hulhup', style: word))),
-          ]),
-        ]))));
+        // mata: menunduk ke balik dinding, lalu naik dengan pantulan
+        final down = Curves.easeInCubic.transform(ramp(.05, .17));
+        final up = Curves.easeOutBack.transform(ramp(.21, .38));
+        final rise = t < .2 ? 1 - down : up;
+        final read = Curves.easeInOutCubic.transform(ramp(.40, .84));
+        final look = -.4 + 3.0 * read;
+        final blink = (t > .88 && t < .95) ? sin((t - .88) / .07 * pi) : 0.0;
+        final pop = 1 + .07 * sin(pi * ramp(.21, .45));
+        final fade = 1 - Curves.easeIn.transform(ramp(.95, 1));
+        final wave = ramp(.22, .62);
+        return Opacity(opacity: fade, child: Material(color: bg, child: Stack(alignment: Alignment.center, children: [
+          if (wave > 0 && wave < 1) CustomPaint(size: const Size(420, 420), painter: _Wave(wave, mc[0])),
+          Center(child: Row(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.center, children: [
+            Transform.scale(scale: pop, child: SizedBox(width: 96, height: 96 * .5 / .72, child: CustomPaint(painter: _PeekPainter(mc[0], mc[1], mc[2], rise: rise.clamp(0.0, 1.06), look: look, blink: blink)))),
+            ClipRect(child: Align(alignment: Alignment.centerLeft, widthFactor: read, child: Padding(padding: const EdgeInsets.only(left: 14), child: Row(mainAxisSize: MainAxisSize.min, children: [
+              for (var i = 0; i < letters.length; i++) Builder(builder: (_) {
+                final p = Curves.easeOutCubic.transform((read * 6.6 - i).clamp(0.0, 1.0));
+                return Opacity(opacity: p, child: Transform.translate(offset: Offset(0, (1 - p) * 16), child: Text(letters[i], style: word)));
+              }),
+            ])))),
+          ])),
+        ])));
       })),
     ]);
   }
 }
 
+class _Wave extends CustomPainter {
+  final double t;
+  final Color c;
+  _Wave(this.t, this.c);
+  @override
+  void paint(Canvas canvas, Size s) {
+    final o = s.center(Offset.zero);
+    for (var i = 0; i < 2; i++) {
+      final k = (t * 1.3 - i * .22).clamp(0.0, 1.0);
+      if (k <= 0 || k >= 1) continue;
+      canvas.drawCircle(o, 40 + Curves.easeOutCubic.transform(k) * 170, Paint()..style = PaintingStyle.stroke..strokeWidth = 2.4..color = c.withValues(alpha: (1 - k) * .28));
+    }
+  }
+  @override
+  bool shouldRepaint(_Wave o) => o.t != t || o.c != c;
+}
 
 /// Logo di tombol Acak: 10 animasi berbeda tiap ditekan (urut berputar). [t] 0..1 progres animasi, [v] nomor animasi 0..9.
 class TapMark extends StatelessWidget {
