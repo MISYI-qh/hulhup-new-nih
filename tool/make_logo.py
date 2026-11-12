@@ -61,10 +61,12 @@ def tile(n, width_frac=0.60, rounded=True):
 A = lambda *p: os.path.join(ROOT, *p)
 tile(1024, 0.60, False).convert('RGB').save(A('assets/icon/icon.png'))
 mark(1024, 0.50, WHITE, BRAND, DEEP).save(A('assets/icon/foreground.png'))
-# Splash: ubin ungu di tengah layar polos (putih atau hitam), tanpa tulisan.
-tile(512, 0.60).save(A('assets/splash/logo.png')); tile(512, 0.60).save(A('assets/splash/logo_dark.png'))
-t12 = Image.new('RGBA', (1152, 1152), (0, 0, 0, 0)); t12.alpha_composite(tile(520, 0.60), (316, 316))
-t12.save(A('assets/splash/logo12.png')); t12.save(A('assets/splash/logo12_dark.png'))
+# Splash: tanda saja tanpa bingkai di layar polos, warna logo tetap. Terang: mata ungu, pupil putih, dinding ungu tua. Gelap: mata putih, pupil ungu, dinding ungu.
+LIGHT, DARK = ((BRAND, WHITE), DEEP), ((WHITE, BRAND), BRAND)
+for name, ((eye, pup), wall) in (('logo.png', LIGHT), ('logo_dark.png', DARK)):
+    mark(512, 0.80, eye, pup, wall).save(A('assets/splash', name))
+for name, ((eye, pup), wall) in (('logo12.png', LIGHT), ('logo12_dark.png', DARK)):
+    mark(1152, 0.46, eye, pup, wall).save(A('assets/splash', name))
 for d, n in (('mdpi', 24), ('hdpi', 36), ('xhdpi', 48), ('xxhdpi', 72), ('xxxhdpi', 96)):
     mark(n * 4, 0.92, WHITE, None, None, silhouette=True).resize((n, n), Image.LANCZOS).save(A(f'tool/android_res/drawable-{d}/ic_stat_hulhup.png'))
 tile(192).save(A('tool/android_res/drawable-xxhdpi/hulhup_large.png'))

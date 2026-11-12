@@ -280,18 +280,24 @@ class _PeekPainter extends CustomPainter {
     final u = s.width / .72, cx = s.width / 2, cy = s.height / 2;
     Offset o(double x, double y) => Offset(cx + x * u, cy + y * u);
     final ep = Paint()..color = eye..isAntiAlias = true, pp = Paint()..color = pupil..isAntiAlias = true;
-    final lift = (1 - rise) * .26, ry = .15 * (1 - .92 * blink);
+    final lift = (1 - rise) * .30, ry = .15 * (1 - .92 * blink);
+    c.save();
+    c.clipRect(Rect.fromLTRB(-1e5, -1e5, 1e5, o(0, .21).dy)); // mata yang turun tersembunyi di balik dinding, tidak muncul di bawahnya
     for (final k in [-1, 1]) {
       final ec = o(k * .15, -.06 + lift);
       c.drawOval(Rect.fromCenter(center: ec, width: .25 * u, height: ry * 2 * u), ep);
       final pr = .055 * u;
       c.drawOval(Rect.fromCenter(center: ec + Offset((.022 + look * .03) * u, -.035 * u * (1 - blink)), width: pr * 2, height: pr * 2 * (1 - .9 * blink)), pp);
     }
+    c.restore();
     c.drawRRect(RRect.fromRectAndRadius(Rect.fromLTRB(o(-.36, 0).dx, o(0, 0).dy, o(.36, 0).dx, o(0, .21).dy), Radius.circular(.07 * u)), Paint()..color = wall..isAntiAlias = true);
   }
   @override
   bool shouldRepaint(_PeekPainter o) => o.rise != rise || o.look != look || o.blink != blink || o.eye != eye || o.pupil != pupil || o.wall != wall;
 }
+
+/// Warna tanda tanpa bingkai: terang = mata ungu, pupil putih, dinding ungu tua; gelap = mata putih, pupil ungu, dinding ungu.
+List<Color> markColors(BuildContext c) => Theme.of(c).brightness == Brightness.dark ? [Colors.white, brand, brand] : [brand, Colors.white, brandDeep];
 
 /// Logo Hulhup (tanda saja, tanpa ubin). Tampil di atas latar ungu: mata putih, dinding ungu tua.
 class Logo extends StatelessWidget {
@@ -330,11 +336,7 @@ class _LogoLoopState extends State<LogoLoop> with SingleTickerProviderStateMixin
       final rise = Curves.easeOutBack.transform(ramp(.04, .22)) * (1 - Curves.easeInCubic.transform(ramp(.84, .98)));
       final look = t < .30 ? .3 : t < .34 ? .3 - 1.3 * ramp(.30, .34) : t < .48 ? -1.0 : t < .54 ? -1 + 2 * ramp(.48, .54) : t < .66 ? 1.0 : t < .72 ? 1 - .7 * ramp(.66, .72) : .3;
       final blink = (t > .74 && t < .82) ? sin((t - .74) / .08 * pi) : 0.0;
-      return SizedBox(width: z, height: z, child: Container(
-        decoration: BoxDecoration(color: brand, borderRadius: BorderRadius.circular(z * .225)),
-        alignment: Alignment.center,
-        child: ClipRRect(borderRadius: BorderRadius.circular(z * .1), child: SizedBox(width: z * .6, height: z * .6 * .5 / .72, child: CustomPaint(painter: _PeekPainter(Colors.white, brand, brandDeep, rise: rise.clamp(0.0, 1.05), look: look, blink: blink)))),
-      ));
+      return SizedBox(width: z, height: z * .5 / .72, child: CustomPaint(painter: _PeekPainter(markColors(context)[0], markColors(context)[1], markColors(context)[2], rise: rise.clamp(0.0, 1.05), look: look, blink: blink)));
     }));
   }
 }
@@ -805,3 +807,79 @@ Future<void> reportSheet(BuildContext context, {int? audio, String? user, int? c
       Tap(onTap: () => send(r), child: Padding(padding: const EdgeInsets.symmetric(vertical: 14), child: Row(children: [Expanded(child: Text(s.t('r_$r'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600))), Icon(Icons.chevron_right_rounded, color: sub(context))]))),
   ]);
 });
+
+
+/// Layar pembuka setelah splash: mata mengintip lalu "membaca" tulisan Hulhup, kemudian memudar ke aplikasi. Hanya sekali tiap aplikasi dibuka.
+class Intro extends StatefulWidget {
+  final Widget child;
+  static bool done = false;
+  const Intro({super.key, required this.child});
+  @override
+  State<Intro> createState() => _IntroState();
+}
+
+class _IntroState extends State<Intro> with SingleTickerProviderStateMixin {
+  late final AnimationController c = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400));
+  late bool show = !Intro.done;
+  @override
+  void initState() {
+    super.initState();
+    if (show) c.forward().whenComplete(() { Intro.done = true; if (mounted) setState(() => show = false); });
+  }
+  @override
+  void dispose() { c.dispose(); super.dispose(); }
+  @override
+  Widget build(BuildContext context) {
+    if (!show) return widget.child;
+    final fg = ink(context), bg = bgOf(context), mc = markColors(context);
+    final word = TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.w700, fontSize: 48, letterSpacing: -1.2, color: fg, height: 1);
+    return Stack(children: [
+      widget.child,
+      Positioned.fill(child: AnimatedBuilder(animation: c, builder: (_, __) {
+        final t = c.value;
+        double ramp(double a, double b) => ((t - a) / (b - a)).clamp(0.0, 1.0);
+        final rise = Curves.easeOutBack.transform(ramp(.05, .22));
+        final read = Curves.easeInOut.transform(ramp(.24, .70));
+        final look = .25 + .75 * read;
+        final blink = (t > .76 && t < .84) ? sin((t - .76) / .08 * pi) : 0.0;
+        final fade = 1 - Curves.easeIn.transform(ramp(.90, 1));
+        return Opacity(opacity: fade, child: ColoredBox(color: bg, child: Center(child: Row(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.center, children: [
+          SizedBox(width: 70, height: 70 * .5 / .72, child: CustomPaint(painter: _PeekPainter(mc[0], mc[1], mc[2], rise: rise.clamp(0.0, 1.05), look: look, blink: blink))),
+          const SizedBox(width: 12),
+          Stack(children: [
+            Opacity(opacity: 0, child: Text('Hulhup', style: word)),
+            ClipRect(child: Align(alignment: Alignment.centerLeft, widthFactor: read, child: Text('Hulhup', style: word))),
+          ]),
+        ]))));
+      })),
+    ]);
+  }
+}
+
+
+/// Logo di tombol Acak: 10 animasi berbeda tiap ditekan (urut berputar). [t] 0..1 progres animasi, [v] nomor animasi 0..9.
+class TapMark extends StatelessWidget {
+  final double width, t;
+  final int v;
+  const TapMark(this.width, {super.key, required this.t, required this.v});
+  @override
+  Widget build(BuildContext context) {
+    double rise = 1, look = .3, blink = 0, dx = 0, dy = 0, sc = 1, rot = 0;
+    final s = sin(t * pi), s2 = sin(t * 2 * pi), fade = 1 - t;
+    switch (v % 10) {
+      case 0: rise = 1 - s; break; // menunduk lalu muncul lagi
+      case 1: blink = (sin(t * 4 * pi).abs()); break; // kedip dua kali
+      case 2: look = s2 * 2.6; break; // lirik kiri-kanan
+      case 3: dy = -s * 16; break; // lompat
+      case 4: rot = Curves.easeInOut.transform(t) * 2 * pi; break; // putar penuh
+      case 5: sc = 1 + .22 * s2.abs() * fade; dy = s2.abs() * 4; break; // melar kenyal
+      case 6: rot = sin(t * 6 * pi) * .28 * fade; break; // goyang
+      case 7: sc = 1 + .3 * s; blink = t > .55 && t < .75 ? sin((t - .55) / .2 * pi) : 0; break; // membesar lalu kedip
+      case 8: rise = 1 - .85 * sin(t * 2 * pi).abs(); look = 1 - 2 * t; break; // ngumpet dua kali sambil menoleh
+      case 9: dx = sin(t * 8 * pi) * 9 * fade; look = sin(t * 8 * pi) * 2; break; // gemetar
+    }
+    final mc = [Colors.white, brand, brandDeep];
+    return Transform.translate(offset: Offset(dx, dy), child: Transform.rotate(angle: rot, child: Transform.scale(scale: sc,
+      child: SizedBox(width: width, height: width * .5 / .72, child: CustomPaint(painter: _PeekPainter(mc[0], mc[1], mc[2], rise: rise.clamp(0.0, 1.05), look: look, blink: blink.clamp(0.0, 1.0)))))));
+  }
+}
