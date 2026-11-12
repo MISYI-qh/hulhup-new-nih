@@ -5,7 +5,7 @@ import 'routes.dart';
 import 'package:flutter/services.dart';
 import 'core.dart';
 
-const brand = Color(0xFFFFC400); // kuning merek (bola pada logo, tombol putar aktif): aksen kecil saja, tampilan tetap dominan hitam-putih
+const brand = Color(0xFF5B47F5); // ungu-biru merek: warna tunggal logo dan aksen kecil: aksen kecil saja, tampilan tetap dominan hitam-putih
 const blue = Color(0xFF3897F0); // tautan, tag, tanda verifikasi
 const cream = Color(0xFFFBF6E9);
 const heart = Color(0xFFE0524A);
@@ -268,62 +268,65 @@ class _ToastState extends State<_Toast> with SingleTickerProviderStateMixin {
   }
 }
 
-class _LogoPainter extends CustomPainter {
-  final Color color, ball;
-  final double drop; // 0 = bola di atas cangkir, 1 = bola di dasar cangkir
-  final double squash; // 0..1 gepeng saat bola mendarat
-  _LogoPainter(this.color, this.ball, this.drop, this.squash);
+class _FacePainter extends CustomPainter {
+  final Color color, face;
+  final double lift, squash, open; // lift 0..1 tinggi loncat, squash 0..1 gepeng saat mendarat, open = bukaan mulut
+  final bool shadow;
+  _FacePainter(this.color, this.face, {this.lift = 0, this.squash = 0, this.open = 1, this.shadow = false});
   @override
   void paint(Canvas c, Size s) {
-    final k = s.height / .805, ox = s.width / 2 - .5 * k, oy = s.height / 2 - .472 * k;
-    Offset o(double x, double y) => Offset(ox + x * k, oy + y * k);
-    final cup = Path()
-      ..moveTo(o(.30, .435).dx, o(.30, .435).dy)
-      ..lineTo(o(.30, .60).dx, o(.30, .60).dy)
-      ..arcTo(Rect.fromCircle(center: o(.5, .60), radius: .20 * k), pi, -pi, false)
-      ..lineTo(o(.70, .435).dx, o(.70, .435).dy);
-    c.drawPath(cup, Paint()..color = color..style = PaintingStyle.stroke..strokeWidth = .15 * k..strokeCap = StrokeCap.round..strokeJoin = StrokeJoin.round..isAntiAlias = true);
-    final cy = .17 + drop * .46, rx = .10 * (1 + squash * .22), ry = .10 * (1 - squash * .22);
-    c.drawOval(Rect.fromCenter(center: o(.5, cy + (.10 - ry)), width: rx * 2 * k, height: ry * 2 * k), Paint()..color = ball..isAntiAlias = true);
+    final d = s.width, cx = s.width / 2, bottom = s.height - (shadow ? .1 * d : 0);
+    if (shadow) {
+      final w = d * (.62 - .22 * lift + .1 * squash);
+      c.drawOval(Rect.fromCenter(center: Offset(cx, s.height - .05 * d), width: w, height: d * .09), Paint()..color = color.withValues(alpha: .18 - .08 * lift));
+    }
+    final sx = 1 + .12 * squash - .03 * lift, sy = 1 - .12 * squash + .05 * lift;
+    c.save();
+    c.translate(cx, bottom - lift * .34 * d);
+    c.scale(sx, sy);
+    final p = Paint()..color = color..isAntiAlias = true, f = Paint()..color = face..isAntiAlias = true;
+    c.drawCircle(Offset(0, -d / 2), d / 2, p);
+    for (final k in [-1, 1]) {
+      c.drawOval(Rect.fromCenter(center: Offset(k * .15 * d, -d / 2 - .08 * d), width: .10 * d, height: .14 * d), f);
+    }
+    c.drawOval(Rect.fromCenter(center: Offset(0, -d / 2 + .17 * d), width: .22 * d, height: .28 * d * open), f);
+    c.restore();
   }
   @override
-  bool shouldRepaint(_LogoPainter o) => o.color != color || o.ball != ball || o.drop != drop || o.squash != squash;
+  bool shouldRepaint(_FacePainter o) => o.color != color || o.face != face || o.lift != lift || o.squash != squash || o.open != open;
 }
 
-/// Logo Hulhup: cangkir "u" dan bola yang meloncat masuk. size = tinggi tanda.
+/// Logo Hulhup: wajah bulat yang berseru "hups!". size = diameter; [color] kepala, [face] mata dan mulut.
 class Logo extends StatelessWidget {
   final double size;
   final Color color;
-  final Color ball;
-  final double drop;
-  const Logo(this.size, this.color, {super.key, this.ball = brand, this.drop = 0});
+  final Color? face;
+  const Logo(this.size, this.color, {super.key, this.face});
   @override
-  Widget build(BuildContext context) => SizedBox(width: size * .7, height: size, child: CustomPaint(painter: _LogoPainter(color, ball, drop, 0)));
+  Widget build(BuildContext context) => SizedBox(width: size, height: size, child: CustomPaint(painter: _FacePainter(color, face ?? brand)));
 }
 
-/// Logo beranimasi: bola jatuh ke cangkir, gepeng sebentar, lalu meloncat keluar. Dipakai untuk semua loading.
+/// Logo beranimasi: wajah meloncat, mulut membuka ("hups!"), mendarat gepeng. Dipakai untuk semua loading.
 class LogoLoop extends StatefulWidget {
   final double size;
-  final Color? color;
-  const LogoLoop({super.key, this.size = 44, this.color});
+  const LogoLoop({super.key, this.size = 44});
   @override
   State<LogoLoop> createState() => _LogoLoopState();
 }
 
 class _LogoLoopState extends State<LogoLoop> with SingleTickerProviderStateMixin {
-  late final AnimationController c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))..repeat();
+  late final AnimationController c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100))..repeat();
   @override
   void dispose() { c.dispose(); super.dispose(); }
   @override
   Widget build(BuildContext context) {
-    final col = widget.color ?? ink(context);
+    final bgc = bgOf(context);
     return RepaintBoundary(child: AnimatedBuilder(animation: c, builder: (_, __) {
       final t = c.value;
-      double drop, sq = 0;
-      if (t < .38) { drop = Curves.easeInQuad.transform(t / .38); }
-      else if (t < .52) { drop = 1; sq = sin((t - .38) / .14 * pi); }
-      else { drop = 1 - Curves.easeOutCubic.transform((t - .52) / .48); }
-      return SizedBox(width: widget.size * .7, height: widget.size, child: CustomPaint(painter: _LogoPainter(col, brand, drop, sq)));
+      double lift = 0, sq = 0, open = .75;
+      if (t < .55) { final u = t / .55; lift = sin(u * pi); open = .75 + .45 * lift; }
+      else if (t < .7) { sq = sin((t - .55) / .15 * pi); open = .75 - .2 * sq; }
+      return SizedBox(width: widget.size, height: widget.size * 1.45, child: CustomPaint(painter: _FacePainter(brand, bgc, lift: lift, squash: sq, open: open, shadow: true)));
     }));
   }
 }
@@ -345,7 +348,7 @@ class _LogoRefreshState extends State<LogoRefresh> {
     return Stack(children: [
       Positioned(top: 10, left: 0, right: 0, child: IgnorePointer(child: AnimatedOpacity(
         opacity: st == null || st == RefreshIndicatorStatus.done || st == RefreshIndicatorStatus.canceled ? 0 : 1, duration: const Duration(milliseconds: 180),
-        child: AnimatedScale(scale: show ? 1 : .6, duration: const Duration(milliseconds: 220), curve: Curves.easeOutBack, child: const Center(child: LogoLoop(size: 34)))))),
+        child: AnimatedScale(scale: show ? 1 : .6, duration: const Duration(milliseconds: 220), curve: Curves.easeOutBack, child: const Center(child: LogoLoop(size: 30)))))),
       RefreshIndicator.noSpinner(onStatusChange: (v) { if (mounted) setState(() => st = v); }, onRefresh: widget.onRefresh, child: widget.child),
     ]);
   }
@@ -357,7 +360,7 @@ class Brand extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final w = Row(mainAxisSize: MainAxisSize.min, children: [
-      Container(width: 30, height: 30, decoration: BoxDecoration(color: btnBg(context), borderRadius: BorderRadius.circular(9)), alignment: Alignment.center, child: const Logo(19, cream)),
+      Container(width: 30, height: 30, decoration: BoxDecoration(color: brand, borderRadius: BorderRadius.circular(9)), alignment: Alignment.center, child: const Logo(21, Colors.white, face: brand)),
       const SizedBox(width: 9),
       Text('Hulhup', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 21, letterSpacing: -.4, color: ink(context))),
       if (onTap != null) Icon(Icons.keyboard_arrow_down_rounded, size: 22, color: sub(context)),

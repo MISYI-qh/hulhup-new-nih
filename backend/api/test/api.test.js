@@ -32,6 +32,13 @@ test('alur utama', async () => {
   assert.equal((await call('POST', `/audios/${r.audio.id}/like`, { token: b })).likes, 0);
   await call('POST', `/audios/${r.audio.id}/like`, { token: b });
   assert.equal((await call('GET', '/me', { token: a })).unread_social, 1);
+  // putar & lihat: 1 per akun walau diulang
+  for (let i = 0; i < 3; i++) { await call('POST', `/audios/${r.audio.id}/play`, { token: b }); await call('POST', `/audios/${r.audio.id}/view`, { token: b }); }
+  const pv = await call('POST', `/audios/${r.audio.id}/play`, { token: b });
+  assert.deepEqual([pv.plays, pv.views, pv.counted], [1, 1, false]);
+  const pv2 = await call('POST', `/audios/${r.audio.id}/view`, { token: a });
+  assert.deepEqual([pv2.plays, pv2.views, pv2.counted], [1, 2, true]);
+  assert.equal((await call('POST', `/audios/${r.audio.id}/play`)).ok, false);
   // file akses
   assert.ok((await call('GET', `/audios/${r.audio.id}/file`, { token: b })).binary);
   // hubungan dua pihak

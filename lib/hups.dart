@@ -159,7 +159,7 @@ class _RecordSheetState extends State<RecordSheet> {
 // ---------- pemutar kecil ----------
 /// Audio sebuah post (satu), dengan tanda bila terdeteksi buatan AI.
 Widget audioBars(A a, Object? scope) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      for (var i = 0; i < a.files.length; i++) FileBar(fileKey(a, i), '${a.files[i]['url']}', (a.files[i]['secs'] as num?)?.toInt() ?? 0, scope: scope),
+      for (var i = 0; i < a.files.length; i++) FileBar(fileKey(a, i), '${a.files[i]['url']}', (a.files[i]['secs'] as num?)?.toInt() ?? 0, scope: scope, onStart: () => Store.i.countPlay(a)),
       if (a.ai) AiTag(Store.i.t(a.aiKind == 'edited' ? 'ai_audio_edit' : 'ai_audio')),
     ]);
 
@@ -208,7 +208,8 @@ class FileBar extends StatelessWidget {
   final String url;
   final int secs;
   final Object? scope;
-  const FileBar(this.keyId, this.url, this.secs, {super.key, this.scope});
+  final VoidCallback? onStart;
+  const FileBar(this.keyId, this.url, this.secs, {super.key, this.scope, this.onStart});
   static String rateText(double r) => r == r.roundToDouble() ? '${r.toInt()}×' : '${r.toString().replaceAll(RegExp(r'0+$'), '')}×';
   @override
   Widget build(BuildContext context) {
@@ -219,7 +220,7 @@ class FileBar extends StatelessWidget {
         margin: const EdgeInsets.only(top: 10), padding: const EdgeInsets.fromLTRB(8, 8, 12, 8),
         decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: ink(context).withValues(alpha: on ? .5 : .12), width: on ? 1.4 : 1)),
         child: Row(children: [
-          Tap(onTap: () => s.playUrl(keyId, url, scope: scope).catchError((_) => toast(s.t('e_server'), bad: true)), child: AnimatedContainer(duration: const Duration(milliseconds: 220), width: 40, height: 40, decoration: BoxDecoration(color: on ? brand : btnBg(context), borderRadius: BorderRadius.circular(on ? 12 : 20)), child: Icon(on ? Icons.pause_rounded : Icons.play_arrow_rounded, color: on ? Colors.black : cream, size: 22))),
+          Tap(onTap: () { if (!on) onStart?.call(); return s.playUrl(keyId, url, scope: scope).catchError((_) => toast(s.t('e_server'), bad: true)); }, child: AnimatedContainer(duration: const Duration(milliseconds: 220), width: 40, height: 40, decoration: BoxDecoration(color: on ? brand : btnBg(context), borderRadius: BorderRadius.circular(on ? 12 : 20)), child: Icon(on ? Icons.pause_rounded : Icons.play_arrow_rounded, color: on ? Colors.white : cream, size: 22))),
           const SizedBox(width: 12),
           Expanded(child: SizedBox(height: 32, child: ValueListenableBuilder<int>(valueListenable: s.pos, builder: (_, ms, __) {
             final total = (on && s.dur > 0 ? s.dur : (secs > 0 ? secs * 1000 : 15000)).clamp(1, 1 << 30);
@@ -241,9 +242,9 @@ class AiTag extends StatelessWidget {
   const AiTag(this.label, {super.key});
   @override
   Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(top: 8), child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Container(padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4), decoration: BoxDecoration(color: const Color(0xFF7C5CFF).withValues(alpha: .12), borderRadius: BorderRadius.circular(10)), child: Row(mainAxisSize: MainAxisSize.min, children: [
-          const Icon(Icons.auto_awesome_rounded, size: 13, color: Color(0xFF7C5CFF)), const SizedBox(width: 5),
-          Text(label, style: const TextStyle(color: Color(0xFF7C5CFF), fontSize: 12, fontWeight: FontWeight.w700)),
+        Container(padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4), decoration: BoxDecoration(color: const Color(0xFFD6336C).withValues(alpha: .12), borderRadius: BorderRadius.circular(10)), child: Row(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.auto_awesome_rounded, size: 13, color: Color(0xFFD6336C)), const SizedBox(width: 5),
+          Text(label, style: const TextStyle(color: Color(0xFFD6336C), fontSize: 12, fontWeight: FontWeight.w700)),
         ])),
       ]));
 }
@@ -275,7 +276,7 @@ class _AudioSlot extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(10, 10, 6, 10),
       decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), border: Border.all(color: ink(context).withValues(alpha: .5), width: 1.4)),
       child: Row(children: [
-        Tap(onTap: onPlay, child: Container(width: 44, height: 44, decoration: BoxDecoration(color: playing ? brand : btnBg(context), borderRadius: BorderRadius.circular(playing ? 13 : 22)), child: Icon(playing ? Icons.pause_rounded : Icons.play_arrow_rounded, color: playing ? Colors.black : cream, size: 24))),
+        Tap(onTap: onPlay, child: Container(width: 44, height: 44, decoration: BoxDecoration(color: playing ? brand : btnBg(context), borderRadius: BorderRadius.circular(playing ? 13 : 22)), child: Icon(playing ? Icons.pause_rounded : Icons.play_arrow_rounded, color: playing ? Colors.white : cream, size: 24))),
         const SizedBox(width: 12),
         Expanded(child: SizedBox(height: 34, child: CustomPaint(painter: WavePainter(c.bytes.length, 0, ink(context), ink(context).withValues(alpha: .35), brand), size: Size.infinite))),
         const SizedBox(width: 10),
@@ -439,12 +440,15 @@ class PostActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = Store.i;
-    return ListenableBuilder(listenable: s, builder: (_, __) => Row(children: [
-      LikeBtn(a.liked, a.likes, () => likeAudio(a)),
-      ActBtn(HK.comment, onComments ?? () => openPost(context, a), count: a.comments),
-      const Spacer(),
-      ActBtn(HK.save, () => savePost(a), on: a.saved),
-      ActBtn(HK.share, () => sharePost(a)),
+    return ListenableBuilder(listenable: s, builder: (_, __) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        LikeBtn(a.liked, a.likes, () => likeAudio(a)),
+        ActBtn(HK.comment, onComments ?? () => openPost(context, a), count: a.comments),
+        const Spacer(),
+        ActBtn(HK.save, () => savePost(a), on: a.saved),
+        ActBtn(HK.share, () => sharePost(a)),
+      ]),
+      Padding(padding: const EdgeInsets.fromLTRB(8, 0, 8, 6), child: Text('${fmt(a.views)} ${s.t('views')} · ${fmt(a.plays)} ${s.t('plays')}', style: TextStyle(fontSize: 12.5, color: sub(context), fontWeight: FontWeight.w500))),
     ]));
   }
 }
@@ -478,6 +482,9 @@ class PostCard extends StatefulWidget {
 class _PostCardState extends State<PostCard> {
   String? full;
   bool busy = false;
+
+  @override
+  void initState() { super.initState(); Store.i.countView(widget.a); }
 
   /// Teks panjang di Hups tampil lengkap: tombol "Selengkapnya" membuka seluruh teks di tempat.
   Future<void> _expand() async {
@@ -678,6 +685,7 @@ class _PostPageState extends State<PostPage> {
     text = widget.seed?.text ?? widget.seed?.desc ?? '';
     _load();
     _live = Timer.periodic(const Duration(seconds: 5), (_) => _silent());
+    if (a != null) Store.i.countView(a!);
   }
 
   @override
@@ -693,6 +701,7 @@ class _PostPageState extends State<PostPage> {
       final j = await Api.req('GET', '/posts/${widget.id}');
       a = A.from(j['post']);
       text = j['text'] ?? '';
+      Store.i.countView(a!);
       await _comments();
       error = null;
       _bgm();

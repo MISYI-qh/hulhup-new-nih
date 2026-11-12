@@ -706,14 +706,14 @@ class A {
   final int bgmIdx;
   final String? text; // teks lengkap bila pendek; null = hanya ringkasan (buka halaman penuh)
   final List<Map> files;
-  int likes;
+  int likes, plays, views;
   bool liked, saved;
   A.from(Map j)
       : id = j['id'], secs = j['secs'] ?? 0, created = j['created'] ?? 0, desc = j['desc'] ?? '', url = j['url'] ?? '', vis = j['vis'] ?? 'public', rand = j['rand'] ?? 'public', owner = j['owner'],
-        ownerName = j['owner_name'], ownerAvatar = j['owner_avatar'], ownerVerified = j['owner_verified'] == true, popup = j['popup'] == true, pprof = j['pprof'] != false, likes = j['likes'] ?? 0, liked = j['liked'] == true,
+        ownerName = j['owner_name'], ownerAvatar = j['owner_avatar'], ownerVerified = j['owner_verified'] == true, popup = j['popup'] == true, pprof = j['pprof'] != false, likes = j['likes'] ?? 0, plays = (j['plays'] as num?)?.toInt() ?? 0, views = (j['views'] as num?)?.toInt() ?? 0, liked = j['liked'] == true,
         long = j['long'] == true, inRand = j['in_rand'] != false, inHups = j['in_hups'] == true, comments = j['comments'] ?? 0, saved = j['saved'] == true, bgm = j['bgm'] == true, ai = j['ai'] == true, ownerAvatarAi = j['owner_avatar_ai'] == true, aiKind = '${j['ai_kind'] ?? (j['ai'] == true ? 'made' : '')}', ownerAvatarAiKind = '${j['owner_avatar_ai_kind'] ?? (j['owner_avatar_ai'] == true ? 'made' : '')}', bgmIdx = (j['bgm_idx'] as num?)?.toInt() ?? 0, text = j['text'] as String?, to = ((j['to'] as List?) ?? const []).map((e) => '${e['username']}').toList(),
         files = (j['files'] is List) ? [for (final f in j['files']) Map.from(f as Map)] : ((j['url'] ?? '') == '' ? <Map>[] : <Map>[{'url': j['url'], 'secs': j['secs'] ?? 0}]);
-  Map<String, dynamic> toJson() => {'id': id, 'secs': secs, 'created': created, 'desc': desc, 'url': url, 'vis': vis, 'rand': rand, 'owner': owner, 'owner_name': ownerName, 'owner_avatar': ownerAvatar, 'owner_verified': ownerVerified, 'popup': popup, 'pprof': pprof, 'likes': likes, 'liked': liked, 'long': long, 'in_rand': inRand, 'in_hups': inHups, 'comments': comments, 'saved': saved, 'files': files, 'bgm': bgm, 'ai': ai, 'ai_kind': aiKind, 'owner_avatar_ai': ownerAvatarAi, 'owner_avatar_ai_kind': ownerAvatarAiKind, 'text': text, 'to': [for (final u in to) {'username': u}]};
+  Map<String, dynamic> toJson() => {'id': id, 'secs': secs, 'created': created, 'desc': desc, 'url': url, 'vis': vis, 'rand': rand, 'owner': owner, 'owner_name': ownerName, 'owner_avatar': ownerAvatar, 'owner_verified': ownerVerified, 'popup': popup, 'pprof': pprof, 'likes': likes, 'plays': plays, 'views': views, 'liked': liked, 'long': long, 'in_rand': inRand, 'in_hups': inHups, 'comments': comments, 'saved': saved, 'files': files, 'bgm': bgm, 'ai': ai, 'ai_kind': aiKind, 'owner_avatar_ai': ownerAvatarAi, 'owner_avatar_ai_kind': ownerAvatarAiKind, 'text': text, 'to': [for (final u in to) {'username': u}]};
 }
 
 String mmss(int s) => '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}';
@@ -1027,6 +1027,19 @@ class Store extends ChangeNotifier {
     } catch (_) {}
   }
 
+  final _counted = <String>{};
+  /// Hitung putar/lihat ke server. Server menghitung 1 per akun per post; di sini juga dicegah kirim ulang berulang.
+  void _count(A a, String kind) {
+    if (me == null || !online || a.id <= 0 || a.url.startsWith('file:') || !_counted.add('$kind${a.id}')) return;
+    Api.req('POST', '/audios/${a.id}/$kind').then((j) {
+      a.plays = (j['plays'] as num?)?.toInt() ?? a.plays;
+      a.views = (j['views'] as num?)?.toInt() ?? a.views;
+      notifyListeners();
+    }).catchError((_) { _counted.remove('$kind${a.id}'); });
+  }
+  void countPlay(A a) => _count(a, 'play');
+  void countView(A a) => _count(a, 'view');
+
   /// Fitur yang butuh internet (pencarian, pengaturan, edit profil, Hups): beri tahu bila sedang offline.
   bool needNet() {
     if (online) return true;
@@ -1126,7 +1139,7 @@ class Store extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> play(A a, {bool force = false, bool loop = true, Object? scope}) => playUrl(a.id, a.url, force: force, loop: loop, scope: scope);
+  Future<void> play(A a, {bool force = false, bool loop = true, Object? scope}) { countPlay(a); return playUrl(a.id, a.url, force: force, loop: loop, scope: scope); }
 
   /// Putar satu berkas audio; [key] membedakan pemutar (audio post, audio ke-n, audio komentar).
   Future<void> playUrl(int key, String url, {bool force = false, bool loop = true, Object? scope}) async {
@@ -1240,7 +1253,7 @@ const S = <String, List<String>>{
   'preview': ['Dengar', 'Listen'], 'done': ['Selesai', 'Done'], 'retry': ['Coba lagi', 'Retry'], 'untitled': ['Audio tanpa deskripsi', 'Audio without description'],
   'e_rate_limited': ['Terlalu sering, coba lagi sebentar lagi', 'Too many requests, try again shortly'],
   'e_banned': ['Akun ini dibatasi', 'This account is restricted'],
-  'need_net': ['Butuh internet untuk ini. Acak tetap bisa dipakai.', 'This needs internet. Random still works.'], 'e_network': ['Tidak terhubung ke server', 'Cannot reach the server'], 'e_server': ['Terjadi kesalahan', 'Something went wrong'],
+  'views': ['dilihat', 'views'], 'plays': ['diputar', 'plays'], 'need_net': ['Butuh internet untuk ini. Acak tetap bisa dipakai.', 'This needs internet. Random still works.'], 'e_network': ['Tidak terhubung ke server', 'Cannot reach the server'], 'e_server': ['Terjadi kesalahan', 'Something went wrong'],
   'e_unauthorized': ['Sesi berakhir, silakan masuk lagi', 'Session expired, please sign in again'],
   'e_username_taken': ['Nama pengguna sudah dipakai', 'Username is already taken'],
   'e_bad_credentials': ['Nama pengguna atau kata sandi salah', 'Wrong username or password'],

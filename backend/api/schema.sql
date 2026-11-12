@@ -262,3 +262,9 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS av_deks TEXT;
 
 create table if not exists search_log (id bigserial primary key, user_id bigint not null, sq text not null, created bigint not null);
 create index if not exists search_log_user on search_log(user_id, id desc);
+
+-- Hitungan putar dan lihat: tiap akun dihitung 1 kali per post, seberapa sering pun diputar atau dilihat.
+ALTER TABLE audios ADD COLUMN IF NOT EXISTS plays INT NOT NULL DEFAULT 0;
+ALTER TABLE audios ADD COLUMN IF NOT EXISTS views INT NOT NULL DEFAULT 0;
+CREATE TABLE IF NOT EXISTS post_plays (post_id BIGINT NOT NULL REFERENCES audios(id) ON DELETE CASCADE, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE, PRIMARY KEY (post_id, user_id));
+CREATE TABLE IF NOT EXISTS post_views (post_id BIGINT NOT NULL REFERENCES audios(id) ON DELETE CASCADE, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE, PRIMARY KEY (post_id, user_id));

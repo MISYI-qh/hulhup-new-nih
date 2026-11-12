@@ -121,7 +121,7 @@ async function uv(u, me, today) {
   };
 }
 
-const AUD_SQL = `select a.id, a.descr, a.secs, a.pprof, a.rand, a.created, a.likes, a.owner, a.body_len, a.in_rand, a.in_hups, a.n_audio, a.comments, a.bgm, a.bgm_idx, a.ai, a.ai_kind, a.body btext, u.username ou, u.name oname, u.av_ver oav, u.av_ai oai, u.av_ai_kind oaik, u.verified ov, u.pvis opvis,
+const AUD_SQL = `select a.id, a.descr, a.secs, a.pprof, a.rand, a.created, a.likes, a.plays, a.views, a.owner, a.body_len, a.in_rand, a.in_hups, a.n_audio, a.comments, a.bgm, a.bgm_idx, a.ai, a.ai_kind, a.body btext, u.username ou, u.name oname, u.av_ver oav, u.av_ai oai, u.av_ai_kind oaik, u.verified ov, u.pvis opvis,
   exists(select 1 from likes l where l.audio_id=a.id and l.user_id=$1) liked, exists(select 1 from saves sv where sv.post_id=a.id and sv.user_id=$1) saved from audios a join users u on u.id=a.owner`;
 
 function av(a) {
@@ -129,7 +129,7 @@ function av(a) {
   const files = Array.from({ length: na }, (_, i) => ({ url: `/audios/${a.id}/file${i ? `?i=${i}` : ''}`, secs: i === 0 ? a.secs : 0 }));
   return {
     id: Number(a.id), desc: a.descr, secs: a.secs, popup: true, vis: 'public', url: files.length ? files[0].url : '', pprof: a.pprof, rand: a.rand,
-    created: Number(a.created), likes: a.likes, liked: a.liked, owner: a.ou, owner_name: a.oname,
+    created: Number(a.created), likes: a.likes, plays: a.plays || 0, views: a.views || 0, liked: a.liked, owner: a.ou, owner_name: a.oname,
     owner_avatar: a.oav > 0 ? `/users/${a.ou}/avatar?v=${a.oav}` : null, owner_avatar_ai: a.oav > 0 && a.oai === true, owner_avatar_ai_kind: a.oav > 0 && a.oai === true ? (a.oaik || 'made') : '', ai: a.ai === true, ai_kind: a.ai === true ? (a.ai_kind || 'made') : '', owner_verified: a.ov,
     long: Number(a.body_len || 0) > String(a.descr || '').length, in_rand: a.in_rand !== false, in_hups: a.in_hups === true,
     files, comments: a.comments || 0, saved: a.saved === true,
@@ -523,6 +523,22 @@ route('DELETE', /^\/audios\/(\d+)$/, async (c, m) => {
   await Promise.all(bl.map((b) => delAudio(b.store, b.key)));
   return { ok: true };
 });
+
+// Putar / lihat: hanya akun masuk, dan tiap akun dihitung 1 kali per post (ulang berapa kali pun tidak menambah).
+for (const [kind, table, col] of [['play', 'post_plays', 'plays'], ['view', 'post_views', 'views']]) {
+  route('POST', new RegExp(`^\\/audios\\/(\\d+)\\/${kind}$`), async (c, m) => {
+    const u = c.need();
+    await hit(`${kind}:${u.id}`, 600, 60);
+    const a = await one('select id, hidden from audios where id=$1', [m[1]]);
+    if (!a || a.hidden) throw new ApiErr('not_found', 404);
+    return tx(async (t) => {
+      const r = await t.query(`insert into ${table}(post_id, user_id) values ($1,$2) on conflict do nothing`, [a.id, u.id]);
+      if (r.rowCount) await t.query(`update audios set ${col}=${col}+1 where id=$1`, [a.id]);
+      const x = (await t.query('select plays, views from audios where id=$1', [a.id])).rows[0];
+      return { plays: x.plays, views: x.views, counted: r.rowCount > 0 };
+    });
+  });
+}
 
 route('POST', /^\/audios\/(\d+)\/like$/, async (c, m) => {
   const u = c.need();

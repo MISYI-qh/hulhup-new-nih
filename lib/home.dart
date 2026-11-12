@@ -35,6 +35,7 @@ class _HomeState extends State<HomePage> {
       if (!mounted) return;
       if (a == null) { toast(s.t(s.fromOffline ? 'no_net_empty' : (s.me != null && s.filter != 'public') ? 'nofilter' : 'nobody')); return; }
       if (s.fromOffline) toast(s.t('no_net'));
+      s.countView(a);
       if (a.url.isNotEmpty) s.play(a, force: true).catchError((_) => toast(s.t('e_server'), bad: true));
       sheet(context, (_) => PopupBody(a)).then((_) { if (s.playing == a.id) s.stop(); });
     } catch (e) {
@@ -160,10 +161,10 @@ class _TapButtonState extends State<TapButton> with TickerProviderStateMixin {
             duration: const Duration(milliseconds: 150), width: 204, height: 204,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: const RadialGradient(center: Alignment(-.36, -.52), radius: 1.1, colors: [Color(0xFF3A3A3A), Color(0xFF161616)], stops: [0, 1]),
-              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: down ? .18 : .32), blurRadius: down ? 24 : 52, offset: Offset(0, down ? 10 : 26))],
+              color: brand,
+              boxShadow: [BoxShadow(color: brand.withValues(alpha: down ? .22 : .38), blurRadius: down ? 24 : 52, offset: Offset(0, down ? 10 : 26))],
             ),
-            child: const Center(child: Logo(88, Colors.white)),
+            child: const Center(child: Logo(104, Colors.white, face: brand)),
           ),
         ),
       ),
@@ -262,7 +263,7 @@ class PopupBody extends StatelessWidget {
         child: ListenableBuilder(listenable: s, builder: (_, __) {
           final on = s.playing == a.id;
           return Row(children: [
-            Tap(onTap: () => s.play(a).catchError((_) => toast(s.t('e_server'), bad: true)), child: AnimatedContainer(duration: const Duration(milliseconds: 250), width: 44, height: 44, decoration: BoxDecoration(color: on ? brand : btnBg(context), shape: BoxShape.circle), child: AnimatedSwitcher(duration: const Duration(milliseconds: 200), child: Icon(on ? Icons.pause_rounded : Icons.play_arrow_rounded, key: ValueKey(on), color: on ? Colors.black : cream, size: 26)))),
+            Tap(onTap: () => s.play(a).catchError((_) => toast(s.t('e_server'), bad: true)), child: AnimatedContainer(duration: const Duration(milliseconds: 250), width: 44, height: 44, decoration: BoxDecoration(color: on ? brand : btnBg(context), shape: BoxShape.circle), child: AnimatedSwitcher(duration: const Duration(milliseconds: 200), child: Icon(on ? Icons.pause_rounded : Icons.play_arrow_rounded, key: ValueKey(on), color: on ? Colors.white : cream, size: 26)))),
             Expanded(child: ValueListenableBuilder<int>(valueListenable: s.pos, builder: (_, ms, __) {
               final total = (s.dur > 0 ? s.dur : a.secs * 1000).clamp(1, 1 << 30);
               return Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: (ms / total).clamp(0.0, 1.0), minHeight: 6, backgroundColor: ink(context).withValues(alpha: .12), color: ink(context))));
