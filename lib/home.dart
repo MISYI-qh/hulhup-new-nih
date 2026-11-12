@@ -78,7 +78,7 @@ class _HomeState extends State<HomePage> {
           final f = s.me == null ? 'public' : s.filter;
           return Stack(children: [
             HupsFeed(f, key: ValueKey('hf_$f${s.me?.username}')),
-            Positioned(right: 20, bottom: 14, child: Tap(onTap: () => { if (Store.i.needNet()) go(context, s.me == null ? const AuthPage() : const ComposePage()); }, child: Container(width: 56, height: 56, decoration: BoxDecoration(color: btnBg(context), shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .35), blurRadius: 22, offset: const Offset(0, 10))]), child: const Center(child: HIcon(HK.add, size: 26, color: cream))))),
+            Positioned(right: 20, bottom: 14, child: Tap(onTap: () { if (Store.i.needNet()) go(context, s.me == null ? const AuthPage() : const ComposePage()); }, child: Container(width: 56, height: 56, decoration: BoxDecoration(color: btnBg(context), shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .35), blurRadius: 22, offset: const Offset(0, 10))]), child: const Center(child: HIcon(HK.add, size: 26, color: cream))))),
           ]);
         })),
       ]);
