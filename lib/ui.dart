@@ -269,11 +269,11 @@ class _ToastState extends State<_Toast> with SingleTickerProviderStateMixin {
   }
 }
 
-class _HPainter extends CustomPainter {
+class _LogoPainter extends CustomPainter {
   final Color color;
   final double lift; // 0..1 tinggi loncatan titik
   final double squash; // 0..1 gepeng saat mendarat
-  _HPainter(this.color, this.lift, this.squash);
+  _LogoPainter(this.color, this.lift, this.squash);
   @override
   void paint(Canvas c, Size s) {
     final k = s.height / .6, ox = s.width / 2 - .5 * k, oy = s.height / 2 - .5 * k;
@@ -287,7 +287,7 @@ class _HPainter extends CustomPainter {
     c.drawOval(Rect.fromCenter(center: Offset(ox + .66 * k, oy + (cy + (.085 - ry)) * k), width: rx * 2 * k, height: ry * 2 * k), p);
   }
   @override
-  bool shouldRepaint(_HPainter o) => o.color != color || o.lift != lift || o.squash != squash;
+  bool shouldRepaint(_LogoPainter o) => o.color != color || o.lift != lift || o.squash != squash;
 }
 
 /// Logo Hulhup: huruf H bulat dengan titik yang meloncat. size = tinggi tanda.
@@ -297,7 +297,7 @@ class Logo extends StatelessWidget {
   final double lift;
   const Logo(this.size, this.color, {super.key, this.lift = 0});
   @override
-  Widget build(BuildContext context) => SizedBox(width: size * .8, height: size, child: CustomPaint(painter: _HPainter(color, lift, 0)));
+  Widget build(BuildContext context) => SizedBox(width: size * .8, height: size, child: CustomPaint(painter: _LogoPainter(color, lift, 0)));
 }
 
 /// Logo beranimasi: titik memantul terus. Dipakai untuk semua loading.
@@ -320,7 +320,7 @@ class _LogoLoopState extends State<LogoLoop> with SingleTickerProviderStateMixin
       final t = c.value;
       final up = t < .62 ? Curves.easeOutCubic.transform(sin(t / .62 * pi).abs()) : 0.0;
       final land = t >= .62 ? sin((t - .62) / .38 * pi) : 0.0;
-      return SizedBox(width: widget.size * .8, height: widget.size, child: CustomPaint(painter: _HPainter(col, up, land.toDouble())));
+      return SizedBox(width: widget.size * .8, height: widget.size, child: CustomPaint(painter: _LogoPainter(col, up, land.toDouble())));
     }));
   }
 }
