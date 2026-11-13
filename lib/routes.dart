@@ -24,7 +24,6 @@ String? pathOf(Widget w) {
   if (w is SessionsPage) return '/settings/sessions';
   if (w is OfflinePage) return '/offline';
   if (w is ComposePage) return '/new';
-  if (w is GetAppPage) return '/get-app';
   if (w is AuthPage) return '/login';
   if (w is RecoverPage) return '/recover';
   if (w is FaqPage) return '/faq';
@@ -79,7 +78,6 @@ Widget? pageFor(String name) {
     case 'streak': return const StreakPage();
     case 'offline': return const OfflinePage();
     case 'new': return const ComposePage();
-    case 'get-app': return const GetAppPage();
     case 'login': return const AuthPage();
     case 'recover': return const RecoverPage();
     case 'faq': return const FaqPage();

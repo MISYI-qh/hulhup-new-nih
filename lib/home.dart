@@ -36,6 +36,7 @@ class _HomeState extends State<HomePage> {
       if (a == null) { toast(s.t(s.fromOffline ? 'no_net_empty' : (s.me != null && s.filter != 'public') ? 'nofilter' : 'nobody')); return; }
       if (s.fromOffline) toast(s.t('no_net'));
       s.countView(a);
+      s.logAct('acak', a.ownerName, go: 'p${a.id}');
       if (a.url.isNotEmpty && !(a.bgm && s.bgmMuted)) s.play(a, force: true).catchError((_) => toast(s.t('e_server'), bad: true));
       sheet(context, (_) => PopupBody(a)).then((_) { if (s.playing == a.id) s.stop(); });
     } catch (e) {
@@ -219,6 +220,7 @@ class _SideMenuState extends State<SideMenu> {
             Padding(padding: const EdgeInsets.only(bottom: 8), child: PBtn(s.t('create'), () { if (!s.needNet()) return; close(); go(context, s.me == null ? const AuthPage() : const ComposePage()); }, icon: Icons.add_rounded)),
             item(Icons.tune_rounded, 'settings', () => const SettingsPage(), net: true),
             if (s.me != null) item(Icons.send_outlined, 'sent_title', () => const SentPage()),
+            item(Icons.history_rounded, 'hist_t', () => const HistoryPage()),
             item(Icons.download_done_rounded, 'offline_t', () => const OfflinePage()),
             if (!kIsWeb) Tap(onTap: () { close(); () async { final up = await s.checkUpdate(force: true); if (up) { showUpdate(context); } else { toast(s.t('upd_none')); } }(); }, child: Padding(padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8), child: Row(children: [Icon(Icons.system_update_rounded, size: 24, color: ink(context)), const SizedBox(width: 16), Text(s.t('upd_menu'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600))]))),
             Tap(onTap: () => setState(() => more = !more), child: Padding(padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8), child: Row(children: [Icon(Icons.more_horiz_rounded, size: 24, color: ink(context)), const SizedBox(width: 16), Expanded(child: Text(s.t('more'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600))), AnimatedRotation(turns: more ? .5 : 0, duration: const Duration(milliseconds: 200), child: Icon(Icons.expand_more_rounded, size: 24, color: sub(context)))]))),
@@ -228,7 +230,6 @@ class _SideMenuState extends State<SideMenu> {
               item(Icons.rule_rounded, 'policy', () => TextPage(s.t('policy'), s.t('policy_t'), slug: 'policy')),
               item(Icons.lock_outline_rounded, 'privacy', () => TextPage(s.t('privacy'), s.t('privacy_t'), slug: 'privacy')),
               if (!kIsWeb) Tap(onTap: () { close(); launchUrl(Uri.parse('https://hulhup.my.id'), mode: LaunchMode.externalApplication); }, child: Padding(padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8), child: Row(children: [Icon(Icons.language_rounded, size: 24, color: ink(context)), const SizedBox(width: 16), Text(s.t('website'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600))]))),
-              if (kIsWeb) item(Icons.android_rounded, 'get_app', () => const GetAppPage()),
             ])) : const SizedBox(width: double.infinity)),
             const Spacer(),
             if (s.me == null) PBtn(s.t('login'), () { close(); go(context, const AuthPage()); }, icon: Icons.login_rounded)
@@ -335,68 +336,6 @@ class _UpdateBody extends StatelessWidget {
     ]);
   }
 }
-
-/// Halaman unduh aplikasi Android di web, dengan tampilan sendiri.
-Future<void> showGetApp(BuildContext context) => go(context, const GetAppPage());
-
-class GetAppPage extends StatelessWidget {
-  const GetAppPage({super.key});
-  @override
-  Widget build(BuildContext context) => Scaffold(body: Column(children: [
-        TopBar(back: true, title: Store.i.t('get_app')),
-        const Expanded(child: SingleChildScrollView(padding: EdgeInsets.fromLTRB(24, 8, 24, 40), child: _GetAppBody())),
-      ]));
-}
-
-class _GetAppBody extends StatefulWidget {
-  const _GetAppBody();
-  @override
-  State<_GetAppBody> createState() => _GetAppState();
-}
-
-class _GetAppState extends State<_GetAppBody> {
-  String ver = '', size = '', size32 = '';
-  @override
-  void initState() { super.initState(); _info(); }
-  Future<void> _info() async {
-    try {
-      final r = await http.get(Uri.parse('https://hulhup.my.id/version.json')).timeout(const Duration(seconds: 8));
-      final j = jsonDecode(r.body) as Map;
-      ver = '${j['version'] ?? ''}';
-      String mb(dynamic v) { final n = int.tryParse('$v'); return n == null || n <= 0 ? '' : '${(n / 1000000).toStringAsFixed(1)} MB'; }
-      size = mb(j['size']);
-      size32 = mb(j['size32']);
-    } catch (_) {}
-    if (mounted) setState(() {});
-  }
-
-  Widget _step(int n, String t) => Padding(padding: const EdgeInsets.only(bottom: 10), child: Row(children: [
-        Container(width: 26, height: 26, alignment: Alignment.center, decoration: BoxDecoration(color: soft(context), shape: BoxShape.circle), child: Text('$n', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13))),
-        const SizedBox(width: 12),
-        Expanded(child: Text(t, style: const TextStyle(fontSize: 14.5, height: 1.4))),
-      ]));
-
-  @override
-  Widget build(BuildContext context) {
-    final s = Store.i;
-    return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Center(child: Icon(Icons.android_rounded, size: 44, color: ink(context))),
-      const SizedBox(height: 10),
-      Center(child: Text(s.t('ga_title'), textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20))),
-      const SizedBox(height: 8),
-      Text(s.t('ga_note'), textAlign: TextAlign.center, style: TextStyle(color: sub(context), fontSize: 14, height: 1.4)),
-      if (ver.isNotEmpty || size.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 12), child: Center(child: Text([if (ver.isNotEmpty) '${s.t('ga_ver')} $ver', if (size.isNotEmpty) '${s.t('ga_size')} $size'].join(' · '), style: TextStyle(color: sub(context), fontWeight: FontWeight.w700, fontSize: 13)))),
-      const SizedBox(height: 18),
-      _step(1, s.t('ga_s1')), _step(2, s.t('ga_s2')), _step(3, s.t('ga_s3')), _step(4, s.t('ga_s4')), _step(5, s.t('ga_s5')),
-      const SizedBox(height: 8),
-      PBtn(s.t('ga_btn'), () => downloadApk(context, kApkUrl), icon: Icons.download_rounded),
-      if (size32.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: Center(child: Tap(onTap: () => downloadApk(context, kApkUrl32), child: Padding(padding: const EdgeInsets.all(8), child: Text('${s.t('ga_32')} ($size32)', textAlign: TextAlign.center, style: TextStyle(color: sub(context), fontSize: 13, fontWeight: FontWeight.w600, decoration: TextDecoration.underline)))))),
-      const SizedBox(height: 10),
-      Text(s.t('ga_tip'), style: TextStyle(color: sub(context), fontSize: 13, height: 1.4)),
-    ]);
-  }
-}
-
 
 /// Unduh APK di tampilan sendiri: progres, status, dan ulangi jika gagal.
 Future<void> downloadApk(BuildContext context, String url) => sheet(context, (_) => _ApkDl(url));

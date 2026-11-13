@@ -178,6 +178,7 @@ class _ProfileState extends State<ProfilePage> {
       final j = await Api.req('POST', '/users/${widget.u}/follow');
       user!.isFollowing = j['following'];
       user!.followers = j['followers'];
+      if (user!.isFollowing) Store.i.logAct('follow', user!.name, go: 'u${widget.u}');
     } catch (e) { toast(Store.i.err(e), bad: true); }
     if (mounted) setState(() => busy = false);
   }
@@ -691,19 +692,34 @@ class _SearchState extends State<SearchPage> {
   Map? res;
   bool busy = false;
   Timer? t;
+  String _lastQ = '';
   @override
-  void dispose() { t?.cancel(); c.dispose(); Store.i.leave(this); super.dispose(); }
+  void dispose() { t?.cancel(); if (_lastQ.length >= 2) Store.i.addSearch(_lastQ); c.dispose(); Store.i.leave(this); super.dispose(); }
+  void _use(String q) { c.text = q; c.selection = TextSelection.collapsed(offset: q.length); _q(q); }
   void _q(String v) {
     t?.cancel();
     if (v.trim().isEmpty) { setState(() => res = null); return; }
     t = Timer(const Duration(milliseconds: 350), () async {
       setState(() => busy = true);
-      try { res = await Api.req('GET', '/search?q=${Uri.encodeQueryComponent(v.trim())}') as Map; } catch (e) { toast(Store.i.err(e), bad: true); }
+      try { res = await Api.req('GET', '/search?q=${Uri.encodeQueryComponent(v.trim())}') as Map; _lastQ = v.trim(); } catch (e) { toast(Store.i.err(e), bad: true); }
       if (mounted) setState(() => busy = false);
     });
   }
 
   Widget _sec(String t) => Padding(padding: const EdgeInsets.fromLTRB(6, 8, 0, 10), child: Text(t, style: TextStyle(color: sub(context), fontWeight: FontWeight.w700, fontSize: 13)));
+
+  Widget _recent() => ListenableBuilder(listenable: Store.i, builder: (_, __) {
+    final s = Store.i;
+    if (s.searches.isEmpty) return const SizedBox();
+    return ListView(padding: const EdgeInsets.fromLTRB(20, 0, 20, 40), children: [
+      Row(children: [Expanded(child: _sec(s.t('hist_recent'))), Tap(onTap: s.clearSearches, child: Padding(padding: const EdgeInsets.all(8), child: Text(s.t('hist_clear'), style: TextStyle(color: sub(context), fontWeight: FontWeight.w700, fontSize: 13))))]),
+      for (final q in s.searches) Tap(onTap: () => _use(q), child: Padding(padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6), child: Row(children: [
+        Icon(Icons.history_rounded, size: 20, color: sub(context)), const SizedBox(width: 14),
+        Expanded(child: Text(q, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600))),
+        IconBtn(Icons.close_rounded, () => s.delSearch(q)),
+      ]))),
+    ]);
+  });
 
   Widget _results() {
     final s = Store.i, us = res!['users'] as List, au = (res!['audios'] as List).map((e) => A.from(e)).toList();
@@ -721,7 +737,7 @@ class _SearchState extends State<SearchPage> {
           height: 54, padding: const EdgeInsets.only(left: 18, right: 6), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(27)),
           child: Row(children: [Icon(Icons.search_rounded, color: sub(context)), const SizedBox(width: 10), Expanded(child: TextField(controller: c, autofocus: true, onChanged: _q, cursorColor: ink(context), style: const TextStyle(fontSize: 16), decoration: InputDecoration(border: InputBorder.none, isDense: true, hintText: Store.i.t('search_hint'), hintStyle: TextStyle(color: sub(context))))), if (busy) const Padding(padding: EdgeInsets.only(right: 12), child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.2)))]),
         )),
-        Expanded(child: res == null ? const SizedBox() : _results()),
+        Expanded(child: res == null ? _recent() : _results()),
       ]));
 }
 
@@ -895,14 +911,28 @@ class _RelationsState extends State<RelationsPage> {
   @override
   void initState() { super.initState(); _load(); }
 
+  /// Urut menurut jenis hubungan (sahabat, keluarga, pasangan, teman, lainnya), lalu nama hubungan buatanmu, lalu nama orangnya.
+  List _sorted(List l) {
+    const order = ['best', 'family', 'partner', 'friend', 'custom'];
+    int k(Map r) { final i = order.indexOf('${r['type']}'); return i < 0 ? order.length : i; }
+    final c = [...l];
+    c.sort((a, b) {
+      final x = k(a as Map).compareTo(k(b as Map));
+      if (x != 0) return x;
+      final y = '${a['label'] ?? ''}'.toLowerCase().compareTo('${b['label'] ?? ''}'.toLowerCase());
+      return y != 0 ? y : '${a['name']}'.toLowerCase().compareTo('${b['name']}'.toLowerCase());
+    });
+    return c;
+  }
+
   Future<void> _load() async {
     try {
       if (mine) {
         final r = await Api.req('GET', '/me/relations');
-        rels = r['active']; relIn = r['incoming']; relOut = r['outgoing'];
+        rels = _sorted(r['active']); relIn = _sorted(r['incoming']); relOut = _sorted(r['outgoing']);
       } else {
         final r = await Api.req('GET', '/users/${widget.u}/relations');
-        rels = r['items'];
+        rels = _sorted(r['items']);
         locked = r['locked'] == true;
       }
       error = null;
@@ -987,7 +1017,7 @@ class _RelationsState extends State<RelationsPage> {
         if (relOut.isNotEmpty) ...[head(s.t('rel_out')), for (var i = 0; i < relOut.length; i++) row(relOut[i], i, act: [IconBtn(Icons.close_rounded, () => _relReq(() => Api.req('DELETE', '/relations/${relOut[i]['username']}'), s.t('rel_ended')))])],
         if (rels.isNotEmpty) ...[if (relIn.isNotEmpty || relOut.isNotEmpty) head(s.t('rel_title')), for (var i = 0; i < rels.length; i++) row(rels[i], i, edit: mine, act: mine ? [IconBtn(Icons.link_off_rounded, () => _relEnd(rels[i]['username'], rels[i]['name']))] : [])],
       ]))),
-      if (mine) Padding(padding: const EdgeInsets.fromLTRB(20, 0, 20, 20), child: PBtn(s.t('lbl_manage'), _manage, ghost: true, icon: Icons.label_outline_rounded)),
+      if (mine) SafeArea(top: false, child: Padding(padding: const EdgeInsets.fromLTRB(20, 0, 20, 20), child: PBtn(s.t('lbl_manage'), _manage, ghost: true, icon: Icons.label_outline_rounded))),
     ]));
   }
 }
@@ -1043,6 +1073,38 @@ class _SessionsState extends State<SessionsPage> {
         ),
         if (list.length > 1) Padding(padding: const EdgeInsets.only(top: 8), child: PBtn(s.t('sess_all'), _all, ghost: true, icon: Icons.devices_other_rounded)) else Padding(padding: const EdgeInsets.only(top: 18), child: Center(child: Text(s.t('sess_empty'), style: TextStyle(color: sub(context))))),
       ]))),
+    ]));
+  }
+}
+
+
+/// Riwayat kegiatanmu di perangkat ini: pencarian, Acak, sorotan, komentar, post, dan yang kamu ikuti.
+class HistoryPage extends StatelessWidget {
+  const HistoryPage({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final s = Store.i;
+    IconData ic(String k) => switch (k) { 'search' => Icons.search_rounded, 'acak' => Icons.graphic_eq_rounded, 'like' => Icons.favorite_border_rounded, 'comment' => Icons.chat_bubble_outline_rounded, 'post' => Icons.edit_outlined, _ => Icons.person_add_alt_1_outlined };
+    return Scaffold(body: Column(children: [
+      TopBar(back: true, title: s.t('hist_t'), actions: [ListenableBuilder(listenable: s, builder: (_, __) => s.history.isEmpty ? const SizedBox() : IconBtn(Icons.delete_outline_rounded, () async { if (await confirm(context, s.t('hist_clear'), s.t('hist_note'), s.t('delete'), danger: true)) s.clearHistory(); }))]),
+      Expanded(child: ListenableBuilder(listenable: s, builder: (_, __) => s.history.isEmpty ? Empty(Icons.history_rounded, s.t('hist_none')) : ListView.builder(
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 40), itemCount: s.history.length,
+        itemBuilder: (_, i) {
+          final h = s.history[i], g = '${h['g'] ?? ''}';
+          return Tap(onTap: g.isEmpty ? null : () { if (g.startsWith('p')) { go(context, PostPage(int.tryParse(g.substring(1)) ?? 0)); } else if (g.startsWith('u')) { go(context, ProfilePage(g.substring(1))); } }, child: Container(
+            margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(22)),
+            child: Row(children: [
+              Icon(ic('${h['k']}'), size: 22, color: ink(context)), const SizedBox(width: 14),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(s.t('h_${h['k']}'), style: TextStyle(color: sub(context), fontSize: 12.5, fontWeight: FontWeight.w700)),
+                Text('${h['t']}', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+              ])),
+              const SizedBox(width: 8), Text(s.ago((h['at'] as num).toInt()), style: TextStyle(color: sub(context), fontSize: 12)),
+            ]),
+          ));
+        },
+      ))),
     ]));
   }
 }

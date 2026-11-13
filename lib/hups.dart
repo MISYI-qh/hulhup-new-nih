@@ -743,6 +743,7 @@ class _PostPageState extends State<PostPage> {
     try {
       final j = await Api.req('POST', '/posts/${widget.id}/comments', body: {'text': t, 'parent': replyTo?['id']});
       id = (j['id'] as num).toInt();
+      s.logAct('comment', t, go: 'p${widget.id}');
       input.clear();
       replyTo = null;
       _autoTag = '';
@@ -991,6 +992,7 @@ class _ComposeState extends State<ComposePage> {
       id = (j['id'] as num).toInt();
       if (c != null) await Api.multi('/posts/$id/audio', c.bytes, 'a.${c.ext}', {'secs': '${c.secs}'});
       if (!mounted) return;
+      s.logAct('post', t.isEmpty ? s.t('h_post') : t, go: 'p$id');
       Navigator.pop(context, true);
       toast(s.t('posted'));
     } catch (e) {
