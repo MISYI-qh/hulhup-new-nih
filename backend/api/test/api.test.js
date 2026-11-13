@@ -317,3 +317,16 @@ test('hubungan custom: nama sendiri jadi audiens, filter, dan privasi profil', a
   assert.equal((await call('GET', `/posts/${p.id}`, { token: a })).post.id, p.id);
   assert.equal((await call('GET', '/me', { token: a })).user.pvis, 'me');
 });
+
+test('pratinjau tautan: aman dan terurai', async () => {
+  const { privateIp, parseMeta } = await import('../lib/preview.js');
+  for (const ip of ['127.0.0.1', '10.0.0.5', '192.168.1.1', '172.16.0.1', '169.254.169.254', '::1', 'fd00::1', '::ffff:127.0.0.1', '0.0.0.0']) assert.equal(privateIp(ip), true, ip);
+  for (const ip of ['8.8.8.8', '1.1.1.1', '2606:4700::1111']) assert.equal(privateIp(ip), false, ip);
+  const m = parseMeta('<html><head><title>Fallback</title><meta property="og:title" content="Hulhup &amp; teman"><meta property="og:description" content="Dengar suara"><meta property="og:image" content="/img/a.png"><link rel="icon" href="/f.ico"></head></html>', 'https://contoh.id/x');
+  assert.deepEqual([m.title, m.desc, m.image, m.icon, m.host], ['Hulhup & teman', 'Dengar suara', 'https://contoh.id/img/a.png', 'https://contoh.id/f.ico', 'contoh.id']);
+  const a = await reg('prevu');
+  assert.equal((await call('GET', '/preview?url=' + encodeURIComponent('http://x'))).error, 'unauthorized');
+  assert.equal((await call('GET', '/preview?url=javascript:1', { token: a })).error, 'bad_url');
+  assert.equal((await call('GET', '/preview?url=' + encodeURIComponent('http://127.0.0.1/'), { token: a })).preview, null);
+  assert.equal((await call('GET', '/preview?url=' + encodeURIComponent('http://169.254.169.254/latest'), { token: a })).preview, null);
+});

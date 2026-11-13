@@ -10,6 +10,7 @@ dependencies:
   flutter_web_plugins:
     sdk: flutter
   audioplayers: ^6.1.0
+  video_player: ^2.9.2
   record: ^7.1.2
   file_picker: ^10.0.0
   image_picker: ^1.1.2

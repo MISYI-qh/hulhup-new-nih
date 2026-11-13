@@ -1,5 +1,6 @@
 // Hulhup API: akun, audio acak dengan filter ketat, hubungan dua pihak, notifikasi.
 // Semua izin ditegakkan di sini. Tidak ada endpoint admin: moderasi hanya lewat database.
+import { preview } from './preview.js';
 import { q, one, many, tx } from './db.js';
 import { ApiErr, now, sha, token, hashPw, checkPw, dayStr, okBirth, ageOf, imageMime, audioMime, readBody } from './util.js';
 import { storeFor, putAudio, getAudio, delAudio } from './blobs.js';
@@ -306,6 +307,14 @@ route('POST', /^\/logout$/, async (c) => {
   const h = c.req.headers.authorization || '';
   if (h.startsWith('Bearer ')) await q('delete from sessions where token_hash=$1', [sha(h.slice(7))]);
   return { ok: true };
+});
+
+route('GET', /^\/preview$/, async (c) => {
+  const u = c.need();
+  await hit(`prev:${u.id}`, 120, 60);
+  const url = String(c.query.url || '').slice(0, 2000);
+  if (!/^https?:\/\//i.test(url)) throw new ApiErr('bad_url');
+  return { preview: await preview(url) };
 });
 
 route('GET', /^\/stats$/, async (c) => ({ taps: c.me ? Number(c.me.taps) : 0, tapf: c.me ? (c.me.tapf || {}) : {} }));

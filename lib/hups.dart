@@ -13,6 +13,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:share_plus/share_plus.dart';
 import 'core.dart';
+import 'linkcard.dart';
 import 'pages.dart';
 import 'ui.dart';
 
@@ -510,6 +511,7 @@ class _PostCardState extends State<PostCard> {
               if (over) Padding(padding: const EdgeInsets.only(top: 4), child: Text(s.t('read_more'), style: TextStyle(color: acc(context), fontWeight: FontWeight.w700, fontSize: 14))),
             ]);
           })),
+          if (firstUrl(text) != null) LinkEmbed(firstUrl(text)!),
           if (a.files.isNotEmpty) Padding(padding: const EdgeInsets.only(right: 8), child: a.bgm ? BgmBar(a) : audioBars(a, widget.scope)),
           const SizedBox(height: 4),
           PostActions(a),
@@ -853,6 +855,7 @@ class _PostPageState extends State<PostPage> {
       Expanded(child: loading && p == null ? const Loader() : error != null && p == null ? Empty(Icons.lock_outline_rounded, error!) : ListView(controller: sc, padding: const EdgeInsets.fromLTRB(18, 4, 18, 24), children: [
         OwnerRow(p!),
         if (text.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 14), child: MentionText(text, selectable: true, style: const TextStyle(fontSize: 17, height: 1.55))),
+        if (firstUrl(text) != null) LinkEmbed(firstUrl(text)!),
         if (p.files.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: p.bgm ? BgmBar(p) : audioBars(p, this)),
         const SizedBox(height: 10),
         PostActions(p, onComments: () { focus.requestFocus(); }),
