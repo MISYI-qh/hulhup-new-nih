@@ -178,7 +178,6 @@ class _ProfileState extends State<ProfilePage> {
       final j = await Api.req('POST', '/users/${widget.u}/follow');
       user!.isFollowing = j['following'];
       user!.followers = j['followers'];
-      if (user!.isFollowing) Store.i.logAct('follow', user!.name, go: 'u${widget.u}');
     } catch (e) { toast(Store.i.err(e), bad: true); }
     if (mounted) setState(() => busy = false);
   }
@@ -1016,8 +1015,8 @@ class _RelationsState extends State<RelationsPage> {
         ])],
         if (relOut.isNotEmpty) ...[head(s.t('rel_out')), for (var i = 0; i < relOut.length; i++) row(relOut[i], i, act: [IconBtn(Icons.close_rounded, () => _relReq(() => Api.req('DELETE', '/relations/${relOut[i]['username']}'), s.t('rel_ended')))])],
         if (rels.isNotEmpty) ...[if (relIn.isNotEmpty || relOut.isNotEmpty) head(s.t('rel_title')), for (var i = 0; i < rels.length; i++) row(rels[i], i, edit: mine, act: mine ? [IconBtn(Icons.link_off_rounded, () => _relEnd(rels[i]['username'], rels[i]['name']))] : [])],
+        if (mine) ...[const SizedBox(height: 16), PBtn(s.t('lbl_manage'), _manage, ghost: true, icon: Icons.label_outline_rounded), SizedBox(height: MediaQuery.of(context).viewPadding.bottom + 32)],
       ]))),
-      if (mine) SafeArea(top: false, child: Padding(padding: const EdgeInsets.fromLTRB(20, 0, 20, 20), child: PBtn(s.t('lbl_manage'), _manage, ghost: true, icon: Icons.label_outline_rounded))),
     ]));
   }
 }
@@ -1073,38 +1072,6 @@ class _SessionsState extends State<SessionsPage> {
         ),
         if (list.length > 1) Padding(padding: const EdgeInsets.only(top: 8), child: PBtn(s.t('sess_all'), _all, ghost: true, icon: Icons.devices_other_rounded)) else Padding(padding: const EdgeInsets.only(top: 18), child: Center(child: Text(s.t('sess_empty'), style: TextStyle(color: sub(context))))),
       ]))),
-    ]));
-  }
-}
-
-
-/// Riwayat kegiatanmu di perangkat ini: pencarian, Acak, sorotan, komentar, post, dan yang kamu ikuti.
-class HistoryPage extends StatelessWidget {
-  const HistoryPage({super.key});
-  @override
-  Widget build(BuildContext context) {
-    final s = Store.i;
-    IconData ic(String k) => switch (k) { 'search' => Icons.search_rounded, 'acak' => Icons.graphic_eq_rounded, 'like' => Icons.favorite_border_rounded, 'comment' => Icons.chat_bubble_outline_rounded, 'post' => Icons.edit_outlined, _ => Icons.person_add_alt_1_outlined };
-    return Scaffold(body: Column(children: [
-      TopBar(back: true, title: s.t('hist_t'), actions: [ListenableBuilder(listenable: s, builder: (_, __) => s.history.isEmpty ? const SizedBox() : IconBtn(Icons.delete_outline_rounded, () async { if (await confirm(context, s.t('hist_clear'), s.t('hist_note'), s.t('delete'), danger: true)) s.clearHistory(); }))]),
-      Expanded(child: ListenableBuilder(listenable: s, builder: (_, __) => s.history.isEmpty ? Empty(Icons.history_rounded, s.t('hist_none')) : ListView.builder(
-        padding: const EdgeInsets.fromLTRB(20, 4, 20, 40), itemCount: s.history.length,
-        itemBuilder: (_, i) {
-          final h = s.history[i], g = '${h['g'] ?? ''}';
-          return Tap(onTap: g.isEmpty ? null : () { if (g.startsWith('p')) { go(context, PostPage(int.tryParse(g.substring(1)) ?? 0)); } else if (g.startsWith('u')) { go(context, ProfilePage(g.substring(1))); } }, child: Container(
-            margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(22)),
-            child: Row(children: [
-              Icon(ic('${h['k']}'), size: 22, color: ink(context)), const SizedBox(width: 14),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(s.t('h_${h['k']}'), style: TextStyle(color: sub(context), fontSize: 12.5, fontWeight: FontWeight.w700)),
-                Text('${h['t']}', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-              ])),
-              const SizedBox(width: 8), Text(s.ago((h['at'] as num).toInt()), style: TextStyle(color: sub(context), fontSize: 12)),
-            ]),
-          ));
-        },
-      ))),
     ]));
   }
 }

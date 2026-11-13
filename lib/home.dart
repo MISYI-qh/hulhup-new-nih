@@ -34,7 +34,6 @@ class _HomeState extends State<HomePage> {
       if (a == null) { toast(s.t(s.fromOffline ? 'no_net_empty' : (s.me != null && s.filter != 'public') ? 'nofilter' : 'nobody')); return; }
       if (s.fromOffline) toast(s.t('no_net'));
       s.countView(a);
-      s.logAct('acak', a.ownerName, go: 'p${a.id}');
       if (a.url.isNotEmpty && !(a.bgm && s.bgmMuted)) s.play(a, force: true).catchError((_) => toast(s.t('e_server'), bad: true));
       sheet(context, (_) => PopupBody(a)).then((_) { if (s.playing == a.id) s.stop(); });
     } catch (e) {
@@ -218,7 +217,6 @@ class _SideMenuState extends State<SideMenu> {
             Padding(padding: const EdgeInsets.only(bottom: 8), child: PBtn(s.t('create'), () { if (!s.needNet()) return; close(); go(context, s.me == null ? const AuthPage() : const ComposePage()); }, icon: Icons.add_rounded)),
             item(Icons.tune_rounded, 'settings', () => const SettingsPage(), net: true),
             if (s.me != null) item(Icons.send_outlined, 'sent_title', () => const SentPage()),
-            item(Icons.history_rounded, 'hist_t', () => const HistoryPage()),
             item(Icons.download_done_rounded, 'offline_t', () => const OfflinePage()),
             if (!kIsWeb) Tap(onTap: () { close(); () async { final up = await s.checkUpdate(force: true); if (up) { showUpdate(context); } else { toast(s.t('upd_none')); } }(); }, child: Padding(padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8), child: Row(children: [Icon(Icons.system_update_rounded, size: 24, color: ink(context)), const SizedBox(width: 16), Text(s.t('upd_menu'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600))]))),
             Tap(onTap: () => setState(() => more = !more), child: Padding(padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8), child: Row(children: [Icon(Icons.more_horiz_rounded, size: 24, color: ink(context)), const SizedBox(width: 16), Expanded(child: Text(s.t('more'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600))), AnimatedRotation(turns: more ? .5 : 0, duration: const Duration(milliseconds: 200), child: Icon(Icons.expand_more_rounded, size: 24, color: sub(context)))]))),

@@ -800,7 +800,7 @@ class Store extends ChangeNotifier {
       if (me?.username == to) { banner?.call('$actor ${notifText(type, extra)}'); refresh(); }
       Notifier.show(200 + (_nid++ % 50), 'Hulhup', '$actor ${notifText(type, extra)} · @$to', t('notif'));
     };
-    _loadHist();
+    searches = _sp.getStringList('search_hist') ?? [];
     try { for (final j in jsonDecode(_sp.getString('offline') ?? '[]') as List) { offline.add(A.from(j as Map)); } } catch (_) {}
     try { for (final j in jsonDecode(_sp.getString('acak_cache') ?? '[]') as List) { acakCache.add(A.from(j as Map)); } } catch (_) {}
     try {
@@ -1211,21 +1211,8 @@ class Store extends ChangeNotifier {
     if (_scope == scope && playing != null) Future.microtask(stop);
   }
 
-  // ── Riwayat (tersimpan di perangkat ini saja) ──
-  List<Map<String, dynamic>> history = [];
+  // ── Riwayat pencarian (tersimpan di perangkat ini saja) ──
   List<String> searches = [];
-  void _loadHist() {
-    try { history = [for (final e in jsonDecode(_sp.getString('history') ?? '[]') as List) Map<String, dynamic>.from(e as Map)]; } catch (_) { history = []; }
-    searches = _sp.getStringList('search_hist') ?? [];
-  }
-  /// Catat satu kegiatan: kind = search | acak | like | comment | post | follow. Disimpan maks 200 terakhir.
-  void logAct(String kind, String text, {String go = ''}) {
-    if (text.trim().isEmpty) return;
-    history.insert(0, {'k': kind, 't': text.trim().length > 140 ? text.trim().substring(0, 140) : text.trim(), 'at': DateTime.now().millisecondsSinceEpoch, if (go.isNotEmpty) 'g': go});
-    if (history.length > 200) history.removeRange(200, history.length);
-    try { _sp.setString('history', jsonEncode(history)); } catch (_) {}
-  }
-  void clearHistory() { history = []; try { _sp.remove('history'); } catch (_) {} notifyListeners(); }
   void addSearch(String q) {
     q = q.trim();
     if (q.isEmpty) return;
@@ -1233,7 +1220,6 @@ class Store extends ChangeNotifier {
     searches.insert(0, q);
     if (searches.length > 20) searches.removeRange(20, searches.length);
     try { _sp.setStringList('search_hist', searches); } catch (_) {}
-    logAct('search', q);
   }
   void delSearch(String q) { searches.remove(q); try { _sp.setStringList('search_hist', searches); } catch (_) {} notifyListeners(); }
   void clearSearches() { searches = []; try { _sp.remove('search_hist'); } catch (_) {} notifyListeners(); }
@@ -1242,7 +1228,6 @@ class Store extends ChangeNotifier {
     final j = await Api.req('POST', '/audios/${a.id}/like');
     a.liked = j['liked'];
     a.likes = j['likes'];
-    if (a.liked) logAct('like', a.text?.isNotEmpty == true ? a.text! : a.ownerName, go: 'p${a.id}');
     notifyListeners();
   }
 }
@@ -1272,7 +1257,7 @@ const S = <String, List<String>>{
   'desc': ['Deskripsi', 'Description'], 'bio': ['Bio', 'Bio'], 'popup': ['Tampilkan popup saat diketuk', 'Show popup on tap'],
   'who': ['Siapa boleh melihat di profil', 'Who can see it on profile'], 'v_all': ['Semua', 'Everyone'], 'v_fol': ['Pengikut', 'Followers'], 'v_me': ['Aku', 'Me'],
   'noedit': ['Post tidak bisa diedit, hanya dihapus.', 'Posts cannot be edited, only deleted.'],
-  'search': ['Cari', 'Search'], 'hist_t': ['Riwayat', 'History'], 'hist_none': ['Belum ada riwayat di perangkat ini', 'No history on this device yet'], 'hist_clear': ['Hapus semua', 'Clear all'], 'hist_note': ['Hanya tersimpan di perangkat ini.', 'Only stored on this device.'], 'hist_recent': ['Pencarian terakhir', 'Recent searches'], 'h_search': ['Mencari', 'Searched'], 'h_acak': ['Mendengar Acak dari', 'Heard Random from'], 'h_like': ['Menyorot', 'Spotlighted'], 'h_comment': ['Berkomentar', 'Commented'], 'h_post': ['Membuat post', 'Created a post'], 'h_follow': ['Mengikuti', 'Followed'], 'notif': ['Notifikasi', 'Notifications'],
+  'search': ['Cari', 'Search'], 'hist_clear': ['Hapus semua', 'Clear all'], 'hist_note': ['Hanya tersimpan di perangkat ini.', 'Only stored on this device.'], 'hist_recent': ['Pencarian terakhir', 'Recent searches'], 'notif': ['Notifikasi', 'Notifications'],
   'n_follow': ['mulai mengikutimu', 'started following you'],
   'remove_photo': ['Hapus foto profil', 'Remove profile photo'], 'remove_photo_q': ['Foto profil akan kembali ke bawaan.', 'Your profile photo will go back to the default.'], 'photo_removed': ['Foto profil dihapus', 'Profile photo removed'],
   'a_friend': ['Teman', 'Friends'], 'a_best': ['Sahabat', 'Best friends'], 'a_partner': ['Pasangan', 'Partner'], 'a_family': ['Keluarga', 'Family'],
