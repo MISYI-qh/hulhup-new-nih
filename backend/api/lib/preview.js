@@ -4,7 +4,7 @@ import http from 'node:http';
 import https from 'node:https';
 import dns from 'node:dns';
 import net from 'node:net';
-import { createHash } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { q, one } from './db.js';
 
 const MAX_BYTES = 700 * 1024, TIMEOUT = 6000, MAX_HOPS = 4;
@@ -84,6 +84,16 @@ export function parseMeta(html, base) {
   return { kind: 'page', url: base, title: title.slice(0, 200), desc: desc.slice(0, 300), image, icon, site: ent(meta['og:site_name'] || '').slice(0, 80) || host, host };
 }
 
+/** Gambar dan ikon diganti alamat proxy; video/audio tetap alamat aslinya (diputar langsung dari situs asal). */
+function signed(d) {
+  if (!d) return d;
+  const o = { ...d };
+  if (o.kind === 'image') { o.src = imgSrc(o.url); }
+  if (o.image) o.image = imgSrc(o.image);
+  if (o.icon) o.icon = imgSrc(o.icon);
+  return o;
+}
+
 export async function preview(raw) {
   let u;
   try { u = new URL(raw); } catch { return null; }
@@ -92,7 +102,7 @@ export async function preview(raw) {
   const key = u.toString(), h = createHash('sha256').update(key).digest('hex');
   await ensure();
   const c = await one('select data, at from link_previews where h=$1', [h]);
-  if (c && Date.now() - Number(c.at) < (c.data ? 86400e3 : 3600e3)) return c.data;
+  if (c && Date.now() - Number(c.at) < (c.data ? 86400e3 : 3600e3)) return signed(c.data);
   let data = null;
   try {
     let cur = key;
@@ -106,5 +116,48 @@ export async function preview(raw) {
     }
   } catch { data = null; }
   await q('insert into link_previews (h, data, at) values ($1,$2,$3) on conflict (h) do update set data=$2, at=$3', [h, data ? JSON.stringify(data) : null, Date.now()]);
-  return data;
+  return signed(data);
+}
+
+// ── Proxy gambar: gambar dari situs luar dimuat lewat server ini, sehingga situs asal tidak melihat IP pengguna. ──
+const SECRET = () => createHmac('sha256', 'img-proxy').update(process.env.DATABASE_URL || process.env.PGLITE || 'dev').digest();
+const sig = (u) => createHmac('sha256', SECRET()).update(u).digest('base64url').slice(0, 22);
+/** Alamat proxy bertanda tangan: hanya URL yang kami keluarkan sendiri yang dilayani (bukan proxy terbuka). */
+export const imgSrc = (u) => (u ? `/img?u=${Buffer.from(u).toString('base64url')}&s=${sig(u)}` : '');
+export function imgUrlOf(u64, s) {
+  let u = '';
+  try { u = Buffer.from(String(u64 || ''), 'base64url').toString('utf8'); } catch { return null; }
+  const a = Buffer.from(sig(u)), b = Buffer.from(String(s || ''));
+  return u && a.length === b.length && timingSafeEqual(a, b) ? u : null;
+}
+
+const IMG_MAX = 5 * 1024 * 1024;
+function getImg(url) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    if (!/^https?:$/.test(u.protocol) || u.username || u.password || (u.port && u.port !== '80' && u.port !== '443')) return reject(new Error('bad_url'));
+    if (net.isIP(u.hostname) && privateIp(u.hostname)) return reject(new Error('blocked'));
+    const lib = u.protocol === 'https:' ? https : http;
+    const req = lib.request(u, { method: 'GET', lookup: safeLookup, timeout: 8000, headers: { 'user-agent': 'Mozilla/5.0 (compatible; HulhupBot/1.0; +https://hulhup.my.id)', accept: 'image/*' } }, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) { res.resume(); return resolve({ redirect: new URL(res.headers.location, u).toString() }); }
+      const mime = String(res.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+      if (res.statusCode !== 200 || !/^image\/(jpeg|png|gif|webp|avif|bmp|x-icon|vnd\.microsoft\.icon)$/.test(mime)) { res.resume(); return reject(new Error('not_image')); }
+      const parts = []; let n = 0;
+      res.on('data', (d) => { n += d.length; if (n > IMG_MAX) { res.destroy(new Error('too_big')); return; } parts.push(d); });
+      res.on('end', () => resolve({ mime, buf: Buffer.concat(parts) }));
+      res.on('error', reject);
+    });
+    req.on('timeout', () => req.destroy(new Error('timeout')));
+    req.on('error', reject);
+    req.end();
+  });
+}
+export async function fetchImage(url) {
+  let cur = url;
+  for (let i = 0; i <= 3; i++) {
+    const r = await getImg(cur);
+    if (r.redirect) { cur = r.redirect; continue; }
+    return r;
+  }
+  throw new Error('redirects');
 }

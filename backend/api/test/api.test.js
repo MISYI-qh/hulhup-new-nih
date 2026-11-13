@@ -324,6 +324,13 @@ test('pratinjau tautan: aman dan terurai', async () => {
   for (const ip of ['8.8.8.8', '1.1.1.1', '2606:4700::1111']) assert.equal(privateIp(ip), false, ip);
   const m = parseMeta('<html><head><title>Fallback</title><meta property="og:title" content="Hulhup &amp; teman"><meta property="og:description" content="Dengar suara"><meta property="og:image" content="/img/a.png"><link rel="icon" href="/f.ico"></head></html>', 'https://contoh.id/x');
   assert.deepEqual([m.title, m.desc, m.image, m.icon, m.host], ['Hulhup & teman', 'Dengar suara', 'https://contoh.id/img/a.png', 'https://contoh.id/f.ico', 'contoh.id']);
+  const { imgSrc, imgUrlOf } = await import('../lib/preview.js');
+  const sp = new URL('http://x' + imgSrc('https://contoh.id/a.png'));
+  assert.equal(imgUrlOf(sp.searchParams.get('u'), sp.searchParams.get('s')), 'https://contoh.id/a.png');
+  assert.equal(imgUrlOf(sp.searchParams.get('u'), 'palsu'), null);
+  assert.equal(imgUrlOf(Buffer.from('https://lain.id/b.png').toString('base64url'), sp.searchParams.get('s')), null);
+  assert.equal((await call('GET', imgSrc('https://lain.id/b.png').replace(/s=.*/, 's=palsu'))).error, 'not_found');
+  assert.equal((await call('GET', imgSrc('http://127.0.0.1/a.png'))).error, 'not_found');
   const a = await reg('prevu');
   assert.equal((await call('GET', '/preview?url=' + encodeURIComponent('http://x'))).error, 'unauthorized');
   assert.equal((await call('GET', '/preview?url=javascript:1', { token: a })).error, 'bad_url');

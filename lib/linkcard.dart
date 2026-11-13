@@ -31,6 +31,9 @@ UrlKind kindOfUrl(String url) {
   return UrlKind.page;
 }
 
+/// Gambar dari situs luar dimuat lewat server Hulhup (alamat bertanda tangan), supaya situs asal tidak melihat IP pengguna.
+String proxied(String s) => s.startsWith('/') ? '${Api.base}$s' : s;
+
 /// Cache pratinjau di memori: hanya URL yang disimpan di post, sisanya diambil saat dilihat.
 final _previews = <String, Future<Map?>>{};
 Future<Map?> fetchPreview(String url) => _previews.putIfAbsent(url, () async {
@@ -55,7 +58,6 @@ class LinkEmbed extends StatelessWidget {
   Widget build(BuildContext context) {
     final k = kindOfUrl(url);
     final host = Uri.tryParse(url)?.host.replaceFirst('www.', '') ?? '';
-    if (k == UrlKind.image) return _ImageEmbed(url);
     if (k == UrlKind.video) return _VideoEmbed(url);
     if (k == UrlKind.audio) return _AudioEmbed(url, host);
     return FutureBuilder<Map?>(
@@ -64,7 +66,7 @@ class LinkEmbed extends StatelessWidget {
         final p = snap.data;
         if (p == null) return const SizedBox();
         switch ('${p['kind']}') {
-          case 'image': return _ImageEmbed('${p['url']}');
+          case 'image': return _ImageEmbed(proxied('${p['src']}'), orig: '${p['url']}');
           case 'video': return _VideoEmbed('${p['url']}');
           case 'audio': return _AudioEmbed('${p['url']}', host);
         }
@@ -80,7 +82,7 @@ class _PageCard extends StatelessWidget {
   const _PageCard(this.url, this.p);
   @override
   Widget build(BuildContext context) {
-    final img = '${p['image'] ?? ''}', icon = '${p['icon'] ?? ''}', title = '${p['title'] ?? ''}', desc = '${p['desc'] ?? ''}', site = '${p['site'] ?? p['host'] ?? ''}';
+    final img = proxied('${p['image'] ?? ''}'), icon = proxied('${p['icon'] ?? ''}'), title = '${p['title'] ?? ''}', desc = '${p['desc'] ?? ''}', site = '${p['site'] ?? p['host'] ?? ''}';
     final host = '${p['host'] ?? ''}';
     return Tap(
       onTap: () => openLink(context, url), scale: .985,
@@ -106,11 +108,11 @@ class _PageCard extends StatelessWidget {
 }
 
 class _ImageEmbed extends StatelessWidget {
-  final String url;
-  const _ImageEmbed(this.url);
+  final String url, orig;
+  const _ImageEmbed(this.url, {this.orig = ''});
   @override
   Widget build(BuildContext context) => Tap(
-        onTap: () => openLink(context, url), scale: .99,
+        onTap: () => openLink(context, orig.isEmpty ? url : orig), scale: .99,
         child: Container(
           margin: const EdgeInsets.only(top: 10, right: 8), constraints: const BoxConstraints(maxHeight: 420),
           decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), border: Border.all(color: ink(context).withValues(alpha: .08))),
@@ -162,6 +164,7 @@ class _VideoState extends State<_VideoEmbed> {
       decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), color: Colors.black),
       clipBehavior: Clip.antiAlias,
       child: AspectRatio(aspectRatio: ratio.toDouble(), child: Stack(alignment: Alignment.center, children: [
+        if (v == null && !failed) Positioned(left: 14, right: 14, bottom: 10, child: Text(Store.i.t('ext_note').replaceAll('{h}', Uri.tryParse(widget.url)?.host.replaceFirst('www.', '') ?? ''), textAlign: TextAlign.center, style: const TextStyle(color: Colors.white60, fontSize: 11.5))),
         if (ok) Positioned.fill(child: VideoPlayer(v)),
         if (failed) Tap(onTap: () => openLink(context, widget.url), child: const Icon(Icons.open_in_new_rounded, color: Colors.white70, size: 34))
         else if (v == null) Tap(onTap: _start, child: Container(width: 58, height: 58, decoration: const BoxDecoration(color: Colors.white24, shape: BoxShape.circle), child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 38)))
@@ -182,7 +185,7 @@ class _AudioEmbed extends StatelessWidget {
     final name = Uri.decodeComponent(Uri.tryParse(url)?.pathSegments.lastOrNull ?? host);
     return Padding(padding: const EdgeInsets.only(right: 8), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       FileBar(key, url, 0),
-      Padding(padding: const EdgeInsets.fromLTRB(6, 4, 0, 0), child: Text('$name · $host', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: sub(context), fontSize: 12))),
+      Padding(padding: const EdgeInsets.fromLTRB(6, 4, 0, 0), child: Text('$name · ${Store.i.t('ext_note').replaceAll('{h}', host)}', maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: sub(context), fontSize: 11.5))),
     ]));
   }
 }

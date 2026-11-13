@@ -1,6 +1,6 @@
 // Hulhup API: akun, audio acak dengan filter ketat, hubungan dua pihak, notifikasi.
 // Semua izin ditegakkan di sini. Tidak ada endpoint admin: moderasi hanya lewat database.
-import { preview } from './preview.js';
+import { preview, imgUrlOf, fetchImage } from './preview.js';
 import { q, one, many, tx } from './db.js';
 import { ApiErr, now, sha, token, hashPw, checkPw, dayStr, okBirth, ageOf, imageMime, audioMime, readBody } from './util.js';
 import { storeFor, putAudio, getAudio, delAudio } from './blobs.js';
@@ -315,6 +315,16 @@ route('GET', /^\/preview$/, async (c) => {
   const url = String(c.query.url || '').slice(0, 2000);
   if (!/^https?:\/\//i.test(url)) throw new ApiErr('bad_url');
   return { preview: await preview(url) };
+});
+
+route('GET', /^\/img$/, async (c) => {
+  await hit(`img:${c.ip}`, 600, 60);
+  const u = imgUrlOf(c.query.u, c.query.s);
+  if (!u) throw new ApiErr('not_found', 404);
+  try {
+    const r = await fetchImage(u);
+    return { binary: r.buf, mime: r.mime, cache: 'public, max-age=86400, s-maxage=604800, immutable' };
+  } catch { throw new ApiErr('not_found', 404); }
 });
 
 route('GET', /^\/stats$/, async (c) => ({ taps: c.me ? Number(c.me.taps) : 0, tapf: c.me ? (c.me.tapf || {}) : {} }));
