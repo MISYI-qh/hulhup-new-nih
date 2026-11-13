@@ -2,12 +2,13 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
+import 'core.dart' show kDlKey;
 
 /// Android: unduh dengan progres di tampilan sendiri, lalu buka pemasang sistem.
 Future<void> fetchApk(String url, void Function(double p) onProgress) async {
   final c = http.Client();
   try {
-    final r = await c.send(http.Request('GET', Uri.parse(url)));
+    final r = await c.send(http.Request('GET', Uri.parse(url))..headers['x-hulhup-key'] = kDlKey);
     if (r.statusCode != 200) throw Exception('http ${r.statusCode}');
     final d = await getTemporaryDirectory();
     final f = File('${d.path}/hulhup.apk');

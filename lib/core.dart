@@ -14,6 +14,8 @@ import 'files_web.dart' if (dart.library.io) 'files_io.dart';
 import 'notify.dart';
 
 const kBuild = int.fromEnvironment('BUILD');
+/// Kunci unduhan: hanya aplikasi yang sudah terpasang yang mengirimnya, jadi berkas pembaruan tidak terbuka untuk umum.
+const kDlKey = String.fromEnvironment('DL_KEY');
 const kApkUrl64 = 'https://hulhup.my.id/hulhup.apk', kApkUrl32 = 'https://hulhup.my.id/hulhup-32.apk';
 /// Berkas APK yang cocok dengan HP ini (64-bit untuk hampir semua HP; 32-bit untuk HP lama).
 String get kApkUrl { final a = abiName(); return (a.contains('android_arm') && !a.contains('arm64')) ? kApkUrl32 : kApkUrl64; }
@@ -891,7 +893,7 @@ class Store extends ChangeNotifier {
     if (!force && (kBuild == 0 || (_updChecked != null && n.difference(_updChecked!).inMinutes < 30))) return updateReady;
     _updChecked = n;
     try {
-      final r = await http.get(Uri.parse('https://hulhup.my.id/version.json?t=${n.millisecondsSinceEpoch}')).timeout(const Duration(seconds: 15));
+      final r = await http.get(Uri.parse('https://hulhup.my.id/version.json?t=${n.millisecondsSinceEpoch}'), headers: const {'x-hulhup-key': kDlKey}).timeout(const Duration(seconds: 15));
       if (r.statusCode != 200) return updateReady;
       final b = int.tryParse('${(jsonDecode(r.body) as Map)['build']}') ?? 0;
       final up = b > kBuild;
