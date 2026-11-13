@@ -268,3 +268,16 @@ ALTER TABLE audios ADD COLUMN IF NOT EXISTS plays INT NOT NULL DEFAULT 0;
 ALTER TABLE audios ADD COLUMN IF NOT EXISTS views INT NOT NULL DEFAULT 0;
 CREATE TABLE IF NOT EXISTS post_plays (post_id BIGINT NOT NULL REFERENCES audios(id) ON DELETE CASCADE, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE, PRIMARY KEY (post_id, user_id));
 CREATE TABLE IF NOT EXISTS post_views (post_id BIGINT NOT NULL REFERENCES audios(id) ON DELETE CASCADE, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE, PRIMARY KEY (post_id, user_id));
+
+-- Nama hubungan custom (maks 100 karakter): tiap pengguna punya daftar sendiri; tiap sisi hubungan boleh memberi nama.
+CREATE TABLE IF NOT EXISTS rel_labels (
+  id      BIGSERIAL PRIMARY KEY,
+  owner   BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name    TEXT NOT NULL CHECK (length(name) BETWEEN 1 AND 400),
+  created BIGINT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS rel_labels_owner_name ON rel_labels (owner, lower(name));
+ALTER TABLE rels ADD COLUMN IF NOT EXISTS la BIGINT REFERENCES rel_labels(id) ON DELETE SET NULL;
+ALTER TABLE rels ADD COLUMN IF NOT EXISTS lb BIGINT REFERENCES rel_labels(id) ON DELETE SET NULL;
+ALTER TABLE rels DROP CONSTRAINT IF EXISTS rels_type_check;
+ALTER TABLE rels ADD CONSTRAINT rels_type_check CHECK (type IN ('friend','best','partner','family','custom'));

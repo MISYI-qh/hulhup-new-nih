@@ -701,12 +701,39 @@ const profileAud = [...audiences, 'me'];
 const uploadAud = [...audiences, 'accounts'];
 const filterAud = [...audiences, 'me'];
 const relKinds = ['friend', 'best', 'partner', 'family'];
-IconData audIcon(String v, {bool filter = false}) => (filter && v == 'me' ? Icons.move_to_inbox_outlined : const {
+final _lblRe = RegExp(r'^L(\d+)$');
+/// Tambahkan nama hubungan custom milikku ke daftar pilihan audiens/filter (setelah "Semua hubungan").
+List<String> withLabels(List<String> base) {
+  final ids = [for (final k in Store.i.me?.labels.keys ?? const <int>[]) 'L$k'];
+  if (ids.isEmpty) return base;
+  final i = base.indexOf('relations');
+  return [...base.sublist(0, i + 1), ...ids, ...base.sublist(i + 1)];
+}
+
+IconData audIcon(String v, {bool filter = false}) => (_lblRe.hasMatch(v) ? Icons.label_outline_rounded : filter && v == 'me' ? Icons.move_to_inbox_outlined : const {
       'public': Icons.public_rounded, 'followers': Icons.group_outlined, 'following': Icons.person_add_alt_1_outlined, 'both': Icons.people_alt_outlined,
       'friend': Icons.sentiment_satisfied_alt_rounded, 'best': Icons.star_outline_rounded, 'partner': Icons.favorite_border_rounded, 'family': Icons.home_outlined,
       'relations': Icons.diversity_3_rounded, 'accounts': Icons.person_search_outlined, 'me': Icons.lock_outline_rounded,
+      'custom': Icons.label_outline_rounded, 'newlabel': Icons.add_circle_outline_rounded, 'nolabel': Icons.label_off_outlined,
     }[v]) ?? Icons.public_rounded;
-String audLabel(String v, {bool filter = false}) => Store.i.t(filter && v == 'me' ? 'f_me' : 'a_$v');
+String audLabel(String v, {bool filter = false}) {
+  final m = _lblRe.firstMatch(v);
+  if (m != null) return Store.i.labelName(int.parse(m.group(1)!));
+  return Store.i.t(filter && v == 'me' ? 'f_me' : 'a_$v');
+}
+
+/// Isian nama hubungan sendiri (maks 100 karakter). Mengembalikan nama, atau null bila dibatalkan.
+Future<String?> askLabel(BuildContext context, {String initial = ''}) => sheet<String>(context, (sc) {
+      final c = TextEditingController(text: initial);
+      final s = Store.i;
+      return StatefulBuilder(builder: (_, set) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Padding(padding: const EdgeInsets.only(left: 4, bottom: 4), child: Text(s.t('lbl_title'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18))),
+        Padding(padding: const EdgeInsets.only(left: 4, bottom: 12), child: Text(s.t('lbl_note'), style: TextStyle(color: sub(sc), fontSize: 13))),
+        TextField(controller: c, autofocus: true, maxLength: 100, onChanged: (_) => set(() {}), decoration: InputDecoration(hintText: s.t('lbl_ph'))),
+        const SizedBox(height: 8),
+        PBtn(s.t('lbl_save'), c.text.trim().isEmpty ? null : () => Navigator.pop(sc, c.text.trim()), icon: Icons.check_rounded),
+      ]));
+    });
 
 /// Label audiens satu post (hanya ditampilkan di profil pemilik): ikon + nama pilihan.
 Widget audChip(BuildContext context, String rand, {List<String> to = const []}) {

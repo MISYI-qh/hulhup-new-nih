@@ -47,7 +47,7 @@ class _HomeState extends State<HomePage> {
 
   Future<void> _filter() async {
     final s = Store.i;
-    final r = await multiSheet(context, s.t('filter_title'), filterAud, s.me == null ? 'public' : s.filter, filter: true);
+    final r = await multiSheet(context, s.t('filter_title'), withLabels(filterAud), s.me == null ? 'public' : s.filter, filter: true);
     if (r == null) return;
     if (s.me == null && r != 'public') { toast(s.t('filter_login')); return; }
     await s.setFilter(r);

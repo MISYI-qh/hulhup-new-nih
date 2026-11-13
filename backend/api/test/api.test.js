@@ -277,3 +277,43 @@ test('foto profil: paket DKS1 (berkas asli + foto tersimpan) dan tanda AI dari b
   assert.equal((await put(small)).ok, true);
   assert.equal((await call('GET', '/deks/selftest')).ok, true);
 });
+
+test('hubungan custom: nama sendiri jadi audiens, filter, dan privasi profil', async () => {
+  const a = await reg('cina'), b = await reg('cdoni'), c3 = await reg('cevan');
+  // a mengajak b dengan nama custom; b menerima (nama otomatis sama)
+  const long = 'x'.repeat(101);
+  assert.equal((await call('POST', '/relations', { token: a, body: { to: 'cdoni', type: 'custom', label: long } })).error, 'too_long');
+  assert.equal((await call('POST', '/relations', { token: a, body: { to: 'cdoni', type: 'custom' } })).error, 'empty');
+  assert.equal((await call('POST', '/relations', { token: a, body: { to: 'cdoni', type: 'custom', label: 'orang kepercayaan' } })).ok, true);
+  assert.equal((await call('POST', '/relations/cina/accept', { token: b })).ok, true);
+  const ma = await call('GET', '/me', { token: a }), mb = await call('GET', '/me', { token: b });
+  assert.deepEqual(ma.user.labels.map((x) => x.name), ['orang kepercayaan']);
+  assert.deepEqual(mb.user.labels.map((x) => x.name), ['orang kepercayaan']);
+  const la = ma.user.labels[0].id, lb = mb.user.labels[0].id;
+  assert.equal((await call('GET', '/me/relations', { token: b })).active[0].label, 'orang kepercayaan');
+  // post hanya untuk nama hubungan itu; nama milik orang lain ditolak
+  assert.equal((await call('POST', '/posts', { token: a, body: { text: 'bocoran', audios: 0, rand: ['L' + lb] } })).error, 'bad_request');
+  const p = await call('POST', '/posts', { token: a, body: { text: 'rahasia kepercayaan', audios: 0, rand: ['L' + la] } });
+  assert.ok(p.id);
+  assert.equal((await call('GET', `/posts/${p.id}`, { token: b })).post.id, p.id);
+  assert.equal((await call('GET', `/posts/${p.id}`, { token: c3 })).error, 'not_found');
+  // filter memakai nama milik pemirsa sendiri (lb) -> post a muncul di Hups b, tidak di c3
+  const fb = await call('GET', `/hups?f=L${lb}`, { token: b });
+  assert.ok(fb.items.some((x) => x.id === p.id), JSON.stringify(fb).slice(0, 200));
+  assert.ok(!(await call('GET', '/hups?f=public', { token: b })).items.some((x) => x.id === p.id));
+  assert.equal((await call('GET', `/random?f=L${lb}`, { token: b })).audio.id, p.id);
+  assert.equal((await call('GET', `/random?f=L${lb}`, { token: c3 })).audio, null);
+  // profil a hanya untuk nama itu
+  assert.equal((await call('PATCH', '/me/settings', { token: a, body: { pvis: 'L' + la } })).ok, true);
+  assert.equal((await call('GET', '/users/cina', { token: b })).locked, false);
+  assert.equal((await call('GET', '/users/cina', { token: c3 })).locked, true);
+  // ganti nama di sisi b, hubungan tetap
+  assert.equal((await call('POST', '/relations/cina/label', { token: b, body: { label: 'kakak asuh' } })).label, 'kakak asuh');
+  assert.equal((await call('GET', '/me/relations', { token: b })).active[0].label, 'kakak asuh');
+  assert.equal((await call('GET', '/me/relations', { token: a })).active[0].label, 'orang kepercayaan');
+  // hapus nama: audiens dicabut jadi hanya pemilik, profil pulih tidak bocor
+  assert.equal((await call('DELETE', `/me/labels/${la}`, { token: a })).ok, true);
+  assert.equal((await call('GET', `/posts/${p.id}`, { token: b })).error, 'not_found');
+  assert.equal((await call('GET', `/posts/${p.id}`, { token: a })).post.id, p.id);
+  assert.equal((await call('GET', '/me', { token: a })).user.pvis, 'me');
+});

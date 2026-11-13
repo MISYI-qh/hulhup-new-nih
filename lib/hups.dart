@@ -1028,7 +1028,7 @@ class _ComposeState extends State<ComposePage> {
         Pick(s.t('who_see'), rand, (v) async {
           setState(() => rand = v);
           if (audSplit(v).contains('accounts') && picked.isEmpty) { await _pickAcc(); }
-        }, opts: uploadAud),
+        }, opts: withLabels(uploadAud)),
         if (hasAcc) Padding(padding: const EdgeInsets.only(top: 10), child: Tap(onTap: _pickAcc, scale: .98, child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(24)),
           child: Row(children: [Icon(Icons.person_search_outlined, size: 20, color: ink(context)), const SizedBox(width: 12), Expanded(child: Text(s.t('pick_acc_n').replaceAll('{n}', '${picked.length}'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15))), Icon(Icons.edit_outlined, size: 18, color: sub(context))]),

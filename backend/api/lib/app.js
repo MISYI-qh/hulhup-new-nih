@@ -23,7 +23,9 @@ function unpack(body) {
 const logDeks = (who, rep) => { try { console.log('deks', who, brief(rep)); } catch { /* */ } };
 const MAX_TEXT = 200000, MAX_POST_TEXT = 200000, INLINE_TEXT = 3000, PREVIEW = 300; // post: 1 audio wajib + teks maks 1000; komentar: teks saja, panjang bebas
 const FILTERS = ['public', 'followers', 'following', 'both', 'friend', 'best', 'partner', 'family', 'relations', 'me'];
-const REL_TYPES = ['friend', 'best', 'partner', 'family'];
+const REL_TYPES = ['friend', 'best', 'partner', 'family', 'custom'];
+const LBL = /^L(\d+)$/; // audiens hubungan custom: L<id nama hubungan milik pemilik>
+const MAX_LABEL = 100, MAX_LABELS = 30;
 const UN = /^[a-z0-9_]{3,20}$/;
 const SESSION_MS = 90 * 24 * 3600 * 1000;
 
@@ -45,7 +47,7 @@ const REL = (a, b, type) => `exists(select 1 from rels r where r.status='active'
 function parseAud(x, allowMe = false, allowAccounts = false, collapse = true) {
   const raw = Array.isArray(x) ? x : String(x ?? '').split(',');
   const ok = new Set(FILTERS.filter((e) => allowMe || e !== 'me').concat(allowAccounts ? ['accounts'] : []));
-  const out = [...new Set(raw.map((e) => String(e).trim()).filter((e) => ok.has(e)))];
+  const out = [...new Set(raw.map((e) => String(e).trim()).filter((e) => ok.has(e) || LBL.test(e)))].slice(0, 40);
   if (!out.length) return null;
   if (!collapse) return out.join(',');
   if (out.includes('public')) return 'public';
@@ -65,7 +67,14 @@ function audCond1(f) {
     case 'friend': case 'best': case 'partner': case 'family': return `${HAS(f)} and ${REL('$1', 'a.owner', f)}`;
     case 'relations': return `${HAS('relations')} and ${REL('$1', 'a.owner')}`;
     case 'me': return `${HAS('accounts')} and exists(select 1 from audio_to t where t.audio_id=a.id and t.user_id=$1)`;
-    default: return 'false';
+    default: {
+      const m = LBL.exec(f);
+      // L<id>: nama hubungan milik pemirsa sendiri; tampilkan post dari akun yang pemirsa beri nama itu, selama post terbuka untuknya lewat hubungan.
+      if (m) return `exists(select 1 from rels r where r.status='active' and ((r.a=$1 and r.b=a.owner and r.la=${m[1]}) or (r.b=$1 and r.a=a.owner and r.lb=${m[1]})) and ('relations'=any(string_to_array(a.rand,',')) or r.type=any(string_to_array(a.rand,',')) or ('L'||(case when r.a=a.owner then r.la else r.lb end))=any(string_to_array(a.rand,','))))`;
+      // lbl: pemirsa masuk audiens hubungan custom milik pemilik post (dipakai untuk "semua yang boleh dilihat").
+      if (f === 'lbl') return `exists(select 1 from rels r where r.status='active' and ((r.a=$1 and r.b=a.owner) or (r.b=$1 and r.a=a.owner)) and ('L'||(case when r.a=a.owner then r.la else r.lb end))=any(string_to_array(a.rand,',')))`;
+      return 'false';
+    }
   }
 }
 /** Filter boleh lebih dari satu: "public,followers" = salah satu. */
@@ -80,10 +89,12 @@ async function canSee(mode, ownerId, viewerId, self = true) {
   viewerId = Number(viewerId) || 0; ownerId = Number(ownerId);
   if (!viewerId) return false;
   if (viewerId === ownerId) return self;
-  const relMode = modes.filter((e) => ['friend', 'best', 'partner', 'family', 'relations'].includes(e));
-  if (relMode.length) {
-    const r = await one(`select type from rels where status='active' and ((a=$1 and b=$2) or (a=$2 and b=$1))`, [viewerId, ownerId]);
+  const relMode = modes.filter((e) => ['friend', 'best', 'partner', 'family', 'custom', 'relations'].includes(e));
+  const lbls = modes.filter((e) => LBL.test(e));
+  if (relMode.length || lbls.length) {
+    const r = await one(`select a, type, la, lb from rels where status='active' and ((a=$1 and b=$2) or (a=$2 and b=$1))`, [viewerId, ownerId]);
     if (r && (relMode.includes('relations') || relMode.includes(r.type))) return true;
+    if (r) { const ol = Number(r.a) === ownerId ? r.la : r.lb; if (ol && lbls.includes('L' + ol)) return true; }
   }
   if (modes.some((e) => ['followers', 'following', 'both'].includes(e))) {
     const r = await one(`select ${FOLLOW('$1', '$2')} as fol, ${FOLLOW('$2', '$1')} as ing`, [viewerId, ownerId]);
@@ -92,6 +103,29 @@ async function canSee(mode, ownerId, viewerId, self = true) {
     if (modes.includes('both') && (r.fol || r.ing)) return true;
   }
   return false;
+}
+
+// ---------- nama hubungan custom ----------
+function cleanLabel(x) {
+  const t = String(x ?? '').replace(/\s+/g, ' ').trim();
+  if ([...t].length > MAX_LABEL) throw new ApiErr('too_long', 413);
+  return t;
+}
+/** Semua token L<id> pada daftar audiens harus nama hubungan milik pengguna itu sendiri. */
+async function ownLabels(uid, rand) {
+  const ids = [...new Set(audList(rand).map((e) => LBL.exec(e)).filter(Boolean).map((m) => Number(m[1])))];
+  if (!ids.length) return;
+  const r = await many('select id from rel_labels where owner=$1 and id = any($2::bigint[])', [uid, ids]);
+  if (r.length !== ids.length) throw new ApiErr('bad_request');
+}
+/** Cari atau buat nama hubungan milik pengguna (di dalam transaksi). */
+async function labelId(t, uid, name) {
+  let r = (await t.query('select id from rel_labels where owner=$1 and lower(name)=lower($2)', [uid, name])).rows[0];
+  if (!r) {
+    if (Number((await t.query('select count(*)::int n from rel_labels where owner=$1', [uid])).rows[0].n) >= MAX_LABELS) throw new ApiErr('bad_request');
+    r = (await t.query('insert into rel_labels(owner, name, created) values ($1,$2,$3) returning id', [uid, name, now()])).rows[0];
+  }
+  return Number(r.id);
 }
 
 // ---------- tampilan ----------
@@ -118,6 +152,7 @@ async function uv(u, me, today) {
     avatar: avUrl(u), avatar_ai: u.av_ver > 0 && u.av_ai === true, avatar_ai_kind: u.av_ver > 0 && u.av_ai === true ? (u.av_ai_kind || 'made') : '', cover: cvUrl(u), taps: mine ? Number(u.taps) : 0, pvis: mine ? u.pvis : '', rvis: mine ? (u.rvis || 'public') : '',
     streak: streakOf(u, today), days: mine ? u.days : 0,
     followers: u.followers, following: u.following, audios: r.audios, is_following: r.isf, is_me: mine, verified: u.verified,
+    labels: mine ? (await many('select id, name from rel_labels where owner=$1 order by lower(name)', [u.id])).map((x) => ({ id: Number(x.id), name: x.name })) : undefined,
   };
 }
 
@@ -331,6 +366,7 @@ route('PATCH', /^\/me\/settings$/, async (c) => {
   const u = c.need();
   const pv = c.body.pvis === undefined ? u.pvis : parseAud(c.body.pvis, true), rv = c.body.rvis === undefined ? (u.rvis || 'public') : parseAud(c.body.rvis, true);
   if (!pv || !rv) throw new ApiErr('bad_file');
+  await ownLabels(u.id, pv + ',' + rv);
   const r = await one('update users set pvis=$2, rvis=$3 where id=$1 returning *', [u.id, pv, rv]);
   return { user: await uv(r, r, c.today) };
 });
@@ -575,6 +611,7 @@ route('POST', /^\/audios$/, async (c) => {
   if (!mime) throw new ApiErr('bad_file');
   const f = c.query;
   const rnd = parseAud(f.rand, false, true) ?? 'public';
+  await ownLabels(u.id, rnd);
   let to = [];
   if (audList(rnd).includes('accounts')) {
     const names = String(f.to ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean).slice(0, 200);
@@ -651,27 +688,77 @@ route('DELETE', /^\/me\/(avatar|cover)$/, async (c, m) => {
 });
 
 // ---------- hubungan ----------
-const relRow = (o, type) => ({ username: o.username, name: o.name, avatar: avUrl(o), type, verified: o.verified });
+const relRow = (o, type) => ({ username: o.username, name: o.name, avatar: avUrl(o), type, verified: o.verified, label: o.label_name ?? null, label_id: o.label_id ? Number(o.label_id) : null });
 
 route('POST', /^\/relations$/, async (c) => {
   const u = c.need();
   await hit(`rel:${u.id}`, 30, 3600);
   const t = String(c.body.type), o = await one('select * from users where username=$1 and status=$2', [String(c.body.to ?? '').toLowerCase(), 'active']);
   if (!REL_TYPES.includes(t)) throw new ApiErr('bad_file');
+  const lab = cleanLabel(c.body.label);
+  if (t === 'custom' && !lab) throw new ApiErr('empty');
   if (!o) throw new ApiErr('not_found', 404);
   if (o.id === u.id) throw new ApiErr('forbidden', 403);
   await tx(async (c2) => {
     const ex = await c2.query(`select 1 from rels where (a=$1 and b=$2) or (a=$2 and b=$1)`, [u.id, o.id]);
     if (ex.rows.length) throw new ApiErr('rel_exists', 409);
-    await c2.query(`insert into rels(a, b, type, status, created) values ($1,$2,$3,'pending',$4)`, [u.id, o.id, t, now()]);
-    await notify(c2, Number(o.id), 'rel_req', u.id, null, t);
+    const la = lab ? await labelId(c2, u.id, lab) : null;
+    await c2.query(`insert into rels(a, b, type, status, created, la) values ($1,$2,$3,'pending',$4,$5)`, [u.id, o.id, t, now(), la]);
+    await notify(c2, Number(o.id), 'rel_req', u.id, null, t === 'custom' ? lab : t);
+  });
+  return { ok: true };
+});
+
+/** Ubah nama hubungan (milikku sendiri) pada satu hubungan; kosong = hapus nama. */
+route('POST', /^\/relations\/([a-z0-9_]+)\/label$/, async (c, m) => {
+  const u = c.need();
+  await hit(`rl:${u.id}`, 60, 3600);
+  const o = await one('select id from users where username=$1', [m[1]]);
+  if (!o) throw new ApiErr('not_found', 404);
+  const lab = cleanLabel(c.body.label);
+  await tx(async (t) => {
+    const r = (await t.query(`select a, b from rels where (a=$1 and b=$2) or (a=$2 and b=$1)`, [u.id, o.id])).rows[0];
+    if (!r) throw new ApiErr('not_found', 404);
+    const lid = lab ? await labelId(t, u.id, lab) : null;
+    await t.query(`update rels set ${Number(r.a) === Number(u.id) ? 'la' : 'lb'}=$3 where a=$1 and b=$2`, [r.a, r.b, lid]);
+  });
+  return { ok: true, label: lab || null };
+});
+
+route('GET', /^\/me\/labels$/, async (c) => {
+  const u = c.need();
+  const rows = await many(`select l.id, l.name, (select count(*)::int from rels r where r.status='active' and ((r.a=$1 and r.la=l.id) or (r.b=$1 and r.lb=l.id))) n from rel_labels l where l.owner=$1 order by lower(l.name)`, [u.id]);
+  return { items: rows.map((x) => ({ id: Number(x.id), name: x.name, n: x.n })) };
+});
+
+route('POST', /^\/me\/labels$/, async (c) => {
+  const u = c.need();
+  await hit(`lbl:${u.id}`, 60, 3600);
+  const name = cleanLabel(c.body.name);
+  if (!name) throw new ApiErr('empty');
+  const id = await tx((t) => labelId(t, u.id, name));
+  return { ok: true, id };
+});
+
+/** Hapus nama hubungan: hubungan yang memakainya tetap ada (tanpa nama), dan audiens post/profil yang memakainya dicabut (bila habis menjadi "hanya saya"). */
+route('DELETE', /^\/me\/labels\/(\d+)$/, async (c, m) => {
+  const u = c.need();
+  await tx(async (t) => {
+    const r = (await t.query('select id from rel_labels where id=$1 and owner=$2', [m[1], u.id])).rows[0];
+    if (!r) throw new ApiErr('not_found', 404);
+    const tok = 'L' + r.id;
+    const strip = "coalesce(nullif(array_to_string(array_remove(string_to_array(%C,','), $2), ','), ''), 'me')";
+    await t.query(`update audios set rand=${strip.replace('%C', 'rand')} where owner=$1 and $2=any(string_to_array(rand,','))`, [u.id, tok]);
+    await t.query(`update users set pvis=${strip.replace('%C', 'pvis')} where id=$1 and $2=any(string_to_array(pvis,','))`, [u.id, tok]);
+    await t.query(`update users set rvis=${strip.replace('%C', 'rvis')} where id=$1 and $2=any(string_to_array(rvis,','))`, [u.id, tok]);
+    await t.query('delete from rel_labels where id=$1', [r.id]);
   });
   return { ok: true };
 });
 
 route('GET', /^\/me\/relations$/, async (c) => {
   const u = c.need();
-  const rows = await many(`select r.*, o.username, o.name, o.av_ver, o.verified from rels r join users o on o.id = case when r.a=$1 then r.b else r.a end where r.a=$1 or r.b=$1 order by r.created desc`, [u.id]);
+  const rows = await many(`select r.*, o.username, o.name, o.av_ver, o.verified, l.name label_name, l.id label_id from rels r join users o on o.id = case when r.a=$1 then r.b else r.a end left join rel_labels l on l.id = case when r.a=$1 then r.la else r.lb end where r.a=$1 or r.b=$1 order by r.created desc`, [u.id]);
   const f = (r) => relRow({ ...r, av_ver: r.av_ver }, r.type);
   return {
     active: rows.filter((r) => r.status === 'active').map(f),
@@ -684,7 +771,7 @@ route('GET', /^\/users\/([a-z0-9_]+)\/relations$/, async (c, m) => {
   const o = await one(`select id, rvis from users where username=$1 and status='active'`, [m[1]]);
   if (!o) throw new ApiErr('not_found', 404);
   if (!(await canSee(o.rvis || 'public', o.id, c.me ? c.me.id : 0))) return { items: [], locked: true };
-  const rows = await many(`select r.type, f.username, f.name, f.av_ver, f.verified from rels r join users f on f.id = case when r.a=$1 then r.b else r.a end where r.status='active' and (r.a=$1 or r.b=$1) and f.status='active' order by r.since desc nulls last limit 200`, [o.id]);
+  const rows = await many(`select r.type, f.username, f.name, f.av_ver, f.verified, l.name label_name, l.id label_id from rels r join users f on f.id = case when r.a=$1 then r.b else r.a end left join rel_labels l on l.id = case when r.a=$1 then r.la else r.lb end where r.status='active' and (r.a=$1 or r.b=$1) and f.status='active' order by r.since desc nulls last limit 200`, [o.id]);
   return { items: rows.map((r) => relRow(r, r.type)) };
 });
 
@@ -698,8 +785,11 @@ route('POST', /^\/relations\/([a-z0-9_]+)\/(accept|decline)$/, async (c, m) => {
     if (r.status !== 'pending' || Number(r.b) !== Number(u.id)) throw new ApiErr('forbidden', 403);
     await t.query(`delete from notifs where type='rel_req' and actor=$1 and to_user=$2`, [o.id, u.id]);
     if (m[2] === 'accept') {
-      await t.query(`update rels set status='active', since=$3 where a=$1 and b=$2`, [r.a, r.b, now()]);
-      await notify(t, Number(o.id), 'rel_ok', u.id, null, r.type);
+      const theirs = r.la ? (await t.query('select name from rel_labels where id=$1', [r.la])).rows[0]?.name : '';
+      const given = c.body.label ? cleanLabel(c.body.label) : (r.type === 'custom' ? theirs : '');
+      const lb = given ? await labelId(t, u.id, given) : null;
+      await t.query(`update rels set status='active', since=$3, lb=$4 where a=$1 and b=$2`, [r.a, r.b, now(), lb]);
+      await notify(t, Number(o.id), 'rel_ok', u.id, null, r.type === 'custom' ? (theirs || 'custom') : r.type);
     } else await t.query('delete from rels where a=$1 and b=$2', [r.a, r.b]);
   });
   return { ok: true };
@@ -723,11 +813,11 @@ route('GET', /^\/users\/([a-z0-9_]+)$/, async (c, m) => {
   if (!u) throw new ApiErr('not_found', 404);
   const uid = Number(u.id), vid = c.me ? Number(c.me.id) : 0, mine = vid === uid;
   const locked = !mine && !(await canSee(u.pvis, uid, vid));
-  const rows = locked ? [] : await many(`${AUD_SQL} where a.owner=$2 and not a.pending ${mine ? '' : `and not a.hidden and (${audCond(FILTERS.join(','))})`} order by a.id desc limit 200`, [vid, uid]);
+  const rows = locked ? [] : await many(`${AUD_SQL} where a.owner=$2 and not a.pending ${mine ? '' : `and not a.hidden and (${audCond(FILTERS.join(',') + ',lbl')})`} order by a.id desc limit 200`, [vid, uid]);
   let rel = { status: 'none', type: '' };
   if (vid && !mine) {
-    const r = await one(`select * from rels where (a=$1 and b=$2) or (a=$2 and b=$1)`, [vid, uid]);
-    if (r) rel = { status: r.status === 'active' ? 'active' : Number(r.a) === Number(vid) ? 'out' : 'in', type: r.type };
+    const r = await one(`select r.*, l.name label_name from rels r left join rel_labels l on l.id = case when r.a=$1 then r.la else r.lb end where (r.a=$1 and r.b=$2) or (r.a=$2 and r.b=$1)`, [vid, uid]);
+    if (r) rel = { status: r.status === 'active' ? 'active' : Number(r.a) === Number(vid) ? 'out' : 'in', type: r.type, label: r.label_name ?? null };
   }
   return { user: await uv(u, c.me, c.today), audios: mine ? await addTo(rows.map(av), c.me) : rows.map(av), locked, rel };
 });
@@ -829,6 +919,7 @@ route('POST', /^\/posts$/, async (c) => {
   if (n === 0 && !text) throw new ApiErr('empty');
   const bgm = n === 1 && b.bgm === true, bgmIdx = 0, inRand = true, inHups = true; // satu post tampil di Acak dan di Hups
   const rnd = parseAud(b.rand, false, true) ?? 'public';
+  await ownLabels(u.id, rnd);
   const mentions = [...new Set((text.match(/@([a-z0-9_]{3,20})/g) || []).map((x) => x.slice(1)))].slice(0, 10);
   let to = [];
   if (audList(rnd).includes('accounts')) {

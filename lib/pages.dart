@@ -188,9 +188,20 @@ class _ProfileState extends State<ProfilePage> {
 
   Future<void> _relAdd() async {
     final s = Store.i;
-    final t = await chooseSheet(context, s.t('rel_pick'), relKinds, null);
-    if (t == null) return;
-    _relReq(() => Api.req('POST', '/relations', body: {'to': widget.u, 'type': t}), s.t('rel_sent'));
+    final t = await chooseSheet(context, s.t('rel_pick'), [...relKinds.where((e) => e != 'custom'), for (final k in s.me?.labels.keys ?? const <int>[]) 'L$k', 'newlabel'], null);
+    if (t == null || !mounted) return;
+    var type = t;
+    String? label;
+    final m = RegExp(r'^L(\d+)$').firstMatch(t);
+    if (t == 'newlabel') {
+      label = await askLabel(context);
+      if (label == null) return;
+      type = 'custom';
+    } else if (m != null) {
+      label = s.labelName(int.parse(m.group(1)!));
+      type = 'custom';
+    }
+    _relReq(() async { await Api.req('POST', '/relations', body: {'to': widget.u, 'type': type, if (label != null) 'label': label}); await s.refresh(); }, s.t('rel_sent'));
   }
 
   Future<void> _relEnd(String uname, String name) async {
@@ -210,7 +221,7 @@ class _ProfileState extends State<ProfilePage> {
         Expanded(child: PBtn(s.t('rel_decline'), () => _relReq(() => Api.req('POST', '/relations/${widget.u}/decline'), s.t('rel_ended')), ghost: true)),
       ]);
     }
-    return PBtn('${s.t('a_$ty')} · ${s.t('rel_end')}', () => _relEnd(widget.u!, user!.name), ghost: true, icon: audIcon(ty));
+    return PBtn('${rel['label'] ?? s.t('a_$ty')} · ${s.t('rel_end')}', () => _relEnd(widget.u!, user!.name), ghost: true, icon: audIcon(ty));
   }
 
   Future<void> _edit() async {
@@ -594,9 +605,9 @@ class SettingsPage extends StatelessWidget {
           row(Icons.edit_outlined, s.t('edit_profile'), () { if (s.needNet()) go(context, const EditProfilePage()); }),
           row(Icons.key_rounded, s.t('change_pw'), () => go(context, const PwPage())),
           const SizedBox(height: 6),
-          Pick(s.t('pvis'), s.me!.pvis, (v) async { try { await s.setPvis(v); toast(s.t('saved')); } catch (e) { toast(s.err(e), bad: true); } }, opts: profileAud),
+          Pick(s.t('pvis'), s.me!.pvis, (v) async { try { await s.setPvis(v); toast(s.t('saved')); } catch (e) { toast(s.err(e), bad: true); } }, opts: withLabels(profileAud)),
           const SizedBox(height: 14),
-          Pick(s.t('rel_vis'), s.me!.rvis, (v) async { try { await s.setRvis(v); toast(s.t('saved')); } catch (e) { toast(s.err(e), bad: true); } }, opts: profileAud),
+          Pick(s.t('rel_vis'), s.me!.rvis, (v) async { try { await s.setRvis(v); toast(s.t('saved')); } catch (e) { toast(s.err(e), bad: true); } }, opts: withLabels(profileAud)),
         ],
         if (!kIsWeb && (section == null || section == 'notifications')) ...[
           label(s.t('notif')),
@@ -909,11 +920,60 @@ class _RelationsState extends State<RelationsPage> {
     _relReq(() => Api.req('DELETE', '/relations/$uname'), s.t('rel_ended'));
   }
 
+  /// Beri atau ganti nama hubungan (milikku sendiri) pada satu hubungan.
+  Future<void> _rename(Map r) async {
+    final s = Store.i;
+    final t = await chooseSheet(context, s.t('lbl_title'), [for (final k in s.me?.labels.keys ?? const <int>[]) 'L$k', 'newlabel', if (r['label'] != null) 'nolabel'], r['label_id'] != null ? 'L${r['label_id']}' : null);
+    if (t == null || !mounted) return;
+    String label = '';
+    if (t == 'newlabel') {
+      final x = await askLabel(context, initial: '${r['label'] ?? ''}');
+      if (x == null) return;
+      label = x;
+    } else if (t != 'nolabel') {
+      label = s.labelName(int.parse(t.substring(1)));
+    }
+    _relReq(() async { await Api.req('POST', '/relations/${r['username']}/label', body: {'label': label}); await s.refresh(); }, s.t('saved'));
+  }
+
+  Future<void> _manage() async {
+    final s = Store.i;
+    await sheet<void>(context, (sc) => StatefulBuilder(builder: (_, set) {
+      final l = s.me?.labels.entries.toList() ?? [];
+      return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Padding(padding: const EdgeInsets.only(left: 4, bottom: 4), child: Text(s.t('lbl_manage'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18))),
+        Padding(padding: const EdgeInsets.only(left: 4, bottom: 12), child: Text(s.t('lbl_note'), style: TextStyle(color: sub(sc), fontSize: 13))),
+        if (l.isEmpty) Padding(padding: const EdgeInsets.symmetric(vertical: 16), child: Text(s.t('lbl_none'), style: TextStyle(color: sub(sc)))),
+        ConstrainedBox(constraints: BoxConstraints(maxHeight: MediaQuery.of(sc).size.height * .45), child: SingleChildScrollView(child: Column(children: [
+          for (final e in l) Container(
+            margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.only(left: 18, right: 6, top: 4, bottom: 4),
+            decoration: BoxDecoration(color: soft(sc), borderRadius: BorderRadius.circular(24)),
+            child: Row(children: [
+              Icon(Icons.label_outline_rounded, size: 22, color: ink(sc)), const SizedBox(width: 14),
+              Expanded(child: Text(e.value, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16))),
+              IconBtn(Icons.delete_outline_rounded, () async {
+                if (!await confirm(sc, s.t('delete'), s.t('lbl_del_q').replaceAll('{n}', e.value), s.t('delete'), danger: true)) return;
+                try { await Api.req('DELETE', '/me/labels/${e.key}'); await s.refresh(); set(() {}); } catch (x) { toast(s.err(x), bad: true); }
+              }),
+            ]),
+          ),
+        ]))),
+        const SizedBox(height: 8),
+        PBtn(s.t('a_newlabel'), () async {
+          final x = await askLabel(sc);
+          if (x == null) return;
+          try { await Api.req('POST', '/me/labels', body: {'name': x}); await s.refresh(); set(() {}); } catch (e) { toast(s.err(e), bad: true); }
+        }, ghost: true, icon: Icons.add_rounded),
+      ]);
+    }));
+    if (mounted) _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = Store.i;
-    Widget chip(String t) => Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: ink(context).withValues(alpha: .1), borderRadius: BorderRadius.circular(14)), child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(audIcon(t), size: 13, color: ink(context)), const SizedBox(width: 5), Text(s.t('a_$t'), style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700))]));
-    Widget row(Map r, int i, {List<Widget> act = const []}) => UserTile(r, i, trailing: Row(mainAxisSize: MainAxisSize.min, children: [chip('${r['type']}'), ...act]));
+    Widget chip(String t, String? label) => ConstrainedBox(constraints: const BoxConstraints(maxWidth: 150), child: Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: ink(context).withValues(alpha: .1), borderRadius: BorderRadius.circular(14)), child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(audIcon(t), size: 13, color: ink(context)), const SizedBox(width: 5), Flexible(child: Text(label ?? s.t('a_$t'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)))])));
+    Widget row(Map r, int i, {List<Widget> act = const [], bool edit = false}) => UserTile(r, i, trailing: Row(mainAxisSize: MainAxisSize.min, children: [Tap(onTap: edit ? () => _rename(r) : null, child: chip('${r['type']}', r['label'] as String?)), ...act]));
     Widget head(String t) => Padding(padding: const EdgeInsets.only(top: 6, bottom: 10, left: 4), child: Text(t, style: TextStyle(color: sub(context), fontWeight: FontWeight.w700, fontSize: 13)));
     final empty = rels.isEmpty && relIn.isEmpty && relOut.isEmpty;
     return Scaffold(body: Column(children: [
@@ -925,8 +985,9 @@ class _RelationsState extends State<RelationsPage> {
           IconBtn(Icons.close_rounded, () => _relReq(() => Api.req('POST', '/relations/${relIn[i]['username']}/decline'), s.t('rel_ended'))),
         ])],
         if (relOut.isNotEmpty) ...[head(s.t('rel_out')), for (var i = 0; i < relOut.length; i++) row(relOut[i], i, act: [IconBtn(Icons.close_rounded, () => _relReq(() => Api.req('DELETE', '/relations/${relOut[i]['username']}'), s.t('rel_ended')))])],
-        if (rels.isNotEmpty) ...[if (relIn.isNotEmpty || relOut.isNotEmpty) head(s.t('rel_title')), for (var i = 0; i < rels.length; i++) row(rels[i], i, act: mine ? [IconBtn(Icons.link_off_rounded, () => _relEnd(rels[i]['username'], rels[i]['name']))] : [])],
+        if (rels.isNotEmpty) ...[if (relIn.isNotEmpty || relOut.isNotEmpty) head(s.t('rel_title')), for (var i = 0; i < rels.length; i++) row(rels[i], i, edit: mine, act: mine ? [IconBtn(Icons.link_off_rounded, () => _relEnd(rels[i]['username'], rels[i]['name']))] : [])],
       ]))),
+      if (mine) Padding(padding: const EdgeInsets.fromLTRB(20, 0, 20, 20), child: PBtn(s.t('lbl_manage'), _manage, ghost: true, icon: Icons.label_outline_rounded)),
     ]));
   }
 }

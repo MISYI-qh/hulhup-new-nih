@@ -688,11 +688,13 @@ class U {
   bool isFollowing;
   final bool isMe, verified, avatarAi;
   final String avatarAiKind; // 'made' | 'edited' | ''
+  final Map<int, String> labels; // nama hubungan custom milikku (id -> nama), maks 100 karakter
   U.from(Map j)
       : username = j['username'], name = j['name'], bio = j['bio'] ?? '', birth = j['birth'] ?? '', avatar = j['avatar'], cover = j['cover'],
         pvis = j['pvis'] ?? 'public', rvis = j['rvis'] ?? 'public', streak = j['streak'] ?? 0, days = j['days'] ?? 0, taps = j['taps'] ?? 0,
         age = j['age'] ?? 0, rels = j['rels'] ?? 0, audios = j['audios'] ?? 0, followers = j['followers'] ?? 0, following = j['following'] ?? 0,
-        isFollowing = j['is_following'] == true, isMe = j['is_me'] == true, verified = j['verified'] == true, avatarAi = j['avatar_ai'] == true, avatarAiKind = '${j['avatar_ai_kind'] ?? (j['avatar_ai'] == true ? 'made' : '')}';
+        isFollowing = j['is_following'] == true, isMe = j['is_me'] == true, verified = j['verified'] == true, avatarAi = j['avatar_ai'] == true, avatarAiKind = '${j['avatar_ai_kind'] ?? (j['avatar_ai'] == true ? 'made' : '')}',
+        labels = {for (final e in (j['labels'] as List? ?? const [])) (e['id'] as num).toInt(): '${e['name']}'};
 }
 
 class A {
@@ -815,6 +817,7 @@ class Store extends ChangeNotifier {
       if (Api.hasSession) {
         final j = await Api.req('GET', '/me');
         me = U.from(j['user']);
+        _cleanFilter();
         try { await _sp.setString('me_cache', jsonEncode(j['user'])); } catch (_) {}
         unread = j['unread'] ?? 0;
         unreadSocial = j['unread_social'] ?? 0;
@@ -947,16 +950,27 @@ class Store extends ChangeNotifier {
   void setMode(ThemeMode m) { mode = m; _sp.setInt('mode', m.index); notifyListeners(); }
 
   /// Teks notifikasi sosial (suka, ikuti, hubungan).
+  /// Nama jenis hubungan di teks: jenis bawaan diterjemahkan, nama custom ditampilkan apa adanya.
+  String relName(String x) => const ['friend', 'best', 'partner', 'family', 'custom'].contains(x) ? t('a_$x').toLowerCase() : x;
+  String labelName(int id) => me?.labels[id] ?? t('a_custom');
+
   String notifText(String type, String extra) {
     switch (type) {
       case 'like': return t('n_like');
       case 'comment': return t('n_comment');
       case 'reply': return t('n_reply');
       case 'mention': return t('n_mention');
-      case 'rel_req': return t('n_rel_req').replaceAll('{r}', t('a_$extra').toLowerCase());
-      case 'rel_ok': return t('n_rel_ok').replaceAll('{r}', t('a_$extra').toLowerCase());
+      case 'rel_req': return t('n_rel_req').replaceAll('{r}', relName(extra));
+      case 'rel_ok': return t('n_rel_ok').replaceAll('{r}', relName(extra));
       default: return t('n_follow');
     }
+  }
+
+  /// Buang nama hubungan yang sudah dihapus dari filter yang tersimpan.
+  void _cleanFilter() {
+    final ok = filter.split(',').where((e) => e.isNotEmpty && (!RegExp(r'^L\d+$').hasMatch(e) || (me?.labels.containsKey(int.tryParse(e.substring(1))) ?? false))).toList();
+    final v = ok.isEmpty ? 'public' : ok.join(',');
+    if (v != filter) { filter = v; _sp.setString('filter', v); }
   }
 
   Future<void> setFilter(String v) async {
@@ -1207,6 +1221,11 @@ const S = <String, List<String>>{
   'n_follow': ['mulai mengikutimu', 'started following you'],
   'remove_photo': ['Hapus foto profil', 'Remove profile photo'], 'remove_photo_q': ['Foto profil akan kembali ke bawaan.', 'Your profile photo will go back to the default.'], 'photo_removed': ['Foto profil dihapus', 'Profile photo removed'],
   'a_friend': ['Teman', 'Friends'], 'a_best': ['Sahabat', 'Best friends'], 'a_partner': ['Pasangan', 'Partner'], 'a_family': ['Keluarga', 'Family'],
+  'a_custom': ['Hubungan khusus', 'Custom relationship'], 'a_newlabel': ['Buat nama hubungan sendiri…', 'Create your own relationship name…'], 'a_nolabel': ['Tanpa nama khusus', 'No custom name'],
+  'lbl_title': ['Nama hubungan', 'Relationship name'], 'lbl_ph': ['Mis. orang kepercayaan', 'e.g. trusted person'], 'lbl_save': ['Simpan', 'Save'], 'lbl_manage': ['Kelola nama hubungan', 'Manage relationship names'],
+  'lbl_note': ['Maksimal 100 karakter. Nama ini otomatis muncul sebagai pilihan di filter Acak dan Hups, siapa yang boleh melihat post, dan privasi profil.', 'Up to 100 characters. This name shows up automatically as an option in the Random and Hups filters, post audience and profile privacy.'],
+  'lbl_del_q': ['Hapus nama "{n}"? Hubungannya tetap ada. Post yang hanya untuk nama ini menjadi khusus kamu.', 'Delete "{n}"? The relationships stay. Posts only for this name become private to you.'],
+  'lbl_none': ['Belum ada nama hubungan sendiri', 'No custom relationship names yet'], 'lbl_users': ['{n} hubungan', '{n} relationships'],
   'a_relations': ['Semua hubungan', 'All relationships'], 'a_accounts': ['Pilih akun', 'Choose accounts'], 'f_me': ['Untuk saya', 'For me'],
   'filter_title': ['Filter suara acak', 'Random voice filter'], 'filter_sub': ['Tombol acak hanya memutar suara dari kelompok ini.', 'The random button only plays voices from this group.'],
   'nofilter': ['Belum ada suara untuk filter ini', 'No voices for this filter yet'], 'filter_login': ['Masuk dulu untuk memakai filter lain', 'Sign in to use other filters'],
