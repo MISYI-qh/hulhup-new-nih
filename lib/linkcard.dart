@@ -4,7 +4,6 @@ import 'core.dart';
 import 'extra.dart';
 import 'hups.dart' show FileBar;
 import 'pages.dart' show ImageViewer;
-import 'routes.dart';
 import 'ui.dart';
 
 /// Tautan pertama di teks post (tanpa tanda baca di ujung), atau null.
