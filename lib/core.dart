@@ -804,7 +804,7 @@ class Store extends ChangeNotifier {
       online = await _online();
       _conn = Connectivity().onConnectivityChanged.listen((r) {
         final on = r.any((e) => e != ConnectivityResult.none);
-        if (on != online) { online = on; notifyListeners(); if (on) refresh(); }
+        if (on != online) { online = on; notifyListeners(); if (on) { refresh(); flushCounts(); } }
       });
     } catch (_) {}
     _p.onPositionChanged.listen((d) => pos.value = d.inMilliseconds);
@@ -818,6 +818,7 @@ class Store extends ChangeNotifier {
         final j = await Api.req('GET', '/me');
         me = U.from(j['user']);
         _cleanFilter();
+        flushCounts();
         try { await _sp.setString('me_cache', jsonEncode(j['user'])); } catch (_) {}
         unread = j['unread'] ?? 0;
         unreadSocial = j['unread_social'] ?? 0;
@@ -1042,14 +1043,37 @@ class Store extends ChangeNotifier {
   }
 
   final _counted = <String>{};
-  /// Hitung putar/lihat ke server. Server menghitung 1 per akun per post; di sini juga dicegah kirim ulang berulang.
+  Set<String> _pend = {};
+  void _savePend() { try { _sp.setStringList('pend_count', _pend.toList()); } catch (_) {} }
+  /// Hitung putar/lihat ke server. Server menghitung 1 per akun per post. Bila gagal atau offline (termasuk Acak dari berkas offline),
+  /// hitungan disimpan dan dikirim otomatis begitu tersambung lagi.
   void _count(A a, String kind) {
-    if (me == null || !online || a.id <= 0 || a.url.startsWith('file:') || !_counted.add('$kind${a.id}')) return;
-    Api.req('POST', '/audios/${a.id}/$kind').then((j) {
-      a.plays = (j['plays'] as num?)?.toInt() ?? a.plays;
-      a.views = (j['views'] as num?)?.toInt() ?? a.views;
+    if (me == null || a.id <= 0 || !_counted.add('$kind${a.id}')) return;
+    _send(a, kind, a.id);
+  }
+  void _send(A? a, String kind, int id) {
+    final k = '$kind$id';
+    Api.req('POST', '/audios/$id/$kind').then((j) {
+      if (_pend.remove(k)) _savePend();
+      if (a != null) {
+        a.plays = (j['plays'] as num?)?.toInt() ?? a.plays;
+        a.views = (j['views'] as num?)?.toInt() ?? a.views;
+      }
       notifyListeners();
-    }).catchError((_) { _counted.remove('$kind${a.id}'); });
+    }).catchError((e) {
+      if (e is ApiErr && !e.code.contains('rate') && !e.code.contains('many')) { if (_pend.remove(k)) _savePend(); return; }
+      if (_pend.add(k)) _savePend();
+    });
+  }
+  /// Kirim hitungan tertunda (dipanggil saat tersambung lagi / aplikasi dibuka).
+  void flushCounts() {
+    if (me == null) return;
+    try { _pend = (_sp.getStringList('pend_count') ?? []).toSet()..addAll(_pend); } catch (_) {}
+    for (final k in _pend.toList()) {
+      final m = RegExp(r'^(play|view)(\d+)$').firstMatch(k);
+      if (m == null) { _pend.remove(k); continue; }
+      _send(null, m.group(1)!, int.parse(m.group(2)!));
+    }
   }
   void countPlay(A a) { if (!a.bgm && a.files.isNotEmpty) _count(a, 'play'); }
   void countView(A a) => _count(a, 'view');

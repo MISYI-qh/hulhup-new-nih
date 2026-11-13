@@ -273,27 +273,28 @@ const brandDeep = Color(0xFF4330D0);
 /// Dua mata yang mengintip dari balik dinding. [w] = lebar tanda. rise 0..1 (0 = bersembunyi), look -1..1 arah pandang, blink 0..1.
 class _PeekPainter extends CustomPainter {
   final Color eye, pupil, wall;
-  final double rise, look, blink;
-  _PeekPainter(this.eye, this.pupil, this.wall, {this.rise = 1, this.look = .3, this.blink = 0});
+  final double rise, look, blink, lookY, cross, winkL, winkR, sep, eyeSc, pupSc, wallDy, wallSx;
+  _PeekPainter(this.eye, this.pupil, this.wall, {this.rise = 1, this.look = .3, this.blink = 0, this.lookY = 0, this.cross = 0, this.winkL = 0, this.winkR = 0, this.sep = 0, this.eyeSc = 1, this.pupSc = 1, this.wallDy = 0, this.wallSx = 1});
   @override
   void paint(Canvas c, Size s) {
     final u = s.width / .72, cx = s.width / 2, cy = s.height / 2;
     Offset o(double x, double y) => Offset(cx + x * u, cy + y * u);
     final ep = Paint()..color = eye..isAntiAlias = true, pp = Paint()..color = pupil..isAntiAlias = true;
-    final lift = (1 - rise) * .30, ry = .15 * (1 - .92 * blink);
+    final lift = (1 - rise) * .30;
     c.save();
-    c.clipRect(Rect.fromLTRB(-1e5, -1e5, 1e5, o(0, .21).dy)); // mata yang turun tersembunyi di balik dinding, tidak muncul di bawahnya
+    c.clipRect(Rect.fromLTRB(-1e5, -1e5, 1e5, o(0, .21 + wallDy).dy)); // mata yang turun tersembunyi di balik dinding, tidak muncul di bawahnya
     for (final k in [-1, 1]) {
-      final ec = o(k * .15, -.06 + lift);
-      c.drawOval(Rect.fromCenter(center: ec, width: .25 * u, height: ry * 2 * u), ep);
-      final pr = .055 * u;
-      c.drawOval(Rect.fromCenter(center: ec + Offset((.022 + look * .03) * u, -.035 * u * (1 - blink)), width: pr * 2, height: pr * 2 * (1 - .9 * blink)), pp);
+      final bl = (blink + (k < 0 ? winkL : winkR)).clamp(0.0, 1.0);
+      final ec = o(k * (.15 + sep), -.06 + lift);
+      c.drawOval(Rect.fromCenter(center: ec, width: .25 * u * eyeSc, height: .30 * u * eyeSc * (1 - .92 * bl)), ep);
+      final pr = .055 * u * pupSc, lx = look + (k < 0 ? cross : -cross);
+      c.drawOval(Rect.fromCenter(center: ec + Offset((.022 + lx * .03) * u, (-.035 * (1 - bl) + lookY * .03) * u), width: pr * 2, height: pr * 2 * (1 - .9 * bl)), pp);
     }
     c.restore();
-    c.drawRRect(RRect.fromRectAndRadius(Rect.fromLTRB(o(-.36, 0).dx, o(0, 0).dy, o(.36, 0).dx, o(0, .21).dy), Radius.circular(.07 * u)), Paint()..color = wall..isAntiAlias = true);
+    c.drawRRect(RRect.fromRectAndRadius(Rect.fromLTRB(o(-.36 * wallSx, 0).dx, o(0, wallDy).dy, o(.36 * wallSx, 0).dx, o(0, .21 + wallDy).dy), Radius.circular(.07 * u)), Paint()..color = wall..isAntiAlias = true);
   }
   @override
-  bool shouldRepaint(_PeekPainter o) => o.rise != rise || o.look != look || o.blink != blink || o.eye != eye || o.pupil != pupil || o.wall != wall;
+  bool shouldRepaint(_PeekPainter o) => o.rise != rise || o.look != look || o.blink != blink || o.lookY != lookY || o.cross != cross || o.winkL != winkL || o.winkR != winkR || o.sep != sep || o.eyeSc != eyeSc || o.pupSc != pupSc || o.wallDy != wallDy || o.wallSx != wallSx || o.eye != eye || o.pupil != pupil || o.wall != wall;
 }
 
 /// Warna tanda tanpa bingkai: terang = mata ungu, pupil putih, dinding ungu tua; gelap = mata putih, pupil ungu, dinding ungu.
@@ -327,29 +328,11 @@ class LogoTile extends StatelessWidget {
 }
 
 /// Loading: ubin logo, mata naik mengintip, menengok kiri-kanan, berkedip, lalu turun lagi. Dipakai untuk semua loading.
-class LogoLoop extends StatefulWidget {
+class LogoLoop extends StatelessWidget {
   final double size;
   const LogoLoop({super.key, this.size = 44});
   @override
-  State<LogoLoop> createState() => _LogoLoopState();
-}
-
-class _LogoLoopState extends State<LogoLoop> with SingleTickerProviderStateMixin {
-  late final AnimationController c = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400))..repeat();
-  @override
-  void dispose() { c.dispose(); super.dispose(); }
-  @override
-  Widget build(BuildContext context) {
-    final z = widget.size;
-    return RepaintBoundary(child: AnimatedBuilder(animation: c, builder: (_, __) {
-      final t = c.value;
-      double ramp(double a, double b) => ((t - a) / (b - a)).clamp(0.0, 1.0);
-      final rise = Curves.easeOutBack.transform(ramp(.04, .22)) * (1 - Curves.easeInCubic.transform(ramp(.84, .98)));
-      final look = t < .30 ? .3 : t < .34 ? .3 - 1.3 * ramp(.30, .34) : t < .48 ? -1.0 : t < .54 ? -1 + 2 * ramp(.48, .54) : t < .66 ? 1.0 : t < .72 ? 1 - .7 * ramp(.66, .72) : .3;
-      final blink = (t > .74 && t < .82) ? sin((t - .74) / .08 * pi) : 0.0;
-      return SizedBox(width: z, height: z * .5 / .72, child: CustomPaint(painter: _PeekPainter(markColors(context)[0], markColors(context)[1], markColors(context)[2], rise: rise.clamp(0.0, 1.05), look: look, blink: blink)));
-    }));
-  }
+  Widget build(BuildContext context) => RepaintBoundary(child: AnimMark(size, auto: true, loop: true, first: 0, ms: 1500));
 }
 
 /// Tarik-untuk-muat dengan logo Hulhup: titik naik mengikuti tarikan, memantul saat memuat.
@@ -381,7 +364,7 @@ class Brand extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final w = Row(mainAxisSize: MainAxisSize.min, children: [
-      const LogoMark(40),
+      const AnimMark(40, auto: true, slow: true, tapPlay: true),
       const SizedBox(width: 10),
       Text('Hulhup', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 21, letterSpacing: -.4, color: ink(context))),
       if (onTap != null) Icon(Icons.keyboard_arrow_down_rounded, size: 22, color: sub(context)),
@@ -922,29 +905,138 @@ class _Wave extends CustomPainter {
   bool shouldRepaint(_Wave o) => o.t != t || o.c != c;
 }
 
-/// Logo di tombol Acak: 10 animasi berbeda tiap ditekan (urut berputar). [t] 0..1 progres animasi, [v] nomor animasi 0..9.
-class TapMark extends StatelessWidget {
-  final double width, t;
-  final int v;
-  const TapMark(this.width, {super.key, required this.t, required this.v});
+/// Satu gerak logo. Semua nilai kembali ke posisi diam di awal dan akhir (t = 0 dan 1).
+class _M {
+  double rise = 1, look = .3, lookY = 0, cross = 0, blink = 0, winkL = 0, winkR = 0, sep = 0, eyeSc = 1, pupSc = 1, wallDy = 0, wallSx = 1, dx = 0, dy = 0, sc = 1, rot = 0;
+}
+
+const int kMarkAnims = 50;
+
+/// 50 animasi logo. [v] 0..49, [t] 0..1.
+_M markMotion(int v, double t) {
+  final m = _M();
+  const tau = 2 * pi;
+  double r(double a, double b) => ((t - a) / (b - a)).clamp(0.0, 1.0);
+  double bp(double a, double b) => sin(pi * r(a, b));
+  final s1 = sin(tau * t), c1 = cos(tau * t), ab = sin(tau * t).abs(), fade = 1 - t;
+  double cl(double x) => x.clamp(-1.0, 1.0);
+  switch (v % kMarkAnims) {
+    case 0: m.rise = 1 - bp(.05, .95); break; // menunduk lalu muncul
+    case 1: m.blink = max(bp(.1, .3), bp(.4, .6)); break; // kedip dua kali
+    case 2: m.look = .3 + 2.6 * s1; break; // lirik kiri-kanan
+    case 3: m.dy = -16 * bp(0, 1); break; // lompat
+    case 4: m.rot = Curves.easeInOut.transform(t) * tau; break; // putar penuh
+    case 5: m.sc = 1 + .22 * ab * fade; m.dy = 4 * ab; break; // melar kenyal
+    case 6: m.rot = .28 * sin(3 * tau * t) * fade; break; // goyang
+    case 7: m.sc = 1 + .3 * bp(0, 1); m.blink = bp(.55, .75); break; // membesar lalu kedip
+    case 8: m.rise = 1 - .85 * ab; m.look = .3 + 1.5 * s1; break; // ngumpet dua kali sambil menoleh
+    case 9: m.dx = 9 * sin(4 * tau * t) * fade; m.look = .3 + 2 * sin(4 * tau * t); break; // gemetar
+    case 10: m.rise = 1 + .12 * bp(.2, .7); break; // mata menjulur
+    case 11: m.blink = max(bp(.05, .2), max(bp(.3, .45), bp(.55, .7))); break; // kedip cepat tiga kali
+    case 12: m.lookY = 2.2 * s1; break; // lirik atas-bawah
+    case 13: m.look = .3 + 2 * c1 - 2; m.lookY = 2 * s1; break; // pupil berputar
+    case 14: m.cross = 2.6 * bp(.1, .9); break; // juling
+    case 15: m.sep = .05 * bp(.1, .9); break; // mata merenggang
+    case 16: m.sep = -.04 * bp(.1, .9); break; // mata merapat
+    case 17: m.eyeSc = 1 + .3 * bp(.1, .9); m.pupSc = 1 + .2 * bp(.1, .9); break; // mata membesar
+    case 18: m.eyeSc = 1 - .3 * bp(.1, .9); break; // mata mengecil
+    case 19: m.wallDy = .04 * sin(3 * tau * t) * fade; break; // dinding memantul
+    case 20: m.wallSx = 1 - .15 * bp(.1, .5) + .1 * bp(.5, .9); break; // dinding mengempis
+    case 21: m.dy = -14 * bp(0, .6); m.blink = bp(.6, .8); break; // lompat lalu kedip
+    case 22: m.dy = -12 * ab; break; // lompat dua kali
+    case 23: m.rot = pi * bp(0, 1); break; // berbalik setengah lalu kembali
+    case 24: m.rot = .35 * sin(2 * tau * t) * fade; m.look = .3 + 2 * sin(2 * tau * t); break; // berayun
+    case 25: m.dy = 6 * sin(2 * tau * t).abs(); m.sc = 1 + .05 * sin(2 * tau * t).abs(); break; // mengangguk
+    case 26: m.dx = 3 * sin(10 * tau * t) * bp(0, 1); break; // menggigil
+    case 27: m.dx = 18 * s1; m.look = .3 + 2 * c1 - 2; break; // geser kiri-kanan
+    case 28: m.sc = 1 + .35 * bp(0, 1); break; // zoom
+    case 29: m.sc = 1 + .12 * (bp(.1, .35) + bp(.45, .7)); break; // detak jantung
+    case 30: m.rise = 1 - bp(0, .45); m.blink = bp(.6, .8); break; // cilukba
+    case 31: m.blink = .9 * bp(.1, .9); m.rise = 1 - .2 * bp(.1, .9); break; // mengantuk
+    case 32: m.winkR = bp(.2, .6); break; // kedip sebelah kanan
+    case 33: m.winkL = bp(.2, .6); break; // kedip sebelah kiri
+    case 34: m.rise = 1 - .35 * bp(.1, .9); m.look = .3 - 2 * bp(.1, .9); break; // malu
+    case 35: m.eyeSc = 1 + .35 * bp(.05, .5); m.pupSc = 1 - .4 * bp(.05, .5); m.dy = -8 * bp(0, .3); break; // kaget
+    case 36: m.pupSc = 1 + .6 * s1; break; // pupil membesar mengecil
+    case 37: m.look = .3 + 2.4 * cos(3 * tau * t) - 2.4; m.lookY = 2.4 * sin(3 * tau * t); m.rot = .12 * sin(3 * tau * t); break; // pusing
+    case 38: m.look = .3 + 2.5 * cl(3 * s1); break; // memindai
+    case 39: m.rise = 1 - .4 * bp(.1, .9); m.look = .3 + 2.5 * cl(2 * s1); m.eyeSc = 1 - .15 * bp(.1, .9); break; // curiga
+    case 40: m.dy = -12 * ab; m.eyeSc = 1 + .15 * ab; break; // riang melompat
+    case 41: m.sc = 1 + .25 * bp(0, 1); m.rise = 1 + .1 * bp(.3, .7); m.blink = bp(.7, .9); break; // dramatis
+    case 42: m.sc = 1 + .08 * sin(3 * tau * t) * fade; m.wallSx = 1 + .1 * sin(3 * tau * t) * fade; m.wallDy = .015 * sin(3 * tau * t) * fade; break; // agar-agar
+    case 43: m.rot = .2 * bp(.1, .9); m.lookY = -2 * bp(.1, .9); break; // miring penasaran
+    case 44: m.rise = t < .7 ? 1 - Curves.easeIn.transform(r(0, .12)) : Curves.easeOutBack.transform(r(.7, .9)); break; // sembunyi lama lalu muncul
+    case 45: m.rise = 1 - .9 * sin(3 * pi * t).abs(); break; // mengintip cepat tiga kali
+    case 46: m.eyeSc = 1 + .3 * bp(.05, .4); m.dx = 6 * sin(12 * tau * t) * bp(.05, .6); break; // terkejut gemetar
+    case 47: m.look = .3 + 2.2 * c1 - 2.2; m.lookY = -2.2 * s1; m.rise = 1 + .08 * bp(.1, .9); break; // memutar bola mata
+    case 48: m.look = .3 + 2 * cos(2 * tau * t) - 2; m.lookY = 2 * sin(2 * tau * t); m.sep = .03 * s1; break; // melirik berputar
+    default: m.rise = 1 - bp(0, .3); m.dy = -14 * bp(.35, .65); m.sc = 1 + .1 * bp(.35, .65); m.blink = bp(.7, .9); // pamungkas
+  }
+  return m;
+}
+
+/// Logo yang hidup: memainkan 50 animasi bergantian dengan urutan acak. [auto] jalan sendiri; [loop] tanpa jeda (untuk pemuat);
+/// [slow] jeda lama (untuk hiasan seperti logo di bilah atas). Ketuk untuk memutar satu animasi bila [tapPlay].
+class AnimMark extends StatefulWidget {
+  final double width;
+  final bool auto, loop, slow, tapPlay;
+  final int? first;
+  final int ms;
+  final List<Color>? colors;
+  const AnimMark(this.width, {super.key, this.auto = false, this.loop = false, this.slow = false, this.tapPlay = false, this.first, this.ms = 1700, this.colors});
+  @override
+  State<AnimMark> createState() => AnimMarkState();
+}
+
+class AnimMarkState extends State<AnimMark> with SingleTickerProviderStateMixin {
+  static final _rnd = Random();
+  late final AnimationController c = AnimationController(vsync: this, duration: Duration(milliseconds: widget.ms));
+  int v = 0, _last = -1;
+  Timer? _timer;
+  bool _still = false;
+
+  @override
+  void initState() {
+    super.initState();
+    v = widget.first ?? _rnd.nextInt(kMarkAnims);
+    c.addStatusListener((st) {
+      if (st != AnimationStatus.completed || !widget.auto || !mounted) return;
+      if (widget.loop) { play(); return; }
+      _timer = Timer(Duration(milliseconds: widget.slow ? 5000 + _rnd.nextInt(7000) : 700 + _rnd.nextInt(1300)), () { if (mounted) play(); });
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _still = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    if (widget.auto && !_still && !c.isAnimating && _timer == null && _last == -1) {
+      _timer = Timer(Duration(milliseconds: widget.loop ? 0 : 500), () { if (mounted) { _last = v; c.forward(from: 0); } });
+    }
+  }
+
+  /// Putar animasi berikutnya (acak, tidak sama dengan yang barusan). [n] memaksa nomor tertentu.
+  void play([int? n]) {
+    if (!mounted || _still) return;
+    _timer?.cancel();
+    var x = n ?? _rnd.nextInt(kMarkAnims);
+    if (n == null && x == _last) x = (x + 1 + _rnd.nextInt(kMarkAnims - 1)) % kMarkAnims;
+    v = _last = x;
+    c.forward(from: 0);
+  }
+
+  @override
+  void dispose() { _timer?.cancel(); c.dispose(); super.dispose(); }
+
   @override
   Widget build(BuildContext context) {
-    double rise = 1, look = .3, blink = 0, dx = 0, dy = 0, sc = 1, rot = 0;
-    final s = sin(t * pi), s2 = sin(t * 2 * pi), fade = 1 - t;
-    switch (v % 10) {
-      case 0: rise = 1 - s; break; // menunduk lalu muncul lagi
-      case 1: blink = (sin(t * 4 * pi).abs()); break; // kedip dua kali
-      case 2: look = s2 * 2.6; break; // lirik kiri-kanan
-      case 3: dy = -s * 16; break; // lompat
-      case 4: rot = Curves.easeInOut.transform(t) * 2 * pi; break; // putar penuh
-      case 5: sc = 1 + .22 * s2.abs() * fade; dy = s2.abs() * 4; break; // melar kenyal
-      case 6: rot = sin(t * 6 * pi) * .28 * fade; break; // goyang
-      case 7: sc = 1 + .3 * s; blink = t > .55 && t < .75 ? sin((t - .55) / .2 * pi) : 0; break; // membesar lalu kedip
-      case 8: rise = 1 - .85 * sin(t * 2 * pi).abs(); look = 1 - 2 * t; break; // ngumpet dua kali sambil menoleh
-      case 9: dx = sin(t * 8 * pi) * 9 * fade; look = sin(t * 8 * pi) * 2; break; // gemetar
-    }
-    final mc = [Colors.white, brand, brandDeep];
-    return Transform.translate(offset: Offset(dx, dy), child: Transform.rotate(angle: rot, child: Transform.scale(scale: sc,
-      child: SizedBox(width: width, height: width * .5 / .72, child: CustomPaint(painter: _PeekPainter(mc[0], mc[1], mc[2], rise: rise.clamp(0.0, 1.05), look: look, blink: blink.clamp(0.0, 1.0)))))));
+    final mc = widget.colors ?? markColors(context);
+    final w = widget.width;
+    final body = RepaintBoundary(child: AnimatedBuilder(animation: c, builder: (_, __) {
+      final m = markMotion(v, c.value);
+      return Transform.translate(offset: Offset(m.dx * w / 100, m.dy * w / 100), child: Transform.rotate(angle: m.rot, child: Transform.scale(scale: m.sc,
+        child: SizedBox(width: w, height: w * .5 / .72, child: CustomPaint(painter: _PeekPainter(mc[0], mc[1], mc[2], rise: m.rise.clamp(0.0, 1.1), look: m.look, blink: m.blink.clamp(0.0, 1.0), lookY: m.lookY, cross: m.cross, winkL: m.winkL.clamp(0.0, 1.0), winkR: m.winkR.clamp(0.0, 1.0), sep: m.sep, eyeSc: m.eyeSc, pupSc: m.pupSc, wallDy: m.wallDy, wallSx: m.wallSx))))));
+    }));
+    return widget.tapPlay ? GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => play(), child: body) : body;
   }
 }

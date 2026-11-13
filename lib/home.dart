@@ -141,11 +141,10 @@ class TapButton extends StatefulWidget {
 
 class _TapButtonState extends State<TapButton> with TickerProviderStateMixin {
   late final burst = AnimationController(vsync: this, duration: const Duration(milliseconds: 1000));
-  late final mark = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100));
-  int variant = -1;
+  final markKey = GlobalKey<AnimMarkState>();
   bool down = false;
   @override
-  void dispose() { burst.dispose(); mark.dispose(); super.dispose(); }
+  void dispose() { burst.dispose(); super.dispose(); }
   @override
   Widget build(BuildContext context) {
     final ring = ink(context);
@@ -155,7 +154,7 @@ class _TapButtonState extends State<TapButton> with TickerProviderStateMixin {
         onTapDown: (_) => setState(() => down = true),
         onTapCancel: () => setState(() => down = false),
         onTapUp: (_) => setState(() => down = false),
-        onTap: () { HapticFeedback.mediumImpact(); burst.forward(from: 0); variant = (variant + 1) % 10; mark.forward(from: 0); widget.onTap(); },
+        onTap: () { HapticFeedback.mediumImpact(); burst.forward(from: 0); markKey.currentState?.play(); widget.onTap(); },
         child: AnimatedScale(
           scale: down ? .94 : 1, duration: const Duration(milliseconds: 150), curve: Curves.easeOut,
           child: AnimatedContainer(
@@ -165,7 +164,7 @@ class _TapButtonState extends State<TapButton> with TickerProviderStateMixin {
               color: brand,
               boxShadow: [BoxShadow(color: brand.withValues(alpha: down ? .22 : .38), blurRadius: down ? 24 : 52, offset: Offset(0, down ? 10 : 26))],
             ),
-            child: Center(child: AnimatedBuilder(animation: mark, builder: (_, __) => TapMark(104, t: variant < 0 ? 0 : mark.value, v: variant < 0 ? 0 : variant))),
+            child: Center(child: AnimMark(104, key: markKey, auto: true, ms: 1500, first: 0, colors: const [Colors.white, brand, brandDeep])),
           ),
         ),
       ),
