@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'extra.dart';
 import 'apk_web.dart' if (dart.library.io) 'apk_io.dart';
 import 'core.dart';
+import 'linkcard.dart';
 import 'ui.dart';
 import 'pages.dart';
 import 'hups.dart';
@@ -254,6 +255,7 @@ class PopupBody extends StatelessWidget {
       ])),
       if (!a.pprof && a.created > 0) Align(alignment: Alignment.centerLeft, child: Padding(padding: const EdgeInsets.only(bottom: 6), child: Text(s.when(a.created), style: TextStyle(color: sub(context), fontSize: 13)))),
       if (a.desc.trim().isNotEmpty) Tap(onTap: () { Navigator.pop(context); openPost(context, a); }, scale: .99, child: Padding(padding: EdgeInsets.only(top: a.pprof ? 12 : 0), child: Align(alignment: Alignment.centerLeft, child: Text.rich(TextSpan(children: [TextSpan(text: a.desc.trim()), if (a.long) TextSpan(text: ' …  ${s.t('read_more')}', style: TextStyle(color: acc(context), fontWeight: FontWeight.w700))]), maxLines: 6, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, height: 1.4))))),
+      if (firstUrl(a.desc) != null) LinkEmbed(firstUrl(a.desc)!),
       SizedBox(height: a.pprof || a.desc.trim().isNotEmpty ? 14 : 4),
       if (a.url.isNotEmpty) Container(
         padding: const EdgeInsets.fromLTRB(8, 8, 6, 8), decoration: BoxDecoration(color: soft(context), borderRadius: BorderRadius.circular(26)),

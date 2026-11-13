@@ -3,6 +3,8 @@ import 'package:video_player/video_player.dart';
 import 'core.dart';
 import 'extra.dart';
 import 'hups.dart' show FileBar;
+import 'pages.dart' show ImageViewer;
+import 'routes.dart';
 import 'ui.dart';
 
 /// Tautan pertama di teks post (tanpa tanda baca di ujung), atau null.
@@ -112,7 +114,7 @@ class _ImageEmbed extends StatelessWidget {
   const _ImageEmbed(this.url, {this.orig = ''});
   @override
   Widget build(BuildContext context) => Tap(
-        onTap: () => openLink(context, orig.isEmpty ? url : orig), scale: .99,
+        onTap: () => go(context, ImageViewer(url, Uri.tryParse(orig.isEmpty ? url : orig)?.host ?? '')), scale: .99,
         child: Container(
           margin: const EdgeInsets.only(top: 10, right: 8), constraints: const BoxConstraints(maxHeight: 420),
           decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), border: Border.all(color: ink(context).withValues(alpha: .08))),
