@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'core.dart';
 import 'extra.dart';
+import 'hups.dart' show FileBar;
 import 'ui.dart';
 
 /// Tautan pertama di teks post (tanpa tanda baca di ujung), atau null.
