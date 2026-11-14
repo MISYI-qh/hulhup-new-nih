@@ -274,7 +274,7 @@ class PopupBody extends StatelessWidget {
       if (a.url.isNotEmpty) ...[const SizedBox(height: 10), const SpeedRow()],
       const SizedBox(height: 6),
       PostActions(a, onComments: () { Navigator.pop(context); openPost(context, a); }),
-      if (a.url.isNotEmpty) ListenableBuilder(listenable: s, builder: (_, __) {
+      ListenableBuilder(listenable: s, builder: (_, __) {
         final off = s.isOffline(a.id);
         return PBtn(off ? s.t('is_offline') : s.t('mk_offline'), () => toggleOffline(a), ghost: true, icon: off ? Icons.offline_pin_rounded : Icons.download_for_offline_outlined);
       }),

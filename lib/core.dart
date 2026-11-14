@@ -744,7 +744,6 @@ class Store extends ChangeNotifier {
   String filter = 'public';
   void Function(String)? banner; // pemberitahuan di dalam aplikasi (diisi dari main)
   final offline = <A>[];
-  final acakCache = <A>[]; // audio Acak yang otomatis terunduh, dipakai saat tanpa internet
   bool online = true;
   StreamSubscription<List<ConnectivityResult>>? _conn;
   void closeConn() { _conn?.cancel(); _conn = null; }
@@ -802,7 +801,14 @@ class Store extends ChangeNotifier {
     };
     searches = _sp.getStringList('search_hist') ?? [];
     try { for (final j in jsonDecode(_sp.getString('offline') ?? '[]') as List) { offline.add(A.from(j as Map)); } } catch (_) {}
-    try { for (final j in jsonDecode(_sp.getString('acak_cache') ?? '[]') as List) { acakCache.add(A.from(j as Map)); } } catch (_) {}
+    // Cadangan Acak otomatis (versi lama) dihapus: offline hanya berisi yang kamu simpan sendiri.
+    try {
+      final old = _sp.getString('acak_cache');
+      if (old != null) {
+        for (final j in jsonDecode(old) as List) { await deleteOffline('rc${(j as Map)['id']}.audio'); }
+        await _sp.remove('acak_cache');
+      }
+    } catch (_) {}
     try {
       online = await _online();
       _conn = Connectivity().onConnectivityChanged.listen((r) {
@@ -1002,7 +1008,7 @@ class Store extends ChangeNotifier {
   }
 
   A? _pickOffline() {
-    var c = [...offline, ...acakCache.where((a) => !offline.any((o) => o.id == a.id))];
+    var c = [...offline];
     if (c.isEmpty) return null;
     if (c.length > 1 && _lastOff != null) c = c.where((a) => a.id != _lastOff).toList();
     final a = c[_rnd.nextInt(c.length)];
@@ -1020,7 +1026,6 @@ class Store extends ChangeNotifier {
       if (me != null && j['taps'] != null) tapf[f] = (j['taps'] as num).toInt();
       notifyListeners();
       final got = j['audio'] == null ? null : A.from(j['audio']);
-      if (got != null) _cacheAcak(got);
       return got;
     } on ApiErr {
       rethrow;
@@ -1031,20 +1036,6 @@ class Store extends ChangeNotifier {
   }
 
   /// Unduh diam-diam audio Acak yang baru didengar (maks 40 terakhir) agar Acak tetap jalan tanpa internet. Hanya di HP.
-  Future<void> _cacheAcak(A a) async {
-    try {
-      if (kIsWeb || a.url.isEmpty || acakCache.any((c) => c.id == a.id) || offline.any((c) => c.id == a.id)) return;
-      final b = await Api.bytes(a.url);
-      if (b == null || !await saveOffline('rc${a.id}.audio', b)) return;
-      final j = a.toJson();
-      j['url'] = 'file:rc${a.id}.audio';
-      j['files'] = [{'url': 'file:rc${a.id}.audio', 'secs': a.secs}];
-      acakCache.insert(0, A.from(j));
-      while (acakCache.length > 40) { final o = acakCache.removeLast(); await deleteOffline('rc${o.id}.audio'); }
-      await _sp.setString('acak_cache', jsonEncode(acakCache.map((o) => o.toJson()).toList()));
-    } catch (_) {}
-  }
-
   final _counted = <String>{};
   Set<String> _pend = {};
   void _savePend() { try { _sp.setStringList('pend_count', _pend.toList()); } catch (_) {} }
@@ -1097,14 +1088,17 @@ class Store extends ChangeNotifier {
       await Local.delBlob('off${a.id}');
       offline.removeAt(i);
     } else {
-      final b = await Api.bytes(a.url);
-      if (b == null) throw ApiErr('server');
       final j = a.toJson();
-      if (await saveOffline('off${a.id}.audio', b)) {
-        j['url'] = 'file:off${a.id}.audio';
-      } else {
-        await Local.putBlob('off${a.id}', b);
-        j['url'] = 'mem:off${a.id}';
+      // Post tanpa audio (teks saja) tidak ada berkas untuk diunduh: yang disimpan hanya isinya.
+      if (a.url.isNotEmpty) {
+        final b = await Api.bytes(a.url);
+        if (b == null) throw ApiErr('server');
+        if (await saveOffline('off${a.id}.audio', b)) {
+          j['url'] = 'file:off${a.id}.audio';
+        } else {
+          await Local.putBlob('off${a.id}', b);
+          j['url'] = 'mem:off${a.id}';
+        }
       }
       offline.insert(0, A.from(j));
     }
@@ -1332,7 +1326,7 @@ const S = <String, List<String>>{
   'n_missed': ['Kamu tidak masuk {n} hari. Rangkaianmu dimulai lagi dari awal.', 'You missed {n} day(s). Your streak starts over.'],
   'push_unread': ['{n} notifikasi baru', '{n} new notifications'],
   'r_title': ['Kamu lelah?', 'Feeling tired?'], 'r_body': ['Coba lah untuk mendengarkan beberapa suara', 'Try listening to a few voices'],
-  'mk_offline': ['Jadikan offline', 'Make available offline'], 'is_offline': ['Tersimpan offline', 'Saved offline'], 'offline_t': ['Audio offline', 'Offline audio'],
+  'mk_offline': ['Jadikan offline', 'Make available offline'], 'is_offline': ['Tersimpan offline', 'Saved offline'], 'offline_t': ['Offline', 'Offline'],
   'saved_off': ['Disimpan untuk offline', 'Saved for offline'], 'removed_off': ['Dihapus dari offline', 'Removed from offline'], 'off_fail': ['Tidak bisa menyimpan audio ini', 'Couldn’t save this audio'],
   'empty_offline': ['Belum ada audio offline. Simpan lewat popup acak atau daftar audio.', 'No offline audio yet. Save from the random popup or an audio list.'],
   'no_net': ['Tidak ada internet. Memutar audio offline.', 'No internet. Playing offline audio.'], 'no_net_empty': ['Tidak ada internet dan belum ada audio offline.', 'No internet and no offline audio yet.'],
