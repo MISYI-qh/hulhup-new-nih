@@ -188,7 +188,7 @@ class FaqPage extends StatelessWidget {
     ('Apa arti "dilihat" dan "diputar"?', 'Jumlah akun yang melihat dan memutar post. Tiap akun dihitung satu kali, seberapa sering pun melihat atau memutar. "Diputar" hanya ada pada post dengan audio biasa.'),
     ('Apa itu sorot?', 'Tanda suka. Ketuk ikon lampu sorot untuk menyorot sebuah post atau komentar.'),
     ('Apa yang bisa dicari?', 'Semuanya: nama atau nama pengguna akun, bio, isi post, penulis, tag @nama, dan isi komentar. Beberapa kata dicocokkan sekaligus.'),
-    ('Bisakah dipakai tanpa internet?', 'Aplikasi tetap terbuka. Acak memutar audio yang otomatis tersimpan di perangkat, dan Audio offline bisa diputar. Pencarian, Pengaturan, Edit profil, Hups, dan membuat post butuh internet.'),
+    ('Bisakah dipakai tanpa internet?', 'Aplikasi tetap terbuka. Acak dan Offline memutar post yang kamu simpan sendiri di perangkat. Pencarian, Pengaturan, Edit profil, Hups, dan membuat post butuh internet.'),
     ('Bagaimana menandai akun?', 'Ketik @nama pengguna di post atau komentar. Ketuk tag untuk membuka akun itu; akun yang ditandai mendapat notifikasi.'),
     ('Siapa yang bisa melihat post saya?', 'Kamu memilih saat membuat post, bisa lebih dari satu (publik, pengikut, hubungan, akun tertentu, dan lainnya).'),
     ('Bagaimana menyematkan komentar?', 'Penulis post membuka menu komentar lalu memilih Sematkan komentar.'),
