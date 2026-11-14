@@ -1,0 +1,33 @@
+import type { Metadata, Viewport } from 'next';
+import Link from 'next/link';
+import './globals.css';
+import Header from '@/components/Header';
+import { ORIGIN } from '@/lib/api';
+
+export const metadata: Metadata = {
+  metadataBase: new URL(ORIGIN),
+  title: { default: 'Hulhup — ketuk, dengarkan suara acak', template: '%s · Hulhup' },
+  description: 'Hulhup: ketuk satu tombol, dengarkan suara singkat (maks 15 detik) atau tulisan acak dari orang lain. Kamu yang mengatur siapa boleh melihat post-mu. Produk Misyi.',
+  applicationName: 'Hulhup',
+  alternates: { canonical: '/' },
+  robots: { index: true, follow: true, 'max-image-preview': 'large' },
+  openGraph: { type: 'website', siteName: 'Hulhup', locale: 'id_ID', images: [{ url: '/icons/Icon-512.png', width: 512, height: 512 }] },
+  twitter: { card: 'summary' },
+  icons: { icon: '/icons/Icon-192.png', apple: '/icons/Icon-192.png' },
+};
+export const viewport: Viewport = { themeColor: '#0B0B0B', colorScheme: 'light dark', width: 'device-width', initialScale: 1 };
+
+export default function Root({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="id">
+      <body>
+        <Header />
+        <main className="wrap">{children}</main>
+        <footer><div className="wrap">
+          <Link href="/about">Tentang</Link><Link href="/faq">FAQ</Link><Link href="/policy">Ketentuan</Link><Link href="/privacy">Privasi</Link>
+          <div style={{ marginTop: 10 }}>© Misyi · Hulhup</div>
+        </div></footer>
+      </body>
+    </html>
+  );
+}

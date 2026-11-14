@@ -1,0 +1,156 @@
+{
+ "about": [
+  "Hulhup adalah ruang suara dan tulisan yang sederhana.\n\nAcak: ketuk satu tombol, dengarkan suara singkat (maksimal 15 detik) dari orang-orang di seluruh dunia, tanpa perlu masuk.\n\nSebuah post bisa berisi tulisan (panjangnya bebas), satu audio, atau keduanya; post hanya teks juga boleh. Audio bisa dijadikan audio biasa atau backsound (pengiring yang terputar otomatis saat post terlihat dan bisa dimatikan pembaca). Satu post otomatis tampil di Acak dan di Hups. Hups untuk menjelajah post pilihanmu, dengan komentar bertingkat seperti di forum (komentar hanya tulisan, panjangnya bebas). Pencarian mencakup akun, isi post, penulis, tag, dan komentar.\n\nMasuk hanya jika kamu ingin membuat post, menyorot, berkomentar, menyimpan, atau mengikuti akun lain. Tanpa akun kamu tetap bisa melihat dan mendengar.\n\nKamu mengatur sendiri siapa yang bisa melihat tiap post, siapa yang bisa melihat profilmu, dan siapa yang bisa melihat daftar hubunganmu. Post apa pun bisa dibagikan lewat tautan; tautan hanya terbuka untuk orang yang berhak melihatnya.\n\nPengingat harian dan pemberitahuan sorotan, komentar, dan pengikut baru datang dari server sehingga tetap masuk walau aplikasi tertutup.\n\nHulhup lahir pada 1 Oktober 2026.\n\nHulhup adalah produk dari Misyi.\n\nVersi 1.3.0",
+  "Hulhup is a simple home for voices and writing.\n\nRandom: tap one button and hear a short voice (up to 15 seconds) from people around the world, no sign-in needed.\n\nA post can hold text (any length), one audio, or both; text-only posts are fine too. The audio is either a regular audio or a backsound (a soundtrack that plays automatically while the post is in view and that readers can mute). A post shows in both Random and Hups automatically. Hups is where you browse posts, with threaded comments like a forum (comments are text only, any length). Search covers accounts, post text, authors, tags and comments.\n\nSign in only if you want to post, spotlight, comment, save, or follow other accounts. Without an account you can still look and listen.\n\nYou choose who can see each post, who can see your profile, and who can see your relationship list. Any post can be shared as a link; the link only opens for people allowed to see it.\n\nThe daily reminder and alerts for spotlights, comments, and new followers come from the server, so they arrive even when the app is closed.\n\nHulhup was born on 1 October 2026.\n\nHulhup is a product of Misyi.\n\nVersion 1.3.0"
+ ],
+ "policy": [
+  "Dengan memakai Hulhup kamu setuju pada aturan berikut.\n\n1. Setiap audio berdurasi maksimal 15 detik dan harus milikmu atau kamu punya izin memakainya. Setiap audio maksimal 1 MB. Setiap post berisi tulisan (panjangnya bebas), maksimal 1 audio, atau keduanya, dan minimal salah satunya harus ada; audio boleh dipilih sebagai backsound. Komentar hanya berupa tulisan (tanpa audio) dan panjangnya bebas. Foto profil maksimal 3 MB.\n2. Dilarang mengunggah atau menulis konten yang melecehkan, menebar kebencian, mengandung kekerasan atau seksual, melanggar hukum, atau meniru orang lain.\n3. Dilarang spam dan menyalahgunakan layanan.\n4. Setiap post tampil di Acak dan di Hups, dan kamu memilih siapa yang boleh melihatnya: publik, pengikut, mengikuti, pengikut dan mengikuti, hubungan tertentu, atau akun pilihanmu. Pilihan yang sama berlaku untuk Acak dan Hups. Post publik dapat dilihat siapa saja, termasuk tanpa akun.\n5. Di Pengaturan kamu memilih siapa yang bisa melihat profilmu dan siapa yang bisa melihat daftar hubunganmu, termasuk hanya untuk saya.\n6. Post tidak bisa diedit, hanya dihapus. Kamu bebas menghapus post, komentarmu, atau akunmu kapan saja. Pemilik post juga bisa menghapus komentar di postnya.\n7. Membagikan tautan post tidak membuka akses: tautan hanya terbuka untuk orang yang berhak melihat post itu.\n8. Kami dapat menghapus konten, memberi tanda verifikasi, atau membatasi dan memblokir akun yang melanggar aturan ini.\n9. Hulhup disediakan apa adanya, aturan dapat diperbarui dan versi terbaru selalu ada di halaman ini.\n10. Setiap audio dan foto profil diperiksa otomatis oleh Deks, pemeriksa buatan Hulhup, dari bukti di dalam berkasnya (Content Credentials/C2PA, penanda sumber IPTC dan XMP, parameter generator gambar, data dan watermark tersembunyi, serta tag pembuat suara/musik AI), bukan dari pengakuan. Berkas yang membawa bukti itu diberi tanda \"Audio oleh AI\", \"Audio diedit dengan AI\", \"Foto dibuat oleh AI\", atau \"Foto diedit dengan AI\". Deks sengaja tidak menuduh tanpa bukti keras, jadi karya AI yang jejaknya sudah terhapus (tangkapan layar, kompresi ulang, rekam ulang) bisa lolos. Jika tanda itu keliru, hubungi kami.",
+  "By using Hulhup you agree to the following.\n\n1. Each audio is at most 15 seconds and must be yours or you must have permission to use it. Each audio is at most 1 MB. Every post holds text (any length), at most 1 audio, or both, and must have at least one of them; the audio may be set as a backsound. Comments are text only (no audio) and any length. Profile photos are at most 3 MB.\n2. Do not upload or write content that harasses, spreads hate, contains violence or sexual material, breaks the law, or impersonates others.\n3. No spam or misuse of the service.\n4. Every post shows in both Random and Hups, and you choose who may see it: public, followers, following, followers and following, certain relationships, or accounts you pick. The same choice applies to Random and Hups. Public posts can be seen by anyone, including without an account.\n5. In Settings you choose who can see your profile and who can see your relationship list, including only me.\n6. Posts cannot be edited, only deleted. You may delete posts, your comments, or your account at any time. A post owner can also delete comments on their post.\n7. Sharing a post link does not grant access: the link only opens for people who are allowed to see that post.\n8. We may remove content, mark accounts as verified, or restrict and ban accounts that break these rules.\n9. Hulhup is provided as is. These rules may be updated and the latest version is always on this page.\n10. Every audio and profile photo is checked automatically by Deks, the checker built by Hulhup, for evidence inside the file (Content Credentials/C2PA, IPTC and XMP source markers, image-generator parameters, hidden data and watermarks, and AI voice/music tool tags), not for claims. Files carrying such evidence are marked \"Audio by AI\", \"Audio edited with AI\", \"Photo made by AI\", or \"Photo edited with AI\". Deks deliberately does not accuse without hard evidence, so AI work whose traces were erased (screenshots, recompression, re-recording) can pass. If a mark is wrong, contact us."
+ ],
+ "privacy": [
+  "Data yang kami simpan: nama, nama pengguna, tanggal lahir, bio, foto profil, post (tulisan dan audio), komentar, sorotan, post yang kamu simpan, pengikut, hubungan, serta jumlah hari kamu masuk. Tanggal lahir dan usiamu tidak ditampilkan ke pengguna lain. Daftar post yang kamu simpan dan yang kamu sorot hanya terlihat olehmu.\n\nKata sandi disimpan dalam bentuk hash, tidak pernah dalam bentuk asli.\n\nTautan di post: yang kami simpan hanya alamat URL-nya, bukan isinya. Gambar dan pratinjau halaman diambil lewat server Hulhup sehingga situs asal tidak melihat alamat IP-mu. Video dan audio dari situs lain diputar langsung dari situs itu setelah kamu mengetuk putar, jadi situs itu dapat melihat alamat IP-mu seperti saat kamu membuka tautannya sendiri.\n\nNotifikasi: Hulhup meminta izin notifikasi untuk pengingat harian jam 19.00 WIB serta pemberitahuan sorotan, komentar, balasan, dan pengikut baru. Agar notifikasi masuk walau aplikasi tertutup, aplikasi mendaftarkan token perangkat ke layanan Firebase Cloud Messaging milik Google dan menyimpannya di server kami bersama bahasa dan pilihan pengingatmu. Token dihapus saat kamu keluar. Kamu bisa mematikan notifikasi di Pengaturan atau di pengaturan sistem perangkat.\n\nMikrofon hanya dipakai saat kamu menekan tombol rekam. Galeri hanya dibuka saat kamu memilih foto atau berkas audio.\n\nTanpa login, kamu hanya melihat dan mendengar; kami tidak membuat profil tamu.\n\nAudio yang kamu jadikan offline disalin dan disimpan di perangkatmu supaya bisa diputar tanpa internet. Kamu bisa menghapusnya kapan saja dari menu Audio offline. Pilihan membisukan backsound juga hanya disimpan di perangkatmu.\n\nHitungan \"dilihat\" dan \"diputar\" dicatat satu kali per akun untuk tiap post. Kata yang kamu cari (20 terakhir) disimpan di akunmu untuk membantu mengurutkan Hups dan dihapus otomatis bila lebih lama.\n\nPenyimpanan: akun, foto profil, dan data terstrukturmu disimpan di server database kami; tulisan panjang disimpan di database dokumen terpisah; audio disimpan di layanan penyimpanan cloud terpisah. Koneksi ke server dienkripsi (HTTPS). Post hanya bisa dilihat dan diputar oleh orang yang berhak sesuai pilihan privasimu. Moderasi (menghapus konten pelanggar, tanda verifikasi, pembatasan akun) dilakukan langsung oleh tim kami di server, tidak ada halaman admin publik.\n\nKami tidak menjual datamu dan tidak menampilkan iklan untuk saat ini.\n\nMenghapus post, komentar, atau akun akan menghapus datanya secara permanen dari server.",
+  "Data we store: name, username, date of birth, bio, profile photo, posts (text and audio), comments, spotlights, posts you save, followers, relationships, and the number of days you signed in. Your date of birth and age are never shown to other users. Your saved and spotlighted lists are visible only to you.\n\nPasswords are stored as hashes, never in plain form.\n\nLinks in posts: we only store the URL, not its content. Images and page previews are fetched through the Hulhup server so the original site does not see your IP address. Video and audio from other sites play directly from that site after you tap play, so that site can see your IP address just as when you open the link yourself.\n\nNotifications: Hulhup asks for notification permission for a daily reminder at 7 PM (WIB) and alerts for spotlights, comments, replies, and new followers. So that notifications arrive even when the app is closed, the app registers a device token with Google's Firebase Cloud Messaging and stores it on our server together with your language and reminder choice. The token is removed when you sign out. You can turn notifications off in Settings or in your device settings.\n\nThe microphone is used only when you press record. The gallery opens only when you pick a photo or audio file.\n\nWithout signing in you only look and listen; we do not create guest profiles.\n\nAudio you make available offline is copied and stored on your device so it can play without internet. You can remove it anytime from the Offline audio menu. Your choice to mute backsounds is also kept only on your device.\n\nThe \"views\" and \"plays\" counts are recorded once per account for each post. Your last 20 searches are kept on your account to help rank Hups, and older ones are removed automatically.\n\nStorage: your account, profile photos and structured data are kept in our server database; long text is kept in a separate document database; audio is kept in separate cloud storage. Connections to the server are encrypted (HTTPS). Posts can only be seen and played by people allowed by your privacy choices. Moderation (removing violating content, verification marks, restricting accounts) is done directly by our team on the server; there is no public admin page.\n\nWe do not sell your data and show no ads for now.\n\nDeleting a post, a comment, or your account permanently removes the data from the server."
+ ],
+ "faq": {
+  "id": [
+   [
+    "Apa itu Hulhup?",
+    "Ruang suara dan tulisan buatan Misyi. Ketuk tombol Acak untuk mendengar suara singkat dari orang lain, atau buka Hups untuk menjelajah post, komentar, dan balasan."
+   ],
+   [
+    "Apa bedanya Acak dan Hups?",
+    "Acak memilih satu post secara acak 100% rata, bisa berupa audio, teks saja, atau post dengan backsound. Hups adalah linimasa; urutannya dipengaruhi waktu (35%), sorot (25%), komentar (25%), dan kecocokan dengan pencarianmu (15%)."
+   ],
+   [
+    "Bisakah memposting teks saja?",
+    "Bisa. Post boleh berisi tulisan saja, audio saja, atau keduanya. Panjang tulisan tidak dibatasi; di kartu hanya tampil sebagian dan \"Selengkapnya\" membuka teks penuh."
+   ],
+   [
+    "Apa itu backsound?",
+    "Audio pada post yang kamu pilih sebagai pengiring (saat menambah audio, nyalakan \"Jadikan backsound\"). Terputar otomatis saat post terlihat dan bisa dibisukan pembaca kapan saja. Kalau tidak dinyalakan, audio itu audio biasa yang diputar dengan tombol putar."
+   ],
+   [
+    "Berapa batas audio?",
+    "Satu post maksimal 1 audio, 15 detik dan 1 MB. Komentar hanya tulisan, tanpa audio."
+   ],
+   [
+    "Apa arti \"dilihat\" dan \"diputar\"?",
+    "Jumlah akun yang melihat dan memutar post. Tiap akun dihitung satu kali, seberapa sering pun melihat atau memutar. \"Diputar\" hanya ada pada post dengan audio biasa."
+   ],
+   [
+    "Apa itu sorot?",
+    "Tanda suka. Ketuk ikon lampu sorot untuk menyorot sebuah post atau komentar."
+   ],
+   [
+    "Apa yang bisa dicari?",
+    "Semuanya: nama atau nama pengguna akun, bio, isi post, penulis, tag @nama, dan isi komentar. Beberapa kata dicocokkan sekaligus."
+   ],
+   [
+    "Bisakah dipakai tanpa internet?",
+    "Aplikasi tetap terbuka. Acak dan Offline memutar post yang kamu simpan sendiri di perangkat. Pencarian, Pengaturan, Edit profil, Hups, dan membuat post butuh internet."
+   ],
+   [
+    "Bagaimana menandai akun?",
+    "Ketik @nama pengguna di post atau komentar. Ketuk tag untuk membuka akun itu; akun yang ditandai mendapat notifikasi."
+   ],
+   [
+    "Siapa yang bisa melihat post saya?",
+    "Kamu memilih saat membuat post, bisa lebih dari satu (publik, pengikut, hubungan, akun tertentu, dan lainnya)."
+   ],
+   [
+    "Bagaimana menyematkan komentar?",
+    "Penulis post membuka menu komentar lalu memilih Sematkan komentar."
+   ],
+   [
+    "Bagaimana melaporkan konten?",
+    "Buka menu pada post atau komentar, lalu pilih Laporkan."
+   ],
+   [
+    "Apa itu tanda AI?",
+    "Deks memeriksa audio dan foto dari bukti di dalam berkasnya. Bila ada bukti kuat, muncul tanda seperti \"Audio oleh AI\". Tanpa bukti, tidak ada tanda."
+   ],
+   [
+    "Saya lupa kata sandi.",
+    "Di halaman masuk pilih Lupa kata sandi, lalu masukkan nama pengguna dan kode pemulihan yang diberikan saat mendaftar. Kode baru dibuat tiap dipakai. Tidak ada email, jadi simpan kodenya."
+   ],
+   [
+    "Bagaimana membagikan post atau akun?",
+    "Setiap post dan akun punya alamat sendiri, misalnya hulhup.my.id/p/18 atau hulhup.my.id/u/nama. Tautan itu terbuka langsung di halaman yang dituju."
+   ],
+   [
+    "Bagaimana menghapus notifikasi?",
+    "Di Notifikasi ketuk Pilih untuk memilih beberapa, atau Hapus semua."
+   ]
+  ],
+  "en": [
+   [
+    "What is Hulhup?",
+    "A home for voices and writing by Misyi. Tap Random to hear a short voice from someone else, or open Hups to browse posts, comments and replies."
+   ],
+   [
+    "Random vs Hups?",
+    "Random picks one post 100% evenly at random: an audio post, a text-only post, or a post with a backsound. Hups is a timeline ranked by recency (35%), spotlights (25%), comments (25%) and how well a post matches your searches (15%)."
+   ],
+   [
+    "Can I post text only?",
+    "Yes. A post can hold text only, audio only, or both. Text length is not limited; a card shows part of it and \"Read more\" opens the full text."
+   ],
+   [
+    "What is a backsound?",
+    "The audio of a post that you choose as a soundtrack (when adding audio, turn on \"Use as backsound\"). It plays automatically while the post is in view and readers can mute it anytime. If you leave it off, the audio is a regular audio played with the play button."
+   ],
+   [
+    "Audio limits?",
+    "A post has at most 1 audio, 15 seconds and 1 MB. Comments are text only, no audio."
+   ],
+   [
+    "What do \"views\" and \"plays\" mean?",
+    "The number of accounts that viewed and played a post. Each account counts once, however often it views or plays. \"Plays\" only exists on posts with a regular audio."
+   ],
+   [
+    "What is a spotlight?",
+    "A like. Tap the spotlight icon on a post or comment."
+   ],
+   [
+    "What can I search?",
+    "Everything: account names and usernames, bios, post text, authors, @tags and comment text. Several words are matched together."
+   ],
+   [
+    "Can I use it offline?",
+    "The app still opens. Random plays audio that was saved automatically on your device, and Offline audio can be played. Search, Settings, Edit profile, Hups and posting need internet."
+   ],
+   [
+    "How do I tag someone?",
+    "Type @username in a post or comment. Tap a tag to open that account; tagged accounts get a notification."
+   ],
+   [
+    "Who can see my posts?",
+    "You choose when posting, and can pick more than one (public, followers, relations, specific accounts, and more)."
+   ],
+   [
+    "How do I pin a comment?",
+    "The post author opens the comment menu and picks Pin comment."
+   ],
+   [
+    "How do I report content?",
+    "Open the menu on a post or comment and choose Report."
+   ],
+   [
+    "What is the AI mark?",
+    "Deks checks audio and photos for evidence inside the file. With strong evidence a mark such as \"Audio by AI\" appears. Without evidence, no mark."
+   ],
+   [
+    "I forgot my password.",
+    "On the sign-in page choose Forgot password, then enter your username and the recovery code given at sign-up. A new code is issued each time. There is no email, so keep the code safe."
+   ],
+   [
+    "How do I share a post or profile?",
+    "Every post and account has its own address, e.g. hulhup.my.id/p/18 or hulhup.my.id/u/name. The link opens straight to that page."
+   ],
+   [
+    "How do I delete notifications?",
+    "In Notifications tap Select to choose several, or Delete all."
+   ]
+  ]
+ }
+}
