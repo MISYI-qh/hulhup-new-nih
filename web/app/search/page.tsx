@@ -30,7 +30,7 @@ export default function Search() {
       {!done && hist.length ? <section><h2>Riwayat pencarian</h2>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>{hist.map((h) => <button key={h} className="pill" onClick={() => { setQ(h); run(h); }}>{h}</button>)}</div>
         <p><button className="pill" onClick={() => { try { localStorage.removeItem(H); } catch {} setHist([]); }}>Hapus riwayat</button></p></section> : null}
-      {users.map((u) => <Link key={u.username} href={`/u/${u.username}`} className="card row"><Avatar src={u.avatar} name={u.name} size={40} /><div><b>{u.name}</b> <span className="handle">@{u.username}</span></div></Link>)}
+      {users.map((u) => <Link key={u.username} href={`/@${u.username}`} className="card row"><Avatar src={u.avatar} name={u.name} size={40} /><div><b>{u.name}</b> <span className="handle">@{u.username}</span></div></Link>)}
       {posts.map((p) => <PostCard key={p.id} p={p} />)}
       {done && !users.length && !posts.length ? <p className="muted">Tidak ada hasil.</p> : null}
     </>

@@ -17,7 +17,7 @@ export default function Header() {
         <Link href="/hups" className="pill">Hups</Link>
         <Link href="/search" className="pill" aria-label="Cari">Cari</Link>
         {u ? <>
-          <Link href={`/u/${u.username}`} className="pill">@{u.username}</Link>
+          <Link href={`/@${u.username}`} className="pill">@{u.username}</Link>
           <button className="pill" onClick={() => { req('POST', '/logout').catch(() => {}); setSession('', null); }}>Keluar</button>
         </> : <Link href="/login" className="pill dark">Masuk</Link>}
       </nav>

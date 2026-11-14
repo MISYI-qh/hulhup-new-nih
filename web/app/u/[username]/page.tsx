@@ -13,7 +13,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { username } = await params;
   const d = await load(username);
   if (!d?.user) return { title: 'Akun tidak ditemukan', robots: { index: false, follow: false } };
-  return { title: `${d.user.name} (@${username})`, description: clip(d.user.bio || `Profil ${d.user.name} di Hulhup.`, 160), alternates: { canonical: `/u/${username}` } };
+  return { title: `${d.user.name} (@${username})`, description: clip(d.user.bio || `Profil ${d.user.name} di Hulhup.`, 160), alternates: { canonical: `/@${username}` } };
 }
 
 export default async function Profile({ params }: Props) {
@@ -21,7 +21,7 @@ export default async function Profile({ params }: Props) {
   const d = await load(username);
   if (!d?.user) notFound();
   const u = d.user;
-  const ld = { '@context': 'https://schema.org', '@type': 'ProfilePage', mainEntity: { '@type': 'Person', name: u.name, alternateName: `@${username}`, url: `${ORIGIN}/u/${username}`, description: u.bio || undefined,
+  const ld = { '@context': 'https://schema.org', '@type': 'ProfilePage', mainEntity: { '@type': 'Person', name: u.name, alternateName: `@${username}`, url: `${ORIGIN}/@${username}`, description: u.bio || undefined,
     interactionStatistic: { '@type': 'InteractionCounter', interactionType: 'https://schema.org/FollowAction', userInteractionCount: u.followers ?? 0 } } };
   return (
     <>
