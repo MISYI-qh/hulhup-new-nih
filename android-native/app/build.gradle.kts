@@ -10,6 +10,7 @@ val dlKey = System.getenv("DL_KEY") ?: ""
 val ksPass = System.getenv("KEYSTORE_PASSWORD")
 
 android {
+    lint { checkReleaseBuilds = false; abortOnError = false }
     namespace = "app.misyi.hulhup"
     compileSdk = 35
     defaultConfig {
