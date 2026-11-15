@@ -323,10 +323,6 @@ suspend fun newRecovery() {
 }
 
 // ───────── baris audio (offline, hasil cari) ─────────
-suspend fun likeAudio(a: A) {
-    val s = Store
-    if (s.me == null) { toast(s.t("need_login")); return }
-    try { s.like(a) } catch (e: Exception) { toast(s.err(e), true) }
 }
 
 @Composable fun AudioRow(a: A, mine: Boolean = false, onDelete: (() -> Unit)? = null, showOwner: Boolean = false, scope: Any? = null) {
