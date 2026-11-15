@@ -22,6 +22,8 @@ object Nav {
     fun reset(vararg s: Screen) { stack.clear(); stack.addAll(s) }
     /** Tutup halaman tertentu (dipakai bila halaman menutup dirinya sendiri). */
     fun pop(s: Screen) { stack.remove(s) }
+    /** Ganti halaman teratas (padanan pushReplacement). */
+    fun replace(s: Screen) { if (stack.isEmpty()) stack.add(s) else stack[stack.size - 1] = s }
 }
 
 fun go(path: String) { Nav.go(pageFor(path) ?: Screen(path) { NotFoundPage() }) }
