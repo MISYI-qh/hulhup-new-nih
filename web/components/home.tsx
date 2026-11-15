@@ -104,6 +104,7 @@ export function HomeScreen({ mode0 = 0 }: { mode0?: 0 | 1 }) {
   const s = useStore(); const n = useNav();
   const [menu, setMenu] = useState(false); const [mode, setMode] = useState<number>(mode0); const busy = useRef(false);
   useEffect(() => { s.homeMode = mode; }, [mode]);
+  useEffect(() => { if (s.ready && mode === 0) s.prime(); }, [s.ready, mode, s.filter]);
   useEffect(() => { if (s.ready && !s.online && mode === 1) setMode(0); }, [s.online, s.ready]);
   const setTab = (i: number) => { if (i === 1 && !s.needNet()) return; if (mode !== i) { setMode(i); s.homeMode = i; history.replaceState(null, '', i === 1 ? '/hups' : '/'); } };
 

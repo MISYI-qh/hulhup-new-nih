@@ -244,15 +244,38 @@ export class Store {
     const a = c[Math.floor(Math.random() * c.length)]; this.lastOff = a.id; return a;
   }
   /** Tanpa internet, acak diambil dari post yang sudah dijadikan offline. */
+  private nextRand: { f: string; me: string; p: Promise<A | null> } | null = null;
+  /** Ambil Acak berikutnya di latar (tanpa menghitung ketukan) dan unduh audionya, supaya ketukan berikutnya langsung berbunyi. */
+  private warm(f: string, last: number) {
+    if (!navigator.onLine) return;
+    const p = Api.req('GET', `/random?f=${f}&peek=1${last ? `&last=${last}` : ''}`).then(async (j) => {
+      if (j.audio == null) return null; const a = new A(j.audio);
+      if (a.url) await Api.bytes(a.url).catch(() => null);
+      return a;
+    }).catch(() => null);
+    this.nextRand = { f, me: this.me?.username ?? '', p };
+  }
+  /** Siapkan Acak pertama begitu beranda terbuka. */
+  prime() { if (!this.nextRand) this.warm(this.me == null ? 'public' : this.filter, 0); }
+  /** Tanpa internet, acak diambil dari post yang sudah dijadikan offline. */
   async random(): Promise<A | null> {
     this.fromOffline = false;
     if (!navigator.onLine) { this.fromOffline = true; return this.pickOffline(); }
     try {
       const f = this.me == null ? 'public' : this.filter;
-      const j = await Api.req('GET', `/random?f=${f}`);
-      if (this.me && j.taps != null) this.tapf[f] = Number(j.taps);
+      let a: A | null = null; const w = this.nextRand; this.nextRand = null;
+      if (w && w.f === f && w.me === (this.me?.username ?? '')) {
+        a = await w.p;
+        if (a) { if (this.me) { const t = await Api.req('POST', '/taps', { f }); if (t.taps != null) this.tapf[f] = Number(t.taps); } }
+      }
+      if (!a) {
+        const j = await Api.req('GET', `/random?f=${f}`);
+        if (this.me && j.taps != null) this.tapf[f] = Number(j.taps);
+        a = j.audio == null ? null : new A(j.audio);
+      }
       this.notify();
-      return j.audio == null ? null : new A(j.audio);
+      if (a) this.warm(f, a.id);
+      return a;
     } catch (e) { if (e instanceof ApiErr) throw e; this.fromOffline = true; return this.pickOffline(); }
   }
 
