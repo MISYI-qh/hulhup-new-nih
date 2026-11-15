@@ -265,7 +265,7 @@ private fun JSONObject.list(k: String) = optJSONArray(k)?.objects() ?: emptyList
         load()
     }
 
-    @Composable fun chip(t: String, label: String?) = Row(Modifier.widthIn(max = 150.dp).background(ink().copy(alpha = .1f), RoundedCornerShape(14.dp)).padding(10.dp, 5.dp), verticalAlignment = Alignment.CenterVertically) {
+    @Composable fun chip(t: String, label: String?) = Row(Modifier.widthIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.let { androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.coerceAtMost(520) } * .3f).dp).background(ink().copy(alpha = .1f), RoundedCornerShape(14.dp)).padding(10.dp, 5.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(audIcon(t), null, Modifier.size(13.dp), tint = ink()); Spacer(Modifier.width(5.dp)); HText(label ?: s.t("a_$t"), 12.5f, FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
     @Composable fun row(r: JSONObject, i: Int, act: @Composable () -> Unit = {}, edit: Boolean = false) = UserTile(r, i, trailing = {
@@ -578,7 +578,7 @@ fun sidecar(b: ByteArray): ByteArray {
         Box(Modifier.weight(1f)) {
             val r = res
             if (r == null) {
-                if (s.searches.isNotEmpty()) Column(Modifier.verticalScroll(rememberScrollState()).padding(20.dp, 0.dp, 20.dp, 40.dp)) {
+                if (s.searches.isNotEmpty()) Column(Modifier.verticalScroll(rememberScrollState()).imePadding().padding(20.dp, 0.dp, 20.dp, 40.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) { Box(Modifier.weight(1f)) { sec(s.t("hist_recent")) }; Tap(onTap = { s.clearSearches() }) { HText(s.t("hist_clear"), 13f, FontWeight.Bold, sub(), Modifier.padding(8.dp)) } }
                     for (h in s.searches.toList()) Tap(Modifier.fillMaxWidth(), onTap = { q = h }) {
                         Row(Modifier.padding(vertical = 4.dp, horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -591,7 +591,7 @@ fun sidecar(b: ByteArray): ByteArray {
             } else {
                 val us = r.users("users"); val au = r.users("audios").map { A(it) }
                 if (us.isEmpty() && au.isEmpty()) Empty(Icons.Rounded.SearchOff, s.t("empty_search"))
-                else Column(Modifier.verticalScroll(rememberScrollState()).padding(20.dp, 0.dp, 20.dp, 40.dp)) {
+                else Column(Modifier.verticalScroll(rememberScrollState()).imePadding().padding(20.dp, 0.dp, 20.dp, 40.dp)) {
                     if (us.isNotEmpty()) { sec(s.t("sec_acc")); us.forEachIndexed { i, u -> UserTile(u, i) } }
                     if (au.isNotEmpty()) { sec(s.t("sec_audio")); au.forEachIndexed { i, a -> In(i) { if (a.inHups || a.files.isEmpty()) PostCard(a, scope = owner) else AudioRow(a, showOwner = true, scope = owner) } } }
                 }
