@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
-import PostCard from '@/components/PostCard';
+import Link from 'next/link';
+import { HomeScreen } from '@/components/home';
 import { pub, type Post } from '@/lib/api';
+import { enc } from '@/lib/code';
+import { clip } from '@/lib/format';
 
 export const revalidate = 60;
 export const metadata: Metadata = {
@@ -13,10 +16,10 @@ export default async function Hups() {
   const feed = await pub<{ items: Post[] }>('/hups?f=public', 60);
   return (
     <>
-      <h1>Hups</h1>
-      <p className="muted">Post publik terbaru dari Hulhup. Masuk untuk melihat post dari pengikut dan hubunganmu.</p>
-      {(feed?.items ?? []).map((p) => <PostCard key={p.id} p={p} />)}
-      {!feed?.items?.length ? <p className="muted">Belum ada post publik.</p> : null}
+      <HomeScreen mode0={1} />
+      <nav className="sr" aria-label="Hups terbaru">
+        {(feed?.items ?? []).map((p) => <Link key={p.id} href={`/p/${enc(p.id)}`}>{p.owner_name}: {clip(p.text || p.desc || 'Audio', 80)}</Link>)}
+      </nav>
     </>
   );
 }

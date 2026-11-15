@@ -2,12 +2,12 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import AnimMark from './AnimMark';
-import { Overlays, TopBar, Loader, Empty } from './ui';
+import { Overlays, TopBar, Loader, Empty, toast } from './ui';
 import { store, useStore } from '@/lib/store';
 
 /** Mulai penyimpanan (sesi, tema, bahasa, offline, hitungan tertunda) sekali di sisi klien. */
 export function Boot() {
-  useEffect(() => { store.init(); }, []);
+  useEffect(() => { store.banner = (m) => toast(m); store.init(); }, []);
   return <Overlays />;
 }
 export function Brand({ onClick }: { onClick?: () => void }) {

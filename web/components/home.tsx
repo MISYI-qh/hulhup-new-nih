@@ -74,7 +74,7 @@ function SideMenu({ open, close }: { open: boolean; close: () => void }) {
       {item('tune_rounded', 'settings', '/settings', true)}
       {s.me ? item('send_outlined', 'sent_title', '/sent') : null}
       {item('download_done_rounded', 'offline_t', '/offline')}
-      <button className="tap mi" onClick={() => setMore(!more)}><Icon n="more_horiz_rounded" size={24} /><span style={{ flex: 1 }}>{s.t('more')}</span><Icon n={more ? 'expand_less_rounded' : 'expand_more_rounded'} size={22} color="var(--sub)" /></button>
+      <button className="tap mi" onClick={() => setMore(!more)}><Icon n="more_horiz_rounded" size={24} /><span style={{ flex: 1 }}>{s.t('more')}</span><Icon n="expand_more_rounded" size={22} color="var(--sub)" style={{ transform: more ? "rotate(180deg)" : undefined, transition: "transform .2s" }} /></button>
       <div style={{ paddingLeft: 16, display: more ? 'block' : 'none' }}>
         {item('info_outline_rounded', 'about', '/about')}{item('help_outline_rounded', 'faq', '/faq')}{item('rule_rounded', 'policy', '/policy')}{item('lock_outline_rounded', 'privacy', '/privacy')}
       </div>

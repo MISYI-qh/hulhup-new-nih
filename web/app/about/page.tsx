@@ -1,4 +1,4 @@
 import type { Metadata } from 'next';
-import Legal from '@/components/Legal';
+import { TextScreen } from '@/components/screens3';
 export const metadata: Metadata = { title: 'Tentang', alternates: { canonical: '/about' } };
-export default function Page() { return <Legal k="about" title="Tentang" />; }
+export default function Page() { return <TextScreen k="about" />; }

@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from 'next';
-import Link from 'next/link';
-import './globals.css';
-import Header from '@/components/Header';
+import './app.css';
+import { Boot } from '@/components/shell';
 import { ORIGIN } from '@/lib/api';
 
 export const metadata: Metadata = {
@@ -21,12 +20,8 @@ export default function Root({ children }: { children: React.ReactNode }) {
   return (
     <html lang="id">
       <body>
-        <Header />
-        <main className="wrap">{children}</main>
-        <footer><div className="wrap">
-          <Link href="/about">Tentang</Link><Link href="/faq">FAQ</Link><Link href="/policy">Ketentuan</Link><Link href="/privacy">Privasi</Link>
-          <div style={{ marginTop: 10 }}>© Misyi · Hulhup</div>
-        </div></footer>
+        <Boot />
+        {children}
       </body>
     </html>
   );

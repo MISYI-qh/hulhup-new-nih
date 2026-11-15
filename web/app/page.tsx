@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import AcakButton from '@/components/AcakButton';
-import PostCard from '@/components/PostCard';
+import { HomeScreen } from '@/components/home';
 import { pub, ORIGIN, type Post } from '@/lib/api';
+import { enc } from '@/lib/code';
+import { clip } from '@/lib/format';
 
 export const revalidate = 60;
 export const metadata: Metadata = { alternates: { canonical: '/' } };
@@ -15,16 +16,10 @@ export default async function Home() {
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld) }} />
-      <section className="hero">
-        <h1>Ketuk, dengarkan suara acak</h1>
-        <p className="muted" style={{ maxWidth: 460, margin: '0 auto' }}>Satu tombol, satu suara singkat (maks 15 detik) atau tulisan dari orang lain. Kamu yang mengatur siapa boleh melihat post-mu.</p>
-        <AcakButton />
-      </section>
-      <section aria-labelledby="terbaru">
-        <h2 id="terbaru">Terbaru di Hups</h2>
-        {items.length ? items.map((p) => <PostCard key={p.id} p={p} />) : <p className="muted">Belum ada post publik.</p>}
-        <p><Link href="/hups" className="pill">Lihat semua Hups</Link></p>
-      </section>
+      <HomeScreen />
+      <nav className="sr" aria-label="Post terbaru">
+        {items.map((p) => <Link key={p.id} href={`/p/${enc(p.id)}`}>{p.owner_name}: {clip(p.text || p.desc || 'Audio', 80)}</Link>)}
+      </nav>
     </>
   );
 }
