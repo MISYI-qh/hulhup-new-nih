@@ -92,8 +92,8 @@ object Store {
         online = isOnline(cm)
         try {
             cm.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
-                override fun onAvailable(n: Network) = connChanged(true)
-                override fun onLost(n: Network) = connChanged(isOnline(cm))
+                override fun onAvailable(n: Network) { connChanged(true) }
+                override fun onLost(n: Network) { connChanged(isOnline(cm)) }
             })
         } catch (_: Exception) {}
         scope.launch { while (true) { delay(30_000); poll() } }
@@ -370,8 +370,18 @@ object Store {
         p.setMediaSource(source(b)); p.prepare(); p.playbackParameters = PlaybackParameters(rate); p.play()
         p.addListener(endListener)
     }
+    private var onBytesEnd: (() -> Unit)? = null
+    /** Putar audio dari memori (pratinjau rekaman); [onEnd] dipanggil saat selesai atau dihentikan. */
+    fun playBytes(key: Int, b: ByteArray, loop: Boolean = false, onEnd: () -> Unit = {}) {
+        p.stop(); p.removeListener(endListener)
+        playing = key; playScope = null; posMs = 0; dur = 0; poke()
+        p.repeatMode = if (loop) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
+        onBytesEnd = onEnd
+        p.setMediaSource(source(b)); p.prepare(); p.playbackParameters = PlaybackParameters(rate); p.play()
+        p.addListener(endListener)
+    }
     private val endListener = object : Player.Listener {
-        override fun onPlaybackStateChanged(state: Int) { if (state == Player.STATE_ENDED) { playing = null; playScope = null; if (dur > 0) posMs = dur; poke() } }
+        override fun onPlaybackStateChanged(state: Int) { if (state == Player.STATE_ENDED) { playing = null; playScope = null; onBytesEnd?.let { onBytesEnd = null; it() }; if (dur > 0) posMs = dur; poke() } }
     }
 
     fun stop() { p.stop(); playing = null; playScope = null; posMs = 0; poke() }

@@ -20,6 +20,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,9 +44,10 @@ val Fire = Color(0xFFE8833A)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable fun LogoRefresh(onRefresh: suspend () -> Unit, content: @Composable BoxScope.() -> Unit) {
     val sc = rememberCoroutineScope(); var refreshing by remember { mutableStateOf(false) }
-    PullToRefreshBox(refreshing, { sc.launch { refreshing = true; onRefresh(); refreshing = false } }, indicator = {
-        PullToRefreshDefaults.Indicator(Modifier.align(Alignment.TopCenter), state = it, isRefreshing = refreshing, containerColor = Color.Transparent, color = Color.Transparent)
-        if (refreshing || it.distanceFraction > .3f) Box(Modifier.align(Alignment.TopCenter).padding(top = 10.dp)) { LogoLoop(34.dp) }
+    val pst = androidx.compose.material3.pulltorefresh.rememberPullToRefreshState()
+    PullToRefreshBox(isRefreshing = refreshing, onRefresh = { sc.launch { refreshing = true; onRefresh(); refreshing = false } }, state = pst, indicator = {
+        PullToRefreshDefaults.Indicator(Modifier.align(Alignment.TopCenter), state = pst, isRefreshing = refreshing, containerColor = Color.Transparent, color = Color.Transparent)
+        if (refreshing || pst.distanceFraction > .3f) Box(Modifier.align(Alignment.TopCenter).padding(top = 10.dp)) { LogoLoop(34.dp) }
     }, content = content)
 }
 
@@ -314,7 +316,7 @@ suspend fun newRecovery() {
 @Composable fun ImageViewer(url: String, name: String) {
     var scale by remember { mutableFloatStateOf(1f) }; var off by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
     Box(Modifier.fillMaxSize().background(Color.Black)) {
-        Box(Modifier.fillMaxSize().pointerInput(Unit) { androidx.compose.foundation.gestures.detectTapGestures { Nav.back() } }
+        Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { Nav.back() } }
             .pointerInput(Unit) { detectTransformGestures { _, pan, z, _ -> scale = (scale * z).coerceIn(1f, 5f); off = if (scale == 1f) androidx.compose.ui.geometry.Offset.Zero else off + pan } }
             .graphicsLayer(scaleX = scale, scaleY = scale, translationX = off.x, translationY = off.y), contentAlignment = Alignment.Center) { Img(url, Modifier.fillMaxSize(), ContentScale.Fit) }
         Box(Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(8.dp)) { IconBtn(Icons.Rounded.Close, color = Color.White) { Nav.back() } }

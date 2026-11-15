@@ -83,7 +83,7 @@ fun openLink(raw: String) {
             IconBtn(Icons.Rounded.OpenInNew) { Plat.openExternal(cur) }
         }
         if (progress < 100) LinearProgressIndicator(progress = { progress / 100f }, Modifier.fillMaxWidth().height(2.dp), color = ink(), trackColor = Color.Transparent)
-        AndroidView(Modifier.weight(1f).fillMaxWidth(), factory = { c ->
+        AndroidView(modifier = Modifier.weight(1f).fillMaxWidth(), factory = { c ->
             WebView(c).apply {
                 settings.javaScriptEnabled = true; settings.domStorageEnabled = true
                 webViewClient = object : WebViewClient() {

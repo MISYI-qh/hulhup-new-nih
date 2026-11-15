@@ -343,7 +343,7 @@ fun sidecar(b: ByteArray): ByteArray {
                 if (t == "IEND") break
                 o += 12 + len
             }
-            out.write(byteArrayOf(0, 0, 0, 0, 0x49, 0x45, 0x4e, 0x44, 0xae.toByte(), 0x42, 0x60, 0x82))
+            out.write(byteArrayOf(0, 0, 0, 0, 0x49, 0x45, 0x4e, 0x44, 0xae.toByte(), 0x42, 0x60, 0x82.toByte()))
         } else if (b.size > 12 && String(b, 0, 4, Charsets.ISO_8859_1) == "RIFF" && String(b, 8, 4, Charsets.ISO_8859_1) == "WEBP") {
             val body = java.io.ByteArrayOutputStream(); body.write(byteArrayOf(0x57, 0x45, 0x42, 0x50)); var o = 12
             while (o + 8 <= b.size) {
