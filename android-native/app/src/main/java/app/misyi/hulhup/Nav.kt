@@ -1,5 +1,7 @@
 package app.misyi.hulhup
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Search
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -81,7 +83,7 @@ fun commentLink(post: Int, c: Int) = "https://hulhup.my.id/p/${PostCode.enc(post
 @androidx.compose.runtime.Composable
 fun NotFoundPage() = androidx.compose.foundation.layout.Column {
     TopBar(back = true, title = "Hulhup")
-    Empty(androidx.compose.material.icons.Icons.Rounded.Search, Store.t("not_found"))
+    Empty(Icons.Rounded.Search, Store.t("not_found"))
 }
 
 /** Tumpukan halaman dengan transisi pudar + geser halus 420 ms (padanan route() di ui.dart). */

@@ -46,7 +46,7 @@ val Fire = Color(0xFFE8833A)
     val sc = rememberCoroutineScope(); var refreshing by remember { mutableStateOf(false) }
     val pst = androidx.compose.material3.pulltorefresh.rememberPullToRefreshState()
     PullToRefreshBox(isRefreshing = refreshing, onRefresh = { sc.launch { refreshing = true; onRefresh(); refreshing = false } }, state = pst, indicator = {
-        PullToRefreshDefaults.Indicator(Modifier.align(Alignment.TopCenter), state = pst, isRefreshing = refreshing, containerColor = Color.Transparent, color = Color.Transparent)
+        PullToRefreshDefaults.Indicator(modifier = Modifier.align(Alignment.TopCenter), state = pst, isRefreshing = refreshing, containerColor = Color.Transparent, color = Color.Transparent)
         if (refreshing || pst.distanceFraction > .3f) Box(Modifier.align(Alignment.TopCenter).padding(top = 10.dp)) { LogoLoop(34.dp) }
     }, content = content)
 }
