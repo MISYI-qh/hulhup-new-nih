@@ -35,11 +35,11 @@ object Store {
     var unread = 0; var unreadSocial = 0
     var tapf: Map<String, Int> = emptyMap()
     val taps get() = tapf[filter] ?: 0
-    var lang by mutableStateOf("id")
+    @set:JvmName("rawLang") var lang by mutableStateOf("id")
     /** 0 = ikuti sistem, 1 = terang, 2 = gelap (urutan ThemeMode Flutter). */
-    var mode by mutableIntStateOf(0)
-    var remind = true; var fromOffline = false
-    var filter by mutableStateOf("public")
+    @set:JvmName("rawMode") var mode by mutableIntStateOf(0)
+    @set:JvmName("rawRemind") var remind = true; var fromOffline = false
+    @set:JvmName("rawFilter") var filter by mutableStateOf("public")
     var banner: ((String) -> Unit)? = null
     val offline = mutableListOf<A>()
     var online by mutableStateOf(true)
@@ -49,8 +49,8 @@ object Store {
     private var playScope: Any? = null
     private var starting = false
     var posMs by mutableIntStateOf(0)
-    var rate = 1.0f
-    var bgmMuted = false; var bgmKey: Int? = null
+    @set:JvmName("rawRate") var rate = 1.0f
+    @set:JvmName("rawBgmMuted") var bgmMuted = false; var bgmKey: Int? = null
     var homeMode = 0
     var updateReady by mutableStateOf(false)
     private var updChecked = 0L
