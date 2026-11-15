@@ -1,0 +1,51 @@
+# Hulhup — ringkasan lengkap
+
+Hulhup (https://hulhup.my.id) adalah ruang suara dan tulisan dari Misyi, lahir pada 1 Oktober 2026.
+
+## Cara kerja
+1. Buka Hulhup dan ketuk tombol utama (Acak).
+2. Hulhup menampilkan satu post acak dari pengguna lain yang memang mengizinkan kamu melihat atau mendengarnya.
+3. Sorot post, ikuti pembuatnya, komentar, atau simpan. Tanpa akun kamu tetap bisa melihat dan mendengar.
+4. Buat post sendiri: tulisan, audio (maks 15 detik, 1 MB), atau keduanya, lalu pilih siapa yang boleh melihatnya.
+
+## Post
+- Tulisan tidak dibatasi panjangnya; di kartu hanya tampil beberapa baris supaya tinggi kartu seragam, dan "Selengkapnya" membuka halaman post dengan teks penuh.
+- Maksimal 1 audio per post. Audio dipilih sebagai audio biasa (diputar dengan tombol putar) atau backsound (terputar otomatis saat post terlihat; pembaca bisa membisukannya kapan saja).
+- Post teks saja dan post backsound tidak punya hitungan "diputar"; hitungan "dilihat" ada pada semua post.
+- Hitungan dilihat dan diputar dicatat satu kali per akun untuk tiap post.
+- Post tidak bisa diedit, hanya dihapus.
+
+## Acak
+Server menghitung semua post yang boleh dilihat pengguna lalu memilih satu secara acak seragam (crypto.randomInt). Tiap post punya peluang sama, termasuk post teks saja. Post sendiri yang berprivasi publik juga bisa muncul.
+
+## Hups
+Hups adalah linimasa post. Urutan dihitung dari waktu (35%), sorot (25%), komentar (25%), dan kecocokan dengan pencarian terakhir pembaca (15%). Komentar hanya tulisan (panjang bebas), bisa dibalas bersarang, dan penulis post dapat menyematkan satu komentar; komentar penulis diberi label "Penulis". Akun bisa ditandai dengan @nama pengguna dan mendapat notifikasi. Pilihan audiens bisa dipilih lebih dari satu.
+
+## Pencarian
+Mencari akun (nama, nama pengguna, bio), isi post, penulis, tag @nama, dan isi komentar. Beberapa kata dicocokkan sekaligus. Hanya post yang berhak dilihat pencari yang muncul.
+
+## Offline
+Aplikasi tetap terbuka tanpa internet. Acak memutar audio yang otomatis tersimpan di perangkat, dan Audio offline bisa diputar. Pencarian, Pengaturan, Edit profil, Hups, dan membuat post butuh internet.
+
+## Deks (penanda AI)
+Setiap audio dan foto profil diperiksa otomatis oleh Deks, pemeriksa buatan Hulhup, dari bukti di dalam berkasnya (Content Credentials/C2PA, penanda IPTC/XMP, parameter generator, watermark, tag alat AI). Tanpa bukti kuat tidak ada tanda.
+
+## Alamat halaman
+Setiap halaman punya alamat sendiri, mis. /p/ID (post), /u/NAMA (akun), /hups, /notifications, /settings, /faq.
+
+## Privasi
+- Pemilik post memilih siapa yang bisa melihatnya, di Acak maupun Hups.
+- Pengguna memilih siapa yang bisa melihat profil dan daftar hubungannya.
+- Kata sandi disimpan sebagai hash; koneksi memakai HTTPS.
+- Tanggal lahir dan usia tidak ditampilkan ke orang lain.
+- 20 pencarian terakhir disimpan di akun untuk membantu urutan Hups.
+- Tidak menjual data; tidak menampilkan iklan untuk saat ini.
+
+## Moderasi
+Laporan konten/akun masuk ke server dan ditinjau manual oleh tim; tidak ada tindakan otomatis.
+
+## Teknis
+Dibuat dengan Flutter. Server Node.js di Vercel, database Postgres, audio di penyimpanan cloud. Tidak ada API publik untuk pihak ketiga.
+
+## Kontak
+Misyi — https://hulhup.my.id

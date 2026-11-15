@@ -1,0 +1,7 @@
+/* TEAM */
+Produk: Misyi
+Situs: https://hulhup.my.id
+
+/* SITE */
+Dibuat dengan Flutter. Lahir: 1 Oktober 2026
+Terakhir diperbarui: 13 November 2026
