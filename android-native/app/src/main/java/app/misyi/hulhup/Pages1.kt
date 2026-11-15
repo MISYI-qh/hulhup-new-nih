@@ -323,8 +323,6 @@ suspend fun newRecovery() {
 }
 
 // ───────── baris audio (offline, hasil cari) ─────────
-}
-
 @Composable fun AudioRow(a: A, mine: Boolean = false, onDelete: (() -> Unit)? = null, showOwner: Boolean = false, scope: Any? = null) {
     val s = Store; val sc = rememberCoroutineScope(); @Suppress("UNUSED_EXPRESSION") s.rev
     val on = s.playing == a.id
