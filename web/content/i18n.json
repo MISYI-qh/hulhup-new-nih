@@ -1,0 +1,1418 @@
+{
+"login": [
+"Masuk",
+"Sign in"
+],
+"register": [
+"Daftar",
+"Sign up"
+],
+"name": [
+"Nama",
+"Name"
+],
+"username": [
+"Nama pengguna",
+"Username"
+],
+"password": [
+"Kata sandi",
+"Password"
+],
+"age": [
+"Tanggal lahir",
+"Date of birth"
+],
+"years": [
+"tahun",
+"years"
+],
+"pprof": [
+"Tampilkan profil di popup",
+"Show profile in popup"
+],
+"who_rand": [
+"Siapa yang bisa mendengar secara acak",
+"Who can hear it randomly"
+],
+"a_public": [
+"Publik",
+"Public"
+],
+"a_followers": [
+"Pengikut",
+"Followers"
+],
+"a_following": [
+"Mengikuti",
+"Following"
+],
+"a_both": [
+"Pengikut dan mengikuti",
+"Followers and following"
+],
+"guest": [
+"Akun tamu",
+"Guest account"
+],
+"guest_note": [
+"Masuk untuk mengunggah suara, menyorot, dan mengikuti.",
+"Sign in to upload voices, spotlight, and follow."
+],
+"logout": [
+"Keluar",
+"Sign out"
+],
+"settings": [
+"Pengaturan",
+"Settings"
+],
+"account": [
+"Akun",
+"Account"
+],
+"general": [
+"Umum",
+"General"
+],
+"edit_profile": [
+"Edit profil",
+"Edit profile"
+],
+"change_pw": [
+"Ubah kata sandi",
+"Change password"
+],
+"old_pw": [
+"Kata sandi lama",
+"Current password"
+],
+"new_pw": [
+"Kata sandi baru",
+"New password"
+],
+"delete_acc": [
+"Hapus akun",
+"Delete account"
+],
+"delete_acc_q": [
+"Akun, semua audio, dan datamu akan dihapus permanen.",
+"Your account, all audio, and data will be permanently deleted."
+],
+"cancel": [
+"Batal",
+"Cancel"
+],
+"save": [
+"Simpan",
+"Save"
+],
+"saved": [
+"Tersimpan",
+"Saved"
+],
+"delete": [
+"Hapus",
+"Delete"
+],
+"delete_audio_q": [
+"Hapus audio ini? Audio tidak bisa diedit, hanya dihapus.",
+"Delete this audio? Audio cannot be edited, only deleted."
+],
+"language": [
+"Bahasa",
+"Language"
+],
+"appearance": [
+"Tampilan",
+"Appearance"
+],
+"system": [
+"Sistem",
+"System"
+],
+"light": [
+"Cerah",
+"Light"
+],
+"dark": [
+"Gelap",
+"Dark"
+],
+"report": [
+"Laporkan",
+"Report"
+],
+"report_title": [
+"Laporkan konten ini",
+"Report this"
+],
+"report_done": [
+"Terima kasih, laporanmu kami terima",
+"Thanks, we received your report"
+],
+"r_abuse": [
+"Pelecehan atau ujaran kebencian",
+"Harassment or hate"
+],
+"r_sexual": [
+"Konten seksual",
+"Sexual content"
+],
+"r_violence": [
+"Kekerasan",
+"Violence"
+],
+"r_spam": [
+"Spam",
+"Spam"
+],
+"r_impersonate": [
+"Meniru orang lain",
+"Impersonation"
+],
+"r_other": [
+"Lainnya",
+"Other"
+],
+"logout_others": [
+"Keluar dari perangkat lain",
+"Sign out of other devices"
+],
+"logout_others_done": [
+"Perangkat lain sudah dikeluarkan",
+"Other devices signed out"
+],
+"sess_t": [
+"Perangkat yang masuk",
+"Signed-in devices"
+],
+"sess_this": [
+"Perangkat ini",
+"This device"
+],
+"sess_active": [
+"Aktif",
+"Active"
+],
+"sess_out": [
+"Keluarkan",
+"Sign out"
+],
+"sess_out_q": [
+"Perangkat ini akan keluar dari akunmu.",
+"This device will be signed out of your account."
+],
+"sess_all": [
+"Keluar dari semua perangkat lain",
+"Sign out of all other devices"
+],
+"sess_empty": [
+"Tidak ada perangkat lain",
+"No other devices"
+],
+"ga_title": [
+"Unduh Hulhup untuk Android",
+"Download Hulhup for Android"
+],
+"ga_note": [
+"Pasang aplikasi Hulhup di HP Android kamu: notifikasi lebih lengkap dan audio offline tersimpan di HP.",
+"Install Hulhup on your Android phone: richer notifications and offline audio saved on your phone."
+],
+"ga_s1": [
+"Ketuk Unduh APK",
+"Tap Download APK"
+],
+"ga_s2": [
+"Tunggu unduhan selesai, lalu buka berkas hulhup.apk dari notifikasi unduhan atau aplikasi File / Unduhan",
+"Wait for the download to finish, then open hulhup.apk from the download notification or your Files / Downloads app"
+],
+"ga_s3": [
+"Jika muncul \"Izinkan dari sumber ini\", ketuk Pengaturan, aktifkan izin untuk peramban yang kamu pakai, lalu kembali",
+"If \"Allow from this source\" appears, tap Settings, turn it on for the browser you use, then go back"
+],
+"ga_s4": [
+"Ketuk Pasang. Jika Play Protect memberi peringatan, pilih \"Tetap pasang\"",
+"Tap Install. If Play Protect warns you, choose \"Install anyway\""
+],
+"ga_s5": [
+"Buka Hulhup, masuk, lalu izinkan notifikasi supaya pemberitahuan sampai walau aplikasi ditutup",
+"Open Hulhup, sign in, then allow notifications so alerts arrive even when the app is closed"
+],
+"ga_tip": [
+"Jika pemasangan gagal karena versi lama, hapus aplikasi Hulhup yang lama lalu pasang ulang.",
+"If the install fails because of an older version, uninstall the old Hulhup app and install again."
+],
+"more": [
+"Selengkapnya",
+"More"
+],
+"create": [
+"Buat",
+"Create"
+],
+"ga_btn": [
+"Unduh APK",
+"Download APK"
+],
+"ga_32": [
+"HP Android lama (32-bit)? Unduh versi ini",
+"Older 32-bit Android phone? Get this version"
+],
+"ga_ver": [
+"Versi",
+"Version"
+],
+"ga_size": [
+"Ukuran",
+"Size"
+],
+"upd_browser": [
+"Unduh lewat peramban",
+"Download via browser"
+],
+"apk_done_web": [
+"Unduhan dimulai. Buka notifikasi unduhan, lalu ketuk berkas Hulhup untuk memasang.",
+"Download started. Open the download notification, then tap the Hulhup file to install."
+],
+"apk_pct": [
+"Mengunduh",
+"Downloading"
+],
+"speed": [
+"Kecepatan",
+"Speed"
+],
+"upd_down": [
+"Mengunduh pembaruan…",
+"Downloading update…"
+],
+"upd_inst": [
+"Membuka pemasang…",
+"Opening installer…"
+],
+"upd_fail": [
+"Gagal memperbarui. Jika muncul \"Aplikasi tidak terpasang\", hapus aplikasi lama lalu pasang ulang dari hulhup.my.id (cukup sekali).",
+"Update failed. If you see \"App not installed\", uninstall the old app and reinstall from hulhup.my.id (only once)."
+],
+"upd_now": [
+"Perbarui sekarang",
+"Update now"
+],
+"upd_note": [
+"Cara memperbarui: unduh ulang aplikasi dari situs, lalu pasang di atas yang lama. Akunmu tetap aman.",
+"How to update: download the app again from the website and install it over the old one. Your account stays safe."
+],
+"upd_s1": [
+"Tekan tombol Unduh di bawah, file terbuka di browser.",
+"Tap Download below; the file opens in your browser."
+],
+"upd_s2": [
+"Tunggu unduhan selesai.",
+"Wait for the download to finish."
+],
+"upd_s3": [
+"Buka file hulhup.apk dari notifikasi unduhan atau folder Unduhan.",
+"Open hulhup.apk from the download notification or the Downloads folder."
+],
+"upd_s4": [
+"Tekan Pasang. Jika diminta, izinkan pemasangan dari sumber ini.",
+"Tap Install. If asked, allow installing from this source."
+],
+"upd_dl": [
+"Unduh versi terbaru",
+"Download latest version"
+],
+"upd_menu": [
+"Perbarui aplikasi",
+"Update app"
+],
+"upd_none": [
+"Aplikasimu sudah versi terbaru",
+"Your app is up to date"
+],
+"upd_title": [
+"Versi baru tersedia",
+"New version available"
+],
+"upd_btn": [
+"Perbarui",
+"Update"
+],
+"get_app": [
+"Unduh aplikasi Android",
+"Download Android app"
+],
+"website": [
+"Situs web hulhup.my.id",
+"Website hulhup.my.id"
+],
+"about": [
+"Tentang Hulhup",
+"About Hulhup"
+],
+"policy": [
+"Kebijakan",
+"Policy"
+],
+"privacy": [
+"Privasi",
+"Privacy"
+],
+"followers": [
+"Pengikut",
+"Followers"
+],
+"following": [
+"Mengikuti",
+"Following"
+],
+"audio": [
+"Audio",
+"Audio"
+],
+"liked": [
+"Disorot",
+"Spotlighted"
+],
+"upload": [
+"Posting",
+"Post"
+],
+"record": [
+"Rekam",
+"Record"
+],
+"stop": [
+"Berhenti",
+"Stop"
+],
+"pick": [
+"Pilih file",
+"Pick file"
+],
+"desc": [
+"Deskripsi",
+"Description"
+],
+"bio": [
+"Bio",
+"Bio"
+],
+"popup": [
+"Tampilkan popup saat diketuk",
+"Show popup on tap"
+],
+"who": [
+"Siapa boleh melihat di profil",
+"Who can see it on profile"
+],
+"v_all": [
+"Semua",
+"Everyone"
+],
+"v_fol": [
+"Pengikut",
+"Followers"
+],
+"v_me": [
+"Aku",
+"Me"
+],
+"ext_note": [
+"Diputar dari {h}. Situs itu dapat melihat alamat IP-mu.",
+"Plays from {h}. That site can see your IP address."
+],
+"noedit": [
+"Post tidak bisa diedit, hanya dihapus.",
+"Posts cannot be edited, only deleted."
+],
+"search": [
+"Cari",
+"Search"
+],
+"hist_clear": [
+"Hapus semua",
+"Clear all"
+],
+"hist_note": [
+"Hanya tersimpan di perangkat ini.",
+"Only stored on this device."
+],
+"hist_recent": [
+"Pencarian terakhir",
+"Recent searches"
+],
+"notif": [
+"Notifikasi",
+"Notifications"
+],
+"n_follow": [
+"mulai mengikutimu",
+"started following you"
+],
+"remove_photo": [
+"Hapus foto profil",
+"Remove profile photo"
+],
+"remove_photo_q": [
+"Foto profil akan kembali ke bawaan.",
+"Your profile photo will go back to the default."
+],
+"photo_removed": [
+"Foto profil dihapus",
+"Profile photo removed"
+],
+"a_friend": [
+"Teman",
+"Friends"
+],
+"a_best": [
+"Sahabat",
+"Best friends"
+],
+"a_partner": [
+"Pasangan",
+"Partner"
+],
+"a_family": [
+"Keluarga",
+"Family"
+],
+"a_custom": [
+"Hubungan khusus",
+"Custom relationship"
+],
+"a_newlabel": [
+"Buat nama hubungan sendiri…",
+"Create your own relationship name…"
+],
+"a_nolabel": [
+"Tanpa nama khusus",
+"No custom name"
+],
+"lbl_title": [
+"Nama hubungan",
+"Relationship name"
+],
+"lbl_ph": [
+"Mis. orang kepercayaan",
+"e.g. trusted person"
+],
+"lbl_save": [
+"Simpan",
+"Save"
+],
+"lbl_manage": [
+"Kelola nama hubungan",
+"Manage relationship names"
+],
+"lbl_note": [
+"Maksimal 100 karakter. Nama ini otomatis muncul sebagai pilihan di filter Acak dan Hups, siapa yang boleh melihat post, dan privasi profil.",
+"Up to 100 characters. This name shows up automatically as an option in the Random and Hups filters, post audience and profile privacy."
+],
+"lbl_del_q": [
+"Hapus nama \"{n}\"? Hubungannya tetap ada. Post yang hanya untuk nama ini menjadi khusus kamu.",
+"Delete \"{n}\"? The relationships stay. Posts only for this name become private to you."
+],
+"lbl_none": [
+"Belum ada nama hubungan sendiri",
+"No custom relationship names yet"
+],
+"lbl_users": [
+"{n} hubungan",
+"{n} relationships"
+],
+"a_relations": [
+"Semua hubungan",
+"All relationships"
+],
+"a_accounts": [
+"Pilih akun",
+"Choose accounts"
+],
+"f_me": [
+"Untuk saya",
+"For me"
+],
+"filter_title": [
+"Filter suara acak",
+"Random voice filter"
+],
+"filter_sub": [
+"Tombol acak hanya memutar suara dari kelompok ini.",
+"The random button only plays voices from this group."
+],
+"nofilter": [
+"Belum ada suara untuk filter ini",
+"No voices for this filter yet"
+],
+"filter_login": [
+"Masuk dulu untuk memakai filter lain",
+"Sign in to use other filters"
+],
+"locked": [
+"Akun ini menggunakan privasi tampilan di profil",
+"This account uses profile display privacy"
+],
+"rel_wait_cancel": [
+"Menunggu · Batalkan",
+"Pending · Cancel"
+],
+"rel_title": [
+"Hubungan",
+"Relationships"
+],
+"rel_none": [
+"Belum ada hubungan",
+"No relationships yet"
+],
+"rel_add": [
+"Ajak berhubungan",
+"Request relationship"
+],
+"rel_pick": [
+"Pilih jenis hubungan",
+"Choose relationship type"
+],
+"rel_wait": [
+"Menunggu persetujuan",
+"Waiting for approval"
+],
+"rel_cancel": [
+"Batalkan permintaan",
+"Cancel request"
+],
+"rel_accept": [
+"Terima",
+"Accept"
+],
+"rel_decline": [
+"Tolak",
+"Decline"
+],
+"rel_end": [
+"Putus hubungan",
+"End relationship"
+],
+"rel_end_q": [
+"Putus hubungan dengan {n}? Pihak lain tidak diberi tahu.",
+"End the relationship with {n}? They will not be notified."
+],
+"rel_sent": [
+"Permintaan terkirim",
+"Request sent"
+],
+"rel_ended": [
+"Hubungan berakhir",
+"Relationship ended"
+],
+"rel_made": [
+"Hubungan dibuat",
+"Relationship created"
+],
+"rel_in": [
+"Permintaan masuk",
+"Incoming requests"
+],
+"rel_out": [
+"Permintaan terkirim",
+"Sent requests"
+],
+"n_rel_req": [
+"mengajakmu berhubungan sebagai {r}",
+"wants to be your {r}"
+],
+"n_rel_ok": [
+"menerima hubungan {r} denganmu",
+"accepted your {r} relationship"
+],
+"e_rel_exists": [
+"Sudah ada hubungan atau permintaan dengan akun ini",
+"A relationship or request with this account already exists"
+],
+"e_need_accounts": [
+"Pilih minimal satu akun",
+"Choose at least one account"
+],
+"pick_acc": [
+"Pilih akun",
+"Choose accounts"
+],
+"pick_acc_n": [
+"{n} akun dipilih",
+"{n} accounts chosen"
+],
+"search_acc": [
+"Cari akun",
+"Search accounts"
+],
+"pick_acc_hint": [
+"Ketik nama untuk mencari akun",
+"Type a name to find accounts"
+],
+"test_notif": [
+"Tes notifikasi",
+"Test notification"
+],
+"test_notif_sub": [
+"Kirim notifikasi percobaan ke HP ini",
+"Send a test notification to this phone"
+],
+"notif_off": [
+"Notifikasi dimatikan di HP. Aktifkan lewat pengaturan aplikasi.",
+"Notifications are off on this phone. Turn them on in app settings."
+],
+"test_sent": [
+"Notifikasi percobaan dikirim",
+"Test notification sent"
+],
+"n_like": [
+"menyorot audiomu",
+"spotlighted your audio"
+],
+"hups": [
+"Hups",
+"Hups"
+],
+"rand_tab": [
+"Acak",
+"Random"
+],
+"sorot_tab": [
+"Sorot",
+"Spotlight"
+],
+"saved_tab": [
+"Simpan",
+"Saved"
+],
+"comments": [
+"Komentar",
+"Comments"
+],
+"comment_ph": [
+"Tulis komentar…",
+"Write a comment…"
+],
+"reply": [
+"Balas",
+"Reply"
+],
+"replying": [
+"Membalas {n}",
+"Replying to {n}"
+],
+"send": [
+"Kirim",
+"Send"
+],
+"login_comment": [
+"Masuk untuk ikut berkomentar",
+"Sign in to join the conversation"
+],
+"audio_req": [
+"Opsional, maksimal 15 detik",
+"Optional, up to 15 seconds"
+],
+"write_hups": [
+"Tulis sesuatu…",
+"Write something…"
+],
+"e_need_audio": [
+"Tambahkan 1 audio untuk memposting",
+"Add 1 audio to post"
+],
+"e_no_comment_audio": [
+"Komentar tidak boleh berisi audio",
+"Comments cannot contain audio"
+],
+"ai_audio": [
+"Audio oleh AI",
+"Audio by AI"
+],
+"ai_photo": [
+"Foto dibuat oleh AI",
+"Photo made by AI"
+],
+"ai_audio_edit": [
+"Audio diedit dengan AI",
+"Audio edited with AI"
+],
+"ai_photo_edit": [
+"Foto diedit dengan AI",
+"Photo edited with AI"
+],
+"cmt_hint": [
+"Tulis komentar…",
+"Write a comment…"
+],
+"add_audio": [
+"Tambah audio",
+"Add audio"
+],
+"audio_n": [
+"Audio ({n}/10)",
+"Audio ({n}/10)"
+],
+"in_rand": [
+"Tampil di Acak",
+"Show in Random"
+],
+"in_hups": [
+"Tampil di Hups",
+"Show in Hups"
+],
+"multi_no_rand": [
+"Tulisan saja dan backsound hanya tampil di Hups.",
+"Text-only posts and backsounds only appear in Hups."
+],
+"e_pick_place": [
+"Pilih tampil di Acak, Hups, atau keduanya",
+"Choose Random, Hups, or both"
+],
+"e_empty": [
+"Tulis sesuatu atau tambah audio",
+"Write something or add audio"
+],
+"e_too_long": [
+"Tulisan maksimal 1.000 karakter",
+"Text is limited to 1,000 characters"
+],
+"read_more": [
+"Selengkapnya",
+"Read more"
+],
+"share": [
+"Bagikan",
+"Share"
+],
+"saved_post": [
+"Disimpan",
+"Saved"
+],
+"unsaved_post": [
+"Dihapus dari simpanan",
+"Removed from saved"
+],
+"no_hups": [
+"Belum ada Hups di sini",
+"No Hups here yet"
+],
+"empty_saved": [
+"Belum ada yang disimpan",
+"Nothing saved yet"
+],
+"empty_cmt": [
+"Belum ada komentar. Jadilah yang pertama.",
+"No comments yet. Be the first."
+],
+"n_comment": [
+"mengomentari postinganmu",
+"commented on your post"
+],
+"n_reply": [
+"membalas komentarmu",
+"replied to your comment"
+],
+"rel_vis": [
+"Siapa yang bisa melihat hubunganmu",
+"Who can see your relationships"
+],
+"rel_locked": [
+"Daftar hubungan ini privat",
+"This relationship list is private"
+],
+"n_mention": [
+"menyebutmu",
+"mentioned you"
+],
+"author": [
+"Penulis",
+"Author"
+],
+"pin": [
+"Sematkan komentar",
+"Pin comment"
+],
+"unpin": [
+"Lepas sematan",
+"Unpin comment"
+],
+"pinned": [
+"Disematkan",
+"Pinned"
+],
+"notif_edit": [
+"Pilih",
+"Select"
+],
+"notif_del_all": [
+"Hapus semua",
+"Delete all"
+],
+"notif_del_sel": [
+"Hapus terpilih ({n})",
+"Delete selected ({n})"
+],
+"notif_del_q": [
+"Hapus notifikasi ini?",
+"Delete these notifications?"
+],
+"notif_del_all_q": [
+"Hapus semua notifikasi?",
+"Delete all notifications?"
+],
+"notif_deleted": [
+"Notifikasi dihapus",
+"Notifications deleted"
+],
+"sent_title": [
+"Terkirim",
+"Sent"
+],
+"sent_none": [
+"Belum ada yang kamu kirimi",
+"You have not sent anything to anyone yet"
+],
+"sent_n": [
+"{n} kiriman",
+"{n} sent"
+],
+"sent_hint": [
+"Pilih akun untuk melihat apa yang pernah kamu kirim",
+"Pick an account to see what you sent them"
+],
+"forgot": [
+"Lupa kata sandi?",
+"Forgot password?"
+],
+"recover_title": [
+"Atur ulang kata sandi",
+"Reset password"
+],
+"recover_hint": [
+"Masukkan nama pengguna dan kode pemulihan yang kamu simpan saat mendaftar.",
+"Enter your username and the recovery code you saved when signing up."
+],
+"recovery_code": [
+"Kode pemulihan",
+"Recovery code"
+],
+"new_password": [
+"Kata sandi baru",
+"New password"
+],
+"recover_do": [
+"Atur ulang",
+"Reset"
+],
+"recover_ok": [
+"Kata sandi diganti. Masuk dengan kata sandi baru.",
+"Password changed. Sign in with the new password."
+],
+"rec_show_title": [
+"Simpan kode pemulihanmu",
+"Save your recovery code"
+],
+"rec_show_note": [
+"Kode ini satu-satunya cara masuk kembali bila kamu lupa kata sandi. Catat di tempat aman; kode ini hanya tampil sekali.",
+"This code is the only way back in if you forget your password. Keep it somewhere safe; it is shown only once."
+],
+"rec_copy": [
+"Salin kode",
+"Copy code"
+],
+"rec_saved": [
+"Sudah kusimpan",
+"I saved it"
+],
+"rec_new": [
+"Buat kode pemulihan baru",
+"Create a new recovery code"
+],
+"rec_new_note": [
+"Kode lama tidak berlaku lagi. Masukkan kata sandimu untuk membuat yang baru.",
+"The old code stops working. Enter your password to create a new one."
+],
+"e_bad_recovery": [
+"Nama pengguna atau kode pemulihan salah",
+"Wrong username or recovery code"
+],
+"bgm_label": [
+"Jadikan backsound",
+"Use as backsound"
+],
+"bgm_note": [
+"Audio ini jadi pengiring: terputar otomatis saat post terlihat, dan pembaca bisa mematikannya. Kalau mati, ini audio biasa.",
+"Plays automatically while the post is in view in Hups; readers can mute it."
+],
+"bgm_tag": [
+"Backsound",
+"Backsound"
+],
+"bgm_mute": [
+"Matikan backsound",
+"Mute backsound"
+],
+"bgm_unmute": [
+"Nyalakan backsound",
+"Unmute backsound"
+],
+"cmt_audio_max": [
+"Maksimal 1 audio per komentar",
+"Up to 1 audio per comment"
+],
+"post_audio_max": [
+"Maksimal 3 audio per post",
+"Up to 3 audios per post"
+],
+"rand_one": [
+"Post di Acak hanya boleh 1 audio",
+"Posts in Random can hold only 1 audio"
+],
+"e_rand_one": [
+"Post di Acak hanya boleh 1 audio",
+"Posts in Random can hold only 1 audio"
+],
+"multi_done": [
+"Selesai",
+"Done"
+],
+"multi_note": [
+"Boleh pilih lebih dari satu",
+"You can pick more than one"
+],
+"rel_count_hidden": [
+"Tersembunyi",
+"Hidden"
+],
+"report_cmt": [
+"Laporkan komentar",
+"Report comment"
+],
+"post_hint_text": [
+"Tulis sesuatu atau tambah audio",
+"Write something or add audio"
+],
+"rec_over": [
+"Audio melebihi 1 MB",
+"Audio is over 1 MB"
+],
+"search_hint2": [
+"Cari akun, audio, atau Hups",
+"Search accounts, audio, or Hups"
+],
+"tag_hint": [
+"Ketik @ untuk menandai akun",
+"Type @ to tag an account"
+],
+"link_copied": [
+"Tautan disalin",
+"Link copied"
+],
+"rec_title": [
+"Rekam audio",
+"Record audio"
+],
+"rec_hint": [
+"Ketuk untuk merekam, maksimal 15 detik",
+"Tap to record, up to 15 seconds"
+],
+"use_audio": [
+"Pakai audio ini",
+"Use this audio"
+],
+"delete_cmt_q": [
+"Hapus komentar ini beserta balasannya?",
+"Delete this comment and its replies?"
+],
+"faq": [
+"FAQ",
+"FAQ"
+],
+"not_found": [
+"Halaman tidak ditemukan",
+"Page not found"
+],
+"post_gone": [
+"Post tidak ditemukan atau tidak bisa kamu lihat",
+"Post not found or not visible to you"
+],
+"posting": [
+"Memposting…",
+"Posting…"
+],
+"posted": [
+"Terkirim",
+"Posted"
+],
+"new_post": [
+"Buat post",
+"New post"
+],
+"text_audio": [
+"Teks dan audio",
+"Text and audio"
+],
+"who_see": [
+"Siapa yang bisa melihat",
+"Who can see it"
+],
+"one_audio_cmt": [
+"Satu audio per komentar",
+"One audio per comment"
+],
+"text_only": [
+"Hanya teks",
+"Text only"
+],
+"empty_audio": [
+"Belum ada audio",
+"No audio yet"
+],
+"empty_liked": [
+"Belum ada yang disorot",
+"Nothing spotlighted yet"
+],
+"empty_notif": [
+"Belum ada notifikasi",
+"No notifications yet"
+],
+"empty_search": [
+"Tidak ada hasil",
+"No results"
+],
+"empty_list": [
+"Belum ada akun",
+"No accounts yet"
+],
+"follow": [
+"Ikuti",
+"Follow"
+],
+"unfollow": [
+"Mengikuti",
+"Following"
+],
+"photo": [
+"Foto profil",
+"Profile photo"
+],
+"cover": [
+"Latar profil",
+"Cover"
+],
+"change": [
+"Ganti",
+"Change"
+],
+"need_login": [
+"Masuk dulu untuk melakukan ini",
+"Sign in first to do this"
+],
+"nobody": [
+"Belum ada suara. Jadilah yang pertama.",
+"No voices yet. Be the first."
+],
+"uploaded": [
+"Audio terunggah",
+"Audio uploaded"
+],
+"welcome": [
+"Selamat datang",
+"Welcome"
+],
+"too_long": [
+"Maksimal 15 detik",
+"Maximum 15 seconds"
+],
+"mic_denied": [
+"Izin mikrofon ditolak",
+"Microphone permission denied"
+],
+"preview": [
+"Dengar",
+"Listen"
+],
+"done": [
+"Selesai",
+"Done"
+],
+"retry": [
+"Coba lagi",
+"Retry"
+],
+"untitled": [
+"Audio tanpa deskripsi",
+"Audio without description"
+],
+"e_rate_limited": [
+"Terlalu sering, coba lagi sebentar lagi",
+"Too many requests, try again shortly"
+],
+"e_banned": [
+"Akun ini dibatasi",
+"This account is restricted"
+],
+"posts_tab": [
+"Postingan",
+"Posts"
+],
+"no_posts": [
+"Belum ada postingan",
+"No posts yet"
+],
+"views": [
+"dilihat",
+"views"
+],
+"plays": [
+"diputar",
+"plays"
+],
+"need_net": [
+"Butuh internet untuk ini. Acak tetap bisa dipakai.",
+"This needs internet. Random still works."
+],
+"e_network": [
+"Tidak terhubung ke server",
+"Cannot reach the server"
+],
+"e_server": [
+"Terjadi kesalahan",
+"Something went wrong"
+],
+"e_unauthorized": [
+"Sesi berakhir, silakan masuk lagi",
+"Session expired, please sign in again"
+],
+"e_username_taken": [
+"Nama pengguna sudah dipakai",
+"Username is already taken"
+],
+"e_bad_credentials": [
+"Nama pengguna atau kata sandi salah",
+"Wrong username or password"
+],
+"e_bad_username": [
+"Nama pengguna 3-20 karakter: huruf kecil, angka, garis bawah",
+"Username 3-20 chars: lowercase, digits, underscore"
+],
+"e_bad_name": [
+"Nama wajib diisi (maks 40 karakter)",
+"Name is required (max 40 chars)"
+],
+"e_bad_password": [
+"Kata sandi minimal 6 karakter dan tanpa spasi",
+"Password must be at least 6 characters with no spaces"
+],
+"e_bad_age": [
+"Tanggal lahir tidak valid",
+"Invalid date of birth"
+],
+"e_bad_bio": [
+"Bio maksimal 300 karakter",
+"Bio max 300 characters"
+],
+"e_bad_file": [
+"File tidak valid",
+"Invalid file"
+],
+"e_too_big": [
+"File terlalu besar (maks 1 MB)",
+"File too large (max 1 MB)"
+],
+"e_not_found": [
+"Tidak ditemukan",
+"Not found"
+],
+"e_forbidden": [
+"Tindakan ini tidak diizinkan",
+"This action is not allowed"
+],
+"a_me": [
+"Hanya untuk saya",
+"Only me"
+],
+"pvis": [
+"Siapa yang bisa melihat postinganku",
+"Who can see my posts"
+],
+"remind": [
+"Pengingat harian",
+"Daily reminder"
+],
+"remind_sub": [
+"Notifikasi “Kamu lelah?” setiap hari jam 19.00",
+"A “Feeling tired?” notification every day at 7 PM"
+],
+"streak_t": [
+"{n} hari berturut-turut",
+"{n}-day streak"
+],
+"days_total": [
+"Total masuk {n} hari",
+"{n} days signed in in total"
+],
+"view_photo": [
+"Lihat foto",
+"View photo"
+],
+"change_photo": [
+"Ganti foto",
+"Change photo"
+],
+"search_hint": [
+"Cari akun atau audio",
+"Search accounts or audio"
+],
+"sec_acc": [
+"Akun",
+"Accounts"
+],
+"sec_audio": [
+"Audio",
+"Audio"
+],
+"n_streak": [
+"Kamu sudah masuk {n} hari berturut-turut",
+"You’ve signed in {n} days in a row"
+],
+"n_missed": [
+"Kamu tidak masuk {n} hari. Rangkaianmu dimulai lagi dari awal.",
+"You missed {n} day(s). Your streak starts over."
+],
+"push_unread": [
+"{n} notifikasi baru",
+"{n} new notifications"
+],
+"r_title": [
+"Kamu lelah?",
+"Feeling tired?"
+],
+"r_body": [
+"Coba lah untuk mendengarkan beberapa suara",
+"Try listening to a few voices"
+],
+"mk_offline": [
+"Jadikan offline",
+"Make available offline"
+],
+"is_offline": [
+"Tersimpan offline",
+"Saved offline"
+],
+"offline_t": [
+"Offline",
+"Offline"
+],
+"saved_off": [
+"Disimpan untuk offline",
+"Saved for offline"
+],
+"removed_off": [
+"Dihapus dari offline",
+"Removed from offline"
+],
+"off_fail": [
+"Tidak bisa menyimpan audio ini",
+"Couldn’t save this audio"
+],
+"empty_offline": [
+"Belum ada audio offline. Simpan lewat popup acak atau daftar audio.",
+"No offline audio yet. Save from the random popup or an audio list."
+],
+"no_net": [
+"Tidak ada internet. Memutar audio offline.",
+"No internet. Playing offline audio."
+],
+"no_net_empty": [
+"Tidak ada internet dan belum ada audio offline.",
+"No internet and no offline audio yet."
+],
+"e_storage_full": [
+"Penyimpanan penuh. Hapus beberapa audio atau foto dulu.",
+"Storage is full. Delete some audio or photos first."
+],
+"remove_follower": [
+"Hapus pengikut",
+"Remove follower"
+],
+"remove": [
+"Hapus",
+"Remove"
+],
+"follower_removed": [
+"Pengikut dihapus",
+"Follower removed"
+],
+"remove_follower_q": [
+"{name} tidak akan mengikutimu lagi. Dia tidak diberi tahu.",
+"{name} will no longer follow you. They won’t be notified."
+],
+"streak_cal": [
+"Hari masuk",
+"Sign-in days"
+],
+"cal_in": [
+"Masuk",
+"Signed in"
+],
+"cal_miss": [
+"Tidak masuk",
+"Missed"
+],
+"cal_today": [
+"Hari ini",
+"Today"
+],
+"cal_month": [
+"Bulan ini: {a} hari masuk, {b} hari tidak masuk",
+"This month: {a} days signed in, {b} missed"
+],
+"cal_missed_list": [
+"Hari yang tidak masuk",
+"Days you missed"
+],
+"cal_none": [
+"Tidak ada hari yang terlewat",
+"No missed days"
+],
+"cal_note": [
+"Riwayat sebelum fitur ini hanya tercatat dari rangkaian terakhir.",
+"History before this feature is only known from your latest streak."
+],
+"ago_now": [
+"baru saja",
+"just now"
+],
+"ago_m": [
+"mnt lalu",
+"min ago"
+],
+"ago_h": [
+"jam lalu",
+"h ago"
+],
+"ago_d": [
+"hari lalu",
+"d ago"
+],
+"e_too_big_img": [
+"Foto terlalu besar (maks 3 MB)",
+"Photo too large (max 3 MB)"
+],
+"about_t": [
+"Hulhup adalah ruang suara dan tulisan yang sederhana.\n\nAcak: ketuk satu tombol, dengarkan suara singkat (maksimal 15 detik) dari orang-orang di seluruh dunia, tanpa perlu masuk.\n\nSebuah post bisa berisi tulisan (panjangnya bebas), satu audio, atau keduanya; post hanya teks juga boleh. Audio bisa dijadikan audio biasa atau backsound (pengiring yang terputar otomatis saat post terlihat dan bisa dimatikan pembaca). Satu post otomatis tampil di Acak dan di Hups. Hups untuk menjelajah post pilihanmu, dengan komentar bertingkat seperti di forum (komentar hanya tulisan, panjangnya bebas). Pencarian mencakup akun, isi post, penulis, tag, dan komentar.\n\nMasuk hanya jika kamu ingin membuat post, menyorot, berkomentar, menyimpan, atau mengikuti akun lain. Tanpa akun kamu tetap bisa melihat dan mendengar.\n\nKamu mengatur sendiri siapa yang bisa melihat tiap post, siapa yang bisa melihat profilmu, dan siapa yang bisa melihat daftar hubunganmu. Post apa pun bisa dibagikan lewat tautan; tautan hanya terbuka untuk orang yang berhak melihatnya.\n\nPengingat harian dan pemberitahuan sorotan, komentar, dan pengikut baru datang dari server sehingga tetap masuk walau aplikasi tertutup.\n\nHulhup lahir pada 1 Oktober 2026.\n\nHulhup adalah produk dari Misyi.\n\nVersi 1.3.0",
+"Hulhup is a simple home for voices and writing.\n\nRandom: tap one button and hear a short voice (up to 15 seconds) from people around the world, no sign-in needed.\n\nA post can hold text (any length), one audio, or both; text-only posts are fine too. The audio is either a regular audio or a backsound (a soundtrack that plays automatically while the post is in view and that readers can mute). A post shows in both Random and Hups automatically. Hups is where you browse posts, with threaded comments like a forum (comments are text only, any length). Search covers accounts, post text, authors, tags and comments.\n\nSign in only if you want to post, spotlight, comment, save, or follow other accounts. Without an account you can still look and listen.\n\nYou choose who can see each post, who can see your profile, and who can see your relationship list. Any post can be shared as a link; the link only opens for people allowed to see it.\n\nThe daily reminder and alerts for spotlights, comments, and new followers come from the server, so they arrive even when the app is closed.\n\nHulhup was born on 1 October 2026.\n\nHulhup is a product of Misyi.\n\nVersion 1.3.0"
+],
+"policy_t": [
+"Dengan memakai Hulhup kamu setuju pada aturan berikut.\n\n1. Setiap audio berdurasi maksimal 15 detik dan harus milikmu atau kamu punya izin memakainya. Setiap audio maksimal 1 MB. Setiap post berisi tulisan (panjangnya bebas), maksimal 1 audio, atau keduanya, dan minimal salah satunya harus ada; audio boleh dipilih sebagai backsound. Komentar hanya berupa tulisan (tanpa audio) dan panjangnya bebas. Foto profil maksimal 3 MB.\n2. Dilarang mengunggah atau menulis konten yang melecehkan, menebar kebencian, mengandung kekerasan atau seksual, melanggar hukum, atau meniru orang lain.\n3. Dilarang spam dan menyalahgunakan layanan.\n4. Setiap post tampil di Acak dan di Hups, dan kamu memilih siapa yang boleh melihatnya: publik, pengikut, mengikuti, pengikut dan mengikuti, hubungan tertentu, atau akun pilihanmu. Pilihan yang sama berlaku untuk Acak dan Hups. Post publik dapat dilihat siapa saja, termasuk tanpa akun.\n5. Di Pengaturan kamu memilih siapa yang bisa melihat profilmu dan siapa yang bisa melihat daftar hubunganmu, termasuk hanya untuk saya.\n6. Post tidak bisa diedit, hanya dihapus. Kamu bebas menghapus post, komentarmu, atau akunmu kapan saja. Pemilik post juga bisa menghapus komentar di postnya.\n7. Membagikan tautan post tidak membuka akses: tautan hanya terbuka untuk orang yang berhak melihat post itu.\n8. Kami dapat menghapus konten, memberi tanda verifikasi, atau membatasi dan memblokir akun yang melanggar aturan ini.\n9. Hulhup disediakan apa adanya, aturan dapat diperbarui dan versi terbaru selalu ada di halaman ini.\n10. Setiap audio dan foto profil diperiksa otomatis oleh Deks, pemeriksa buatan Hulhup, dari bukti di dalam berkasnya (Content Credentials/C2PA, penanda sumber IPTC dan XMP, parameter generator gambar, data dan watermark tersembunyi, serta tag pembuat suara/musik AI), bukan dari pengakuan. Berkas yang membawa bukti itu diberi tanda \"Audio oleh AI\", \"Audio diedit dengan AI\", \"Foto dibuat oleh AI\", atau \"Foto diedit dengan AI\". Deks sengaja tidak menuduh tanpa bukti keras, jadi karya AI yang jejaknya sudah terhapus (tangkapan layar, kompresi ulang, rekam ulang) bisa lolos. Jika tanda itu keliru, hubungi kami.",
+"By using Hulhup you agree to the following.\n\n1. Each audio is at most 15 seconds and must be yours or you must have permission to use it. Each audio is at most 1 MB. Every post holds text (any length), at most 1 audio, or both, and must have at least one of them; the audio may be set as a backsound. Comments are text only (no audio) and any length. Profile photos are at most 3 MB.\n2. Do not upload or write content that harasses, spreads hate, contains violence or sexual material, breaks the law, or impersonates others.\n3. No spam or misuse of the service.\n4. Every post shows in both Random and Hups, and you choose who may see it: public, followers, following, followers and following, certain relationships, or accounts you pick. The same choice applies to Random and Hups. Public posts can be seen by anyone, including without an account.\n5. In Settings you choose who can see your profile and who can see your relationship list, including only me.\n6. Posts cannot be edited, only deleted. You may delete posts, your comments, or your account at any time. A post owner can also delete comments on their post.\n7. Sharing a post link does not grant access: the link only opens for people who are allowed to see that post.\n8. We may remove content, mark accounts as verified, or restrict and ban accounts that break these rules.\n9. Hulhup is provided as is. These rules may be updated and the latest version is always on this page.\n10. Every audio and profile photo is checked automatically by Deks, the checker built by Hulhup, for evidence inside the file (Content Credentials/C2PA, IPTC and XMP source markers, image-generator parameters, hidden data and watermarks, and AI voice/music tool tags), not for claims. Files carrying such evidence are marked \"Audio by AI\", \"Audio edited with AI\", \"Photo made by AI\", or \"Photo edited with AI\". Deks deliberately does not accuse without hard evidence, so AI work whose traces were erased (screenshots, recompression, re-recording) can pass. If a mark is wrong, contact us."
+],
+"privacy_t": [
+"Data yang kami simpan: nama, nama pengguna, tanggal lahir, bio, foto profil, post (tulisan dan audio), komentar, sorotan, post yang kamu simpan, pengikut, hubungan, serta jumlah hari kamu masuk. Tanggal lahir dan usiamu tidak ditampilkan ke pengguna lain. Daftar post yang kamu simpan dan yang kamu sorot hanya terlihat olehmu.\n\nKata sandi disimpan dalam bentuk hash, tidak pernah dalam bentuk asli.\n\nTautan di post: yang kami simpan hanya alamat URL-nya, bukan isinya. Gambar dan pratinjau halaman diambil lewat server Hulhup sehingga situs asal tidak melihat alamat IP-mu. Video dan audio dari situs lain diputar langsung dari situs itu setelah kamu mengetuk putar, jadi situs itu dapat melihat alamat IP-mu seperti saat kamu membuka tautannya sendiri.\n\nNotifikasi: Hulhup meminta izin notifikasi untuk pengingat harian jam 19.00 WIB serta pemberitahuan sorotan, komentar, balasan, dan pengikut baru. Agar notifikasi masuk walau aplikasi tertutup, aplikasi mendaftarkan token perangkat ke layanan Firebase Cloud Messaging milik Google dan menyimpannya di server kami bersama bahasa dan pilihan pengingatmu. Token dihapus saat kamu keluar. Kamu bisa mematikan notifikasi di Pengaturan atau di pengaturan sistem perangkat.\n\nMikrofon hanya dipakai saat kamu menekan tombol rekam. Galeri hanya dibuka saat kamu memilih foto atau berkas audio.\n\nTanpa login, kamu hanya melihat dan mendengar; kami tidak membuat profil tamu.\n\nAudio yang kamu jadikan offline disalin dan disimpan di perangkatmu supaya bisa diputar tanpa internet. Kamu bisa menghapusnya kapan saja dari menu Audio offline. Pilihan membisukan backsound juga hanya disimpan di perangkatmu.\n\nHitungan \"dilihat\" dan \"diputar\" dicatat satu kali per akun untuk tiap post. Kata yang kamu cari (20 terakhir) disimpan di akunmu untuk membantu mengurutkan Hups dan dihapus otomatis bila lebih lama.\n\nPenyimpanan: akun, foto profil, dan data terstrukturmu disimpan di server database kami; tulisan panjang disimpan di database dokumen terpisah; audio disimpan di layanan penyimpanan cloud terpisah. Koneksi ke server dienkripsi (HTTPS). Post hanya bisa dilihat dan diputar oleh orang yang berhak sesuai pilihan privasimu. Moderasi (menghapus konten pelanggar, tanda verifikasi, pembatasan akun) dilakukan langsung oleh tim kami di server, tidak ada halaman admin publik.\n\nKami tidak menjual datamu dan tidak menampilkan iklan untuk saat ini.\n\nMenghapus post, komentar, atau akun akan menghapus datanya secara permanen dari server.",
+"Data we store: name, username, date of birth, bio, profile photo, posts (text and audio), comments, spotlights, posts you save, followers, relationships, and the number of days you signed in. Your date of birth and age are never shown to other users. Your saved and spotlighted lists are visible only to you.\n\nPasswords are stored as hashes, never in plain form.\n\nLinks in posts: we only store the URL, not its content. Images and page previews are fetched through the Hulhup server so the original site does not see your IP address. Video and audio from other sites play directly from that site after you tap play, so that site can see your IP address just as when you open the link yourself.\n\nNotifications: Hulhup asks for notification permission for a daily reminder at 7 PM (WIB) and alerts for spotlights, comments, replies, and new followers. So that notifications arrive even when the app is closed, the app registers a device token with Google's Firebase Cloud Messaging and stores it on our server together with your language and reminder choice. The token is removed when you sign out. You can turn notifications off in Settings or in your device settings.\n\nThe microphone is used only when you press record. The gallery opens only when you pick a photo or audio file.\n\nWithout signing in you only look and listen; we do not create guest profiles.\n\nAudio you make available offline is copied and stored on your device so it can play without internet. You can remove it anytime from the Offline audio menu. Your choice to mute backsounds is also kept only on your device.\n\nThe \"views\" and \"plays\" counts are recorded once per account for each post. Your last 20 searches are kept on your account to help rank Hups, and older ones are removed automatically.\n\nStorage: your account, profile photos and structured data are kept in our server database; long text is kept in a separate document database; audio is kept in separate cloud storage. Connections to the server are encrypted (HTTPS). Posts can only be seen and played by people allowed by your privacy choices. Moderation (removing violating content, verification marks, restricting accounts) is done directly by our team on the server; there is no public admin page.\n\nWe do not sell your data and show no ads for now.\n\nDeleting a post, a comment, or your account permanently removes the data from the server."
+]
+}

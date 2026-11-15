@@ -5,10 +5,14 @@ export type Post = {
   id: number; desc: string; secs: number; url: string; created: number; likes: number; plays: number; views: number; comments: number;
   owner: string; owner_name: string; owner_avatar: string | null; owner_verified?: boolean; files: { url: string; secs: number }[];
   bgm: boolean; text: string | null; long: boolean; ai?: boolean;
+  liked?: boolean; saved?: boolean; vis?: string; rand?: string; pprof?: boolean; popup?: boolean; in_rand?: boolean; in_hups?: boolean;
+  ai_kind?: string; owner_avatar_ai?: boolean; owner_avatar_ai_kind?: string; bgm_idx?: number; to?: { username: string }[];
 };
 export type User = {
   username: string; name: string; bio?: string; avatar: string | null; cover?: string | null; verified?: boolean;
   followers?: number; following?: number; posts?: number;
+  age?: number; birth?: string; pvis?: string; rvis?: string; streak?: number; days?: number; taps?: number; rels?: number; audios?: number;
+  is_following?: boolean; is_me?: boolean; labels?: { id: number; name: string }[]; avatar_ai?: boolean; avatar_ai_kind?: string;
 };
 export type Comment = { id: number; text?: string; body?: string; owner: string; owner_name: string; owner_avatar: string | null; created: number; likes: number; replies?: Comment[] };
 
