@@ -1,6 +1,7 @@
 package app.misyi.hulhup
 
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.border
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
@@ -376,11 +377,28 @@ class AnimMarkCtl { var play: ((Int?) -> Unit)? = null }
 /** Masuk dengan geser+pudar bertahap (padanan In). */
 @Composable fun In(i: Int, content: @Composable () -> Unit) {
     val a = remember { Animatable(0f) }
-    LaunchedEffect(Unit) { a.animateTo(1f, tween(380 + min(i, 8) * 80, easing = FastOutSlowInEasing)) }
-    Box(Modifier.alpha(a.value).offset(y = ((1 - a.value) * 20).dp)) { content() }
+    LaunchedEffect(Unit) { a.animateTo(1f, tween(240 + min(i, 6) * 40, easing = FastOutSlowInEasing)) }
+    Box(Modifier.graphicsLayer { alpha = a.value; translationY = (1f - a.value) * 14.dp.toPx() }) { content() }
 }
 
-@Composable fun Loader() = Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { LogoLoop(46.dp) }
+/** Kerangka pemuatan berdenyut halus (pengganti putaran kosong): kartu dengan avatar, nama, dan baris teks. */
+@Composable fun Loader() {
+    val t = androidx.compose.animation.core.rememberInfiniteTransition(label = "sk")
+    val a by t.animateFloat(.55f, 1f, androidx.compose.animation.core.infiniteRepeatable(tween(850, easing = FastOutSlowInEasing), androidx.compose.animation.core.RepeatMode.Reverse), label = "a")
+    val c = soft()
+    Column(Modifier.fillMaxSize().padding(20.dp, 8.dp).graphicsLayer { alpha = a }) {
+        repeat(4) {
+            Column(Modifier.padding(bottom = 12.dp).fillMaxWidth().background(cardC(), RoundedCornerShape(28.dp)).border(1.dp, ink().copy(alpha = .07f), RoundedCornerShape(28.dp)).padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(42.dp).background(c, CircleShape)); Spacer(Modifier.width(10.dp))
+                    Column { Box(Modifier.width(120.dp).height(12.dp).background(c, RoundedCornerShape(6.dp))); Spacer(Modifier.height(7.dp)); Box(Modifier.width(70.dp).height(9.dp).background(c, RoundedCornerShape(5.dp))) }
+                }
+                Spacer(Modifier.height(14.dp)); Box(Modifier.fillMaxWidth().height(12.dp).background(c, RoundedCornerShape(6.dp)))
+                Spacer(Modifier.height(8.dp)); Box(Modifier.fillMaxWidth(.7f).height(12.dp).background(c, RoundedCornerShape(6.dp)))
+            }
+        }
+    }
+}
 
 @Composable fun Empty(icon: ImageVector?, text: String, action: (@Composable () -> Unit)? = null, custom: (@Composable () -> Unit)? = null) = In(0) {
     Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {

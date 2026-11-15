@@ -329,6 +329,11 @@ route('GET', /^\/img$/, async (c) => {
 
 route('GET', /^\/stats$/, async (c) => ({ taps: c.me ? Number(c.me.taps) : 0, tapf: c.me ? (c.me.tapf || {}) : {} }));
 
+async function addTap(uid, f) {
+  const r = await one(`update users set taps=taps+1, tapf=jsonb_set(tapf, array[$2::text], to_jsonb(coalesce((tapf->>$2::text)::int,0)+1), true) where id=$1 returning tapf`, [uid, f]);
+  return Number(r.tapf[f]);
+}
+
 route('GET', /^\/random$/, async (c) => {
   await hit(`rnd:${c.me ? 'u' + c.me.id : c.ip}`, 120, 60);
   const f = filterOf(c.query.f);
@@ -342,11 +347,15 @@ route('GET', /^\/random$/, async (c) => {
   const off = randomInt(n); // acak sungguhan (CSPRNG), peluang sama
   const row = await one(`select a.id ${base} and ${excl ? 'a.id<>$2' : '$2=$2'} order by a.id offset ${off} limit 1`, [vid, last]);
   const a = await one(`${AUD_SQL} where a.id=$2`, [vid, row.id]);
-  if (c.me) {
-    const r = await one(`update users set taps=taps+1, tapf=jsonb_set(tapf, array[$2::text], to_jsonb(coalesce((tapf->>$2::text)::int,0)+1), true) where id=$1 returning tapf`, [c.me.id, f]);
-    taps = Number(r.tapf[f]);
-  }
+  if (c.me && c.query.peek !== '1') taps = await addTap(c.me.id, f);
   return { taps, audio: av(a) };
+});
+
+// Hitung satu ketukan Acak untuk audio yang sudah diambil lebih dulu (peek=1), agar angka ketukan tetap tepat.
+route('POST', /^\/taps$/, async (c) => {
+  c.need(); await hit(`tap:${c.me.id}`, 120, 60);
+  const f = filterOf(c.body && c.body.f);
+  return { taps: await addTap(c.me.id, f) };
 });
 
 route('GET', /^\/search$/, async (c) => {

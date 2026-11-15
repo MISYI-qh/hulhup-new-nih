@@ -10,8 +10,8 @@ import { FileBar } from './post';
 export function Avatar({ url, name, size }: { url?: string | null; name: string; size: number }) {
   const [bad, setBad] = useState(false);
   const init = (name || '?').trim().charAt(0).toUpperCase() || '?';
-  return <span style={{ width: size, height: size, borderRadius: '50%', overflow: 'hidden', flex: 'none', display: 'inline-grid', placeItems: 'center', background: '#2b2b2b', color: 'var(--cream)', fontWeight: 800, fontSize: size * .42 }}>
-    {url && !bad ? <img src={mediaUrl(url)} alt="" width={size} height={size} style={{ width: size, height: size, objectFit: 'cover' }} onError={() => setBad(true)} /> : init}</span>;
+  return <span className="avatar" style={{ width: size, height: size, fontSize: size * .42 }}>
+    {url && !bad ? <img src={mediaUrl(url)} alt="" width={size} height={size} loading="lazy" decoding="async" onError={() => setBad(true)} /> : init}</span>;
 }
 export const Verified = ({ size = 15 }: { size?: number }) => <Icon n="verified_rounded" size={size} color="var(--blue)" style={{ marginLeft: 4 }} />;
 

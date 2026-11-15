@@ -1,16 +1,26 @@
+/* Dasar: reset, tanpa geser samping, gulir tenang. */
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;overflow-x:clip;overscroll-behavior-x:none;scroll-behavior:auto}
+body{margin:0;overflow-x:clip;overscroll-behavior-x:none;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-size:16px;line-height:1.35}
+img,svg,video,canvas{max-width:100%}
+button{font:inherit;color:inherit}
+h1,h2,h3,p{overflow-wrap:anywhere}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:12px}
+::selection{background:color-mix(in srgb,var(--brand) 28%,transparent)}
 /* Gaya aplikasi (terjemahan ui.dart): hitam-putih dominan, aksen ungu, bentuk bulat. */
 :root{--ink:#111;--sub:rgba(17,17,17,.6);--bg:#fff;--soft:#f4f4f4;--card:#fff;--btn:#111;--acc:#2b6fde;--heart:#e0524a;--cream:#fbf6e9;--brand:#5b47f5;--deep:#4330d0;--hair:rgba(17,17,17,.07)}
 :root[data-theme=dark]{--ink:#f2f2f2;--sub:rgba(242,242,242,.6);--bg:#0b0b0b;--soft:#1a1a1a;--card:#141414;--btn:#2e2e2e;--acc:#7db4ff;--hair:rgba(242,242,242,.07)}
 @media(prefers-color-scheme:dark){:root:not([data-theme=light]){--ink:#f2f2f2;--sub:rgba(242,242,242,.6);--bg:#0b0b0b;--soft:#1a1a1a;--card:#141414;--btn:#2e2e2e;--acc:#7db4ff;--hair:rgba(242,242,242,.07)}}
 body{font-family:Outfit,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
-.app{max-width:520px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column;position:relative}
-.tap{cursor:pointer;border:0;background:none;color:inherit;font:inherit;padding:0;transition:transform .12s;-webkit-tap-highlight-color:transparent}
+.app{max-width:520px;width:100%;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column;position:relative;overflow-x:clip;animation:pgin .2s cubic-bezier(.2,.8,.2,1) both}
+.app>div{min-width:0}
+.tap{touch-action:manipulation;cursor:pointer;border:0;background:none;color:inherit;font:inherit;padding:0;transition:transform .12s;-webkit-tap-highlight-color:transparent}
 .tap:active{transform:scale(.94)}
 .tap[disabled]{cursor:default}
 .topbar{display:flex;align-items:center;min-height:56px;padding:6px 6px;position:sticky;top:0;z-index:15;background:var(--bg)}
 .topbar .mid{flex:1;display:flex;justify-content:center;font-weight:800;font-size:18px}
 .topbar .ttl{flex:1;font-weight:800;font-size:20px;letter-spacing:-.4px;padding-left:4px}
-.ibtn{width:48px;height:48px;display:grid;place-items:center;position:relative;border-radius:50%}
+.ibtn{flex:none;width:48px;height:48px;display:grid;place-items:center;position:relative;border-radius:50%}
 .ibtn .dot{position:absolute;top:11px;right:11px;width:9px;height:9px;border-radius:50%;background:var(--heart);border:1.5px solid var(--bg)}
 .pbtn{height:52px;border-radius:26px;background:var(--ink);color:var(--bg);display:flex;align-items:center;justify-content:center;gap:8px;font-weight:700;font-size:15px;width:100%;padding:0 14px}
 .pbtn.ghost{background:var(--soft);color:var(--ink)}
@@ -30,7 +40,7 @@ body{font-family:Outfit,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;bac
 .seg{display:flex;background:var(--soft);border-radius:24px;padding:4px;height:48px;position:relative}
 .seg b{flex:1;display:grid;place-items:center;font-weight:700;font-size:14px;border-radius:20px;color:var(--sub);transition:all .25s;cursor:pointer}
 .seg b.on{background:var(--ink);color:var(--bg)}
-.hcard{background:var(--card);border-radius:28px;border:1px solid var(--hair);box-shadow:0 6px 18px rgba(0,0,0,.05);padding:14px 8px 4px 16px;margin-bottom:12px}
+.hcard{background:var(--card);border-radius:28px;border:1px solid var(--hair);box-shadow:0 1px 2px rgba(0,0,0,.04),0 8px 24px -12px rgba(0,0,0,.12);padding:14px 10px 4px 16px;margin-bottom:12px}
 .hrow{display:flex;align-items:center;gap:10px}
 .hname{font-weight:800;font-size:15.5px}
 .hsub{color:var(--sub);font-size:12.5px}
@@ -112,7 +122,7 @@ a{color:inherit}
 .row2{display:flex;align-items:center;gap:12px}
 .soft{background:var(--soft);border-radius:26px}
 .lbl{color:var(--sub);font-weight:700;font-size:13px;margin:22px 0 10px 6px}
-.urow{display:flex;align-items:center;gap:12px;background:var(--soft);border-radius:26px;padding:12px;margin-bottom:10px;text-decoration:none;color:inherit;width:100%;text-align:left}
+.urow{min-width:0;overflow:hidden;display:flex;align-items:center;gap:12px;background:var(--soft);border-radius:26px;padding:12px;margin-bottom:10px;text-decoration:none;color:inherit;width:100%;text-align:left}
 .srow{display:flex;align-items:center;gap:14px;background:var(--soft);border-radius:24px;padding:16px 18px;margin-bottom:10px;width:100%;text-align:left;font-weight:600;font-size:16px}
 .stat{display:inline-flex;gap:6px;align-items:baseline;font-size:14px;color:var(--sub)}.stat b{font-size:17px;font-weight:800;color:var(--ink)}
 .cal{display:grid;grid-template-columns:repeat(7,1fr)}
@@ -129,4 +139,14 @@ input,textarea{color:inherit;font-family:inherit}
 .sheetfield{background:var(--soft);border-radius:22px;padding:8px 18px}
 .sheetfield textarea{width:100%;border:0;background:none;outline:none;resize:vertical;font-size:16.5px;line-height:1.5;min-height:96px}
 .hl{background:color-mix(in srgb,var(--acc) 12%,transparent);border-radius:16px}
+@keyframes pgin{from{opacity:0;transform:translateY(8px)}}
+@keyframes shim{to{background-position:-200% 0}}
+.sk{background:linear-gradient(100deg,var(--soft) 30%,color-mix(in srgb,var(--ink) 7%,var(--soft)) 50%,var(--soft) 70%) 0 0/200% 100%;animation:shim 1.3s linear infinite;border-radius:14px}
+.skc{border-radius:28px;border:1px solid var(--hair);padding:16px;margin-bottom:12px;display:flex;flex-direction:column;gap:10px}
+.hcard,.cmt,.urow{content-visibility:auto;contain-intrinsic-size:auto 140px}
+.avatar{border-radius:50%;overflow:hidden;flex:none;display:inline-grid;place-items:center;background:#2b2b2b;color:var(--cream);font-weight:800;clip-path:circle(50%);isolation:isolate}
+.avatar img{display:block;width:100%;height:100%;object-fit:cover;border-radius:50%}
+.splash{position:fixed;inset:0;z-index:100;background:var(--bg);display:grid;place-items:center;animation:splashout .35s .45s ease forwards;pointer-events:none}
+@keyframes splashout{to{opacity:0;visibility:hidden}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}.sk{animation:none}}
 @keyframes ring3{0%{transform:scale(1);opacity:.34}100%{transform:scale(1.58);opacity:0}}

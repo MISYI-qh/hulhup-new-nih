@@ -89,7 +89,7 @@ export function PostScreen({ id, comment, seed }: { id: number; comment?: number
     <div className="topbar" style={{ position: 'static' }}>
       <IconBtn n="arrow_back_ios_new_rounded" onClick={() => n.back()} label="Kembali" /><div className="ttl" role="heading" aria-level={1}>{s.t('hups')}</div>
       <div style={{ display: 'flex' }}>{p ? <IconBtn n="more_horiz_rounded" label="Menu" onClick={() => postMenu(p, () => n.back())} /> : null}</div></div>
-    <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>{loading && !p ? <Loader /> : err && !p ? <Empty icon="lock_outline_rounded" text={err} /> : p ? <div style={{ padding: '4px 18px 24px' }}>
+    <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', overscrollBehavior: 'contain', minHeight: 0 }}>{loading && !p ? <Loader /> : err && !p ? <Empty icon="lock_outline_rounded" text={err} /> : p ? <div style={{ padding: '4px 18px 24px' }}>
       <OwnerRow a={p} />
       {text ? <div style={{ paddingTop: 14, userSelect: 'text' }}><MentionText text={text} style={{ fontSize: 17, lineHeight: 1.55 }} /></div> : null}
       {url ? <LinkEmbed url={url} /> : null}
@@ -195,7 +195,7 @@ export function ComposeScreen() {
     } catch (e) { if (id != null) { try { await Api.req('DELETE', `/audios/${id}`); } catch {} } toast(s.err(e), { bad: true }); setBusy(false); }
   };
   const hasAcc = audSplit(rand).includes('accounts');
-  return <Screen title={s.t('new_post')}><div style={{ padding: '4px 22px 40px', overflow: 'auto' }}>
+  return <Screen title={s.t('new_post')}><div style={{ padding: '4px 22px 40px' }}>
     {!clip ? <button className="tap" onClick={busy ? undefined : add} style={{ width: '100%', padding: '26px 18px', borderRadius: 20, border: '1.4px solid color-mix(in srgb, var(--ink) 25%, transparent)', textAlign: 'center' }}>
       <span style={{ width: 54, height: 54, borderRadius: '50%', background: 'var(--btn)', color: 'var(--cream)', display: 'inline-grid', placeItems: 'center' }}><Icon n="mic_rounded" size={26} /></span>
       <div style={{ fontWeight: 800, fontSize: 16, marginTop: 12 }}>{s.t('add_audio')}</div><div style={{ color: 'var(--sub)', fontSize: 12.5, marginTop: 3 }}>{s.t('audio_req')}</div></button>

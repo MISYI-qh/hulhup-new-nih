@@ -86,7 +86,7 @@ fun NotFoundPage() = androidx.compose.foundation.layout.Column {
     Empty(Icons.Rounded.Search, Store.t("not_found"))
 }
 
-/** Tumpukan halaman dengan transisi pudar + geser halus 420 ms (padanan route() di ui.dart). */
+/** Tumpukan halaman dengan transisi pudar + geser halus 220 ms (padanan route() di ui.dart). */
 @androidx.compose.runtime.Composable
 fun NavHost() {
     val st = Nav.stack
@@ -94,7 +94,7 @@ fun NavHost() {
     val top = st.lastOrNull() ?: return
     AnimatedContent(top, transitionSpec = {
         val fwd = Nav.stack.size >= (initialState.let { Nav.stack.indexOf(it) } + 1)
-        (fadeIn(tween(420, easing = FastOutSlowInEasing)) + slideInVertically(tween(420, easing = FastOutSlowInEasing)) { (it * .05f).toInt() }) togetherWith
-            fadeOut(tween(300, easing = FastOutSlowInEasing))
+        (fadeIn(tween(220, easing = FastOutSlowInEasing)) + slideInHorizontally(tween(220, easing = FastOutSlowInEasing)) { if (fwd) (it * .06f).toInt() else -(it * .06f).toInt() }) togetherWith
+            fadeOut(tween(140, easing = FastOutSlowInEasing))
     }, label = "nav") { s -> Box(Modifier.fillMaxSize().background(bgOf())) { s.content() } }
 }

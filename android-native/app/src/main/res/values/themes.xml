@@ -3,4 +3,8 @@
     <item name="android:windowBackground">@android:color/white</item>
     <item name="android:statusBarColor">@android:color/transparent</item>
     <item name="android:navigationBarColor">@android:color/white</item>
+</style><style name="Theme.Hulhup.Starting" parent="Theme.SplashScreen">
+    <item name="windowSplashScreenBackground">#FFFFFF</item>
+    <item name="windowSplashScreenAnimatedIcon">@drawable/splash_logo</item>
+    <item name="postSplashScreenTheme">@style/Theme.Hulhup</item>
 </style></resources>

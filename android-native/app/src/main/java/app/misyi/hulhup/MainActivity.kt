@@ -7,6 +7,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.compose.foundation.LocalOverscrollConfiguration
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
@@ -28,11 +31,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 /** Pintu masuk aplikasi (padanan main.dart): tema, alamat tautan, catat hari masuk saat dibuka/kembali. */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 class MainActivity : ComponentActivity() {
     private var ready by mutableStateOf(false)
 
     override fun onCreate(b: Bundle?) {
+        val splash = installSplashScreen()
         super.onCreate(b)
+        splash.setKeepOnScreenCondition { !ready }
         Plat.attach(this)
         Store.init(this)
         Store.banner = { toast(it) }
@@ -52,11 +58,11 @@ class MainActivity : ComponentActivity() {
                     statusBarStyle = SystemBarStyle.auto(AColor.TRANSPARENT, AColor.TRANSPARENT) { dark },
                     navigationBarStyle = SystemBarStyle.auto(if (dark) 0xFF0B0B0B.toInt() else AColor.WHITE, if (dark) 0xFF0B0B0B.toInt() else AColor.WHITE) { dark })
             }
-            CompositionLocalProvider(LocalDark provides dark) {
+            CompositionLocalProvider(LocalDark provides dark, LocalOverscrollConfiguration provides null) {
                 MaterialTheme(colorScheme = if (dark) darkColorScheme(primary = Color(0xFFF2F2F2), background = Color(0xFF0B0B0B), surface = Color(0xFF0B0B0B)) else lightColorScheme(primary = Color(0xFF111111), background = Color.White, surface = Color.White)) {
                     Box(Modifier.fillMaxSize().background(bgOf()), contentAlignment = Alignment.TopCenter) {
                         Box(Modifier.widthIn(max = 520.dp).fillMaxSize()) {
-                            Intro { if (ready) NavHost() }
+                            Intro { if (ready) Box(Modifier.fillMaxSize().navigationBarsPadding()) { NavHost() } }
                             OverlayHost()
                         }
                     }

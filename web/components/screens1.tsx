@@ -83,7 +83,7 @@ export function AuthScreen() {
     } catch (e) { toast(s.err(e), { bad: true }); setBusy(false); }
   };
   return <Screen back center={<div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><AnimMark width={40} auto slow tapPlay /><span style={{ fontWeight: 800, fontSize: 21 }}>Hulhup</span></div>}>
-    <div className="pad" style={{ paddingTop: 12, paddingBottom: 40, overflow: 'auto' }}>
+    <div className="pad" style={{ paddingTop: 12, paddingBottom: 40}}>
       <Seg<string> items={[['login', s.t('login')], ['register', s.t('register')]]} value={reg ? 'register' : 'login'} on={(v) => setReg(v === 'register')} />
       <div className="stack" style={{ marginTop: 24, gap: 16 }}>
         {reg ? <Field label={s.t('name')} value={name} onChange={setName} max={40} auto="name" /> : null}
@@ -231,7 +231,7 @@ export function SearchScreen() {
     <div style={{ padding: '0 20px 14px' }}><div className="row2" style={{ height: 54, padding: '0 6px 0 18px', background: 'var(--soft)', borderRadius: 27, gap: 10 }}>
       <Icon n="search_rounded" color="var(--sub)" /><input autoFocus value={q} onChange={(e) => run(e.target.value)} placeholder={s.t('search_hint')} style={{ flex: 1, border: 0, background: 'none', outline: 'none', fontSize: 16, minWidth: 0 }} />
       {busy ? <span className="spin" style={{ marginRight: 12, width: 18, height: 18 }} /> : null}</div></div>
-    <div className="pad" style={{ paddingBottom: 40, overflow: 'auto' }}>
+    <div className="pad" style={{ paddingBottom: 40}}>
       {!res ? (s.searches.length ? <>
         <div className="row2"><div style={{ flex: 1 }}>{sec(s.t('hist_recent'))}</div><button className="tap" style={{ padding: 8, color: 'var(--sub)', fontWeight: 700, fontSize: 13 }} onClick={() => s.clearSearches()}>{s.t('hist_clear')}</button></div>
         {s.searches.map((x) => <div key={x} className="row2" style={{ padding: '4px 6px', gap: 14 }}><button className="tap row2" style={{ flex: 1, gap: 14, textAlign: 'left', minWidth: 0 }} onClick={() => run(x)}><Icon n="history_rounded" size={20} color="var(--sub)" /><span style={{ flex: 1, fontSize: 16, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x}</span></button><IconBtn n="close_rounded" onClick={() => s.delSearch(x)} /></div>)}</> : null)
@@ -267,7 +267,7 @@ export function NotifScreen() {
   };
   return <Screen title={s.t('notif')} actions={items?.length ? <button className="tap" style={{ padding: 10, fontWeight: 700 }} onClick={() => { setSelecting(!selecting); setSel(new Set()); }}>{selecting ? s.t('cancel') : s.t('notif_edit')}</button> : null}>
     {selecting ? <div className="row2" style={{ padding: '0 20px 8px', gap: 10 }}><div style={{ flex: 1 }}><PBtn ghost onClick={sel.size ? () => del(false) : undefined}>{s.t('notif_del_sel').replace('{n}', `${sel.size}`)}</PBtn></div><div style={{ flex: 1 }}><PBtn color="var(--heart)" onClick={() => del(true)}>{s.t('notif_del_all')}</PBtn></div></div> : null}
-    {err ? <Empty icon="cloud_off_rounded" text={err} /> : !items ? <Loader /> : <div className="pad" style={{ paddingBottom: 40, overflow: 'auto' }}>
+    {err ? <Empty icon="cloud_off_rounded" text={err} /> : !items ? <Loader /> : <div className="pad" style={{ paddingBottom: 40}}>
       {s.me && (s.me.streak > 0 || s.me.days > 0) ? <div style={{ marginBottom: 14 }}><StreakChip streak={s.me.streak} days={s.me.days} open /></div> : null}
       {!items.length ? <Empty icon="notifications_none_rounded" text={s.t('empty_notif')} /> : null}
       {items.map((x) => selecting

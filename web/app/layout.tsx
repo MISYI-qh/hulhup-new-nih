@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './app.css';
 import { Boot } from '@/components/shell';
-import { ORIGIN } from '@/lib/api';
+import { ORIGIN, API } from '@/lib/api';
 
 export const metadata: Metadata = {
   metadataBase: new URL(ORIGIN),
@@ -19,7 +19,9 @@ export const viewport: Viewport = { themeColor: '#0B0B0B', colorScheme: 'light d
 export default function Root({ children }: { children: React.ReactNode }) {
   return (
     <html lang="id">
+      <head><link rel="preconnect" href={API} crossOrigin="" /><link rel="dns-prefetch" href={API} /></head>
       <body>
+        <div className="splash" aria-hidden="true"><img src="/icons/Icon-192.png" alt="" width={88} height={88} style={{ borderRadius: 22 }} /></div>
         <Boot />
         {children}
       </body>

@@ -261,16 +261,48 @@ object Store {
         val a = c.random(); lastOff = a.id; return a
     }
 
+    private var nextA: A? = null
+    private var nextF: String? = null
+    private var lastRand = 0
+    private var prefetching = false
+    /** Ambil Acak berikutnya (beserta audionya) di latar, supaya ketukan berikut langsung terputar tanpa jeda. */
+    private fun prefetch() {
+        if (prefetching || !online) return
+        prefetching = true
+        val f = if (me == null) "public" else filter
+        scope.launch {
+            try {
+                val j = Api.req("GET", "/random?f=$f&peek=1&last=$lastRand")
+                if (!j.isNull("audio")) {
+                    val a = A(j.getJSONObject("audio"))
+                    if (a.url.isNotEmpty()) try { Api.bytes(a.url) } catch (_: Exception) {}
+                    nextA = a; nextF = f
+                }
+            } catch (_: Exception) {} finally { prefetching = false }
+        }
+    }
+
     /** Tanpa internet, acak diambil dari audio yang sudah dijadikan offline. */
     suspend fun random(): A? {
         fromOffline = false
         if (!online) { fromOffline = true; return pickOffline() }
+        val f = if (me == null) "public" else filter
+        val pre = nextA
+        if (pre != null && nextF == f) {
+            nextA = null; lastRand = pre.id
+            if (me != null) {
+                tapf = tapf + (f to ((tapf[f] ?: 0) + 1)); poke()
+                scope.launch { try { val j = Api.req("POST", "/taps", JSONObject().put("f", f)); if (!j.isNull("taps")) { tapf = tapf + (f to j.optInt("taps")); poke() } } catch (_: Exception) {} }
+            }
+            prefetch()
+            return pre
+        }
+        nextA = null
         return try {
-            val f = if (me == null) "public" else filter
-            val j = Api.req("GET", "/random?f=$f")
+            val j = Api.req("GET", "/random?f=$f&last=$lastRand")
             if (me != null && !j.isNull("taps")) tapf = tapf + (f to j.optInt("taps"))
             poke()
-            if (j.isNull("audio")) null else A(j.getJSONObject("audio"))
+            if (j.isNull("audio")) null else A(j.getJSONObject("audio")).also { lastRand = it.id; prefetch() }
         } catch (e: ApiErr) { throw e } catch (_: Exception) { fromOffline = true; pickOffline() }
     }
 

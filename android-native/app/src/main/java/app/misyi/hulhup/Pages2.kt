@@ -113,7 +113,7 @@ private fun JSONObject.list(k: String) = optJSONArray(k)?.objects() ?: emptyList
                                 In(0) {
                                     Box(Modifier.padding(horizontal = 24.dp)) {
                                         Tap(onTap = if (u.avatar == null) null else ({ Nav.go(Screen("image") { ImageViewer(u.avatar, u.name) }) }), scale = .96f) {
-                                            Box(Modifier.shadow(16.dp, CircleShape).background(bgOf(), CircleShape).padding(5.dp)) { Avatar(u.avatar, u.name, 96.dp) }
+                                            Avatar(u.avatar, u.name, 96.dp)
                                         }
                                     }
                                 }
