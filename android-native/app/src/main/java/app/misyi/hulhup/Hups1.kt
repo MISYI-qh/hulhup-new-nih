@@ -146,11 +146,23 @@ fun waveShape(seed: Int, n: Int): List<Double> {
     }
 }
 
-@Composable fun Wave(seed: Int, progress: Float, played: Color, rest: Color, now: Color, modifier: Modifier) {
+/** Progres dibaca di fase gambar ([progress] lambda) supaya gelombang bergerak 60 fps tanpa komposisi ulang. */
+@Composable fun rememberPlayFrac(on: Boolean, totalOf: () -> Int): () -> Float {
+    val f = remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(on) {
+        if (!on) { f.floatValue = 0f; return@LaunchedEffect }
+        while (true) { androidx.compose.runtime.withFrameNanos { }; f.floatValue = (Store.curMs().toFloat() / totalOf().coerceAtLeast(1)).coerceIn(0f, 1f) }
+    }
+    return { f.floatValue }
+}
+
+@Composable fun Wave(seed: Int, progress: () -> Float, played: Color, rest: Color, now: Color, modifier: Modifier) {
+    val shapes = remember(seed) { HashMap<Int, List<Double>>() }
     Canvas(modifier) {
+        val progress = progress()
         val gap = 3.dp.toPx(); val w = 3.dp.toPx()
         val n = ((size.width + gap) / (w + gap)).toInt().coerceIn(8, 80)
-        val hs = waveShape(seed, n); val cur = (progress * n).toInt()
+        val hs = shapes.getOrPut(n) { waveShape(seed, n) }; val cur = (progress * n).toInt()
         for (i in 0 until n) {
             val h = (size.height * hs[i]).toFloat().coerceIn(4.dp.toPx(), size.height)
             drawRoundRect(if (progress <= 0f) rest else if (i < cur) played else if (i == cur) now else rest, Offset(i * (w + gap), (size.height - h) / 2), Size(w, h), CornerRadius(2.dp.toPx()))
@@ -170,7 +182,7 @@ fun waveShape(seed: Int, n: Int): List<Double> {
             Box(Modifier.size(40.dp).background(if (on) Brand else btnBg(), RoundedCornerShape(r)), contentAlignment = Alignment.Center) { Icon(if (on) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, null, Modifier.size(22.dp), tint = if (on) Color.White else Cream) }
         }
         Spacer(Modifier.width(12.dp))
-        Wave(keyId, if (on) (ms.toFloat() / total).coerceIn(0f, 1f) else 0f, ink(), ink().copy(alpha = .2f), Brand, Modifier.weight(1f).height(32.dp))
+        Wave(keyId, rememberPlayFrac(on) { if (Store.dur > 0) Store.dur else total }, ink(), ink().copy(alpha = .2f), Brand, Modifier.weight(1f).height(32.dp))
         Spacer(Modifier.width(10.dp))
         HText(if (on) mmss(ms / 1000) else if (secs > 0) mmss(secs) else "·", 12.5f, FontWeight.Bold, if (on) ink() else sub())
         Spacer(Modifier.width(6.dp))
@@ -204,7 +216,7 @@ fun rateText(r: Float): String = if (r == Math.round(r).toFloat()) "${r.toInt()}
     Row(Modifier.fillMaxWidth().border(1.4.dp, ink().copy(alpha = .5f), RoundedCornerShape(20.dp)).padding(10.dp, 10.dp, 6.dp, 10.dp), verticalAlignment = Alignment.CenterVertically) {
         Tap(onTap = onPlay) { Box(Modifier.size(44.dp).background(if (playing) Brand else btnBg(), RoundedCornerShape(if (playing) 13.dp else 22.dp)), contentAlignment = Alignment.Center) { Icon(if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, null, Modifier.size(24.dp), tint = if (playing) Color.White else Cream) } }
         Spacer(Modifier.width(12.dp))
-        Wave(clip.bytes.size, 0f, ink(), ink().copy(alpha = .35f), Brand, Modifier.weight(1f).height(34.dp))
+        Wave(clip.bytes.size, { 0f }, ink(), ink().copy(alpha = .35f), Brand, Modifier.weight(1f).height(34.dp))
         Spacer(Modifier.width(10.dp)); HText(mmss(clip.secs), 13.5f, FontWeight.ExtraBold)
         IconBtn(Icons.Rounded.Refresh, color = sub()) { onPick?.invoke() }
         IconBtn(Icons.Rounded.Close, color = sub()) { onClear() }

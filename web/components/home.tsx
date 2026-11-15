@@ -20,7 +20,7 @@ function TapButton({ onTap }: { onTap: () => void }) {
     <button className="tap" aria-label={store.t('rand_tab')} onPointerDown={() => setDown(true)} onPointerUp={() => setDown(false)} onPointerLeave={() => setDown(false)}
       onClick={() => { setBurst((b) => b + 1); (mark.current?.firstElementChild as any)?.__play?.(); try { navigator.vibrate?.(12); } catch {} onTap(); }}
       style={{ width: 204, height: 204, borderRadius: '50%', background: 'var(--brand)', display: 'grid', placeItems: 'center', transform: `scale(${down ? .94 : 1})`, transition: 'transform .15s ease-out, box-shadow .15s', boxShadow: `0 ${down ? 10 : 26}px ${down ? 24 : 52}px rgba(91,71,245,${down ? .22 : .38})` }}>
-      <div ref={mark}><AnimMark width={104} auto ms={1500} first={0} colors={['#fff', '#5b47f5', '#4330d0']} /></div>
+      <div ref={mark}><AnimMark width={170} auto ms={1500} first={0} colors={['#fff', '#5b47f5', '#4330d0']} /></div>
     </button></div>;
 }
 

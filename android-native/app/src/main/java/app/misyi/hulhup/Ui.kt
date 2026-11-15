@@ -332,11 +332,14 @@ class AnimMarkCtl { var play: ((Int?) -> Unit)? = null }
         prog.snapTo(0f); prog.animateTo(1f, tween(ms, easing = LinearEasing))
         if (auto) { if (loop) play() else { delay(if (slow) 5000L + (0..7000).random() else 700L + (0..1300).random()); play() } }
     }
-    val m = markMotion(v, prog.value)
     val w = width
-    val mod = Modifier.offset(x = w * (m.dx / 100f), y = w * (m.dy / 100f)).rotate(Math.toDegrees(m.rot.toDouble()).toFloat()).scale(m.sc)
-        .size(w, w * .5f / .72f).let { if (tapPlay) it.pointerInput(Unit) { detectTapGestures { play() } } else it }
-    Canvas(mod) { peek(mc[0], mc[1], mc[2], MarkP(m.rise.coerceIn(0f, 1.1f), m.look, m.blink.coerceIn(0f, 1f), m.lookY, m.cross, m.winkL.coerceIn(0f, 1f), m.winkR.coerceIn(0f, 1f), m.sep, m.eyeSc, m.pupSc, m.wallDy, m.wallSx)) }
+    // Gerak dihitung di fase gambar/layer (bukan komposisi) supaya mulus 60 fps tanpa komposisi ulang tiap frame.
+    val mod = Modifier.size(w, w * .5f / .72f).graphicsLayer {
+        val m = markMotion(v, prog.value)
+        translationX = w.toPx() * (m.dx / 100f); translationY = w.toPx() * (m.dy / 100f)
+        rotationZ = Math.toDegrees(m.rot.toDouble()).toFloat(); scaleX = m.sc; scaleY = m.sc
+    }.let { if (tapPlay) it.pointerInput(Unit) { detectTapGestures { play() } } else it }
+    Canvas(mod) { val m = markMotion(v, prog.value); peek(mc[0], mc[1], mc[2], MarkP(m.rise.coerceIn(0f, 1.1f), m.look, m.blink.coerceIn(0f, 1f), m.lookY, m.cross, m.winkL.coerceIn(0f, 1f), m.winkR.coerceIn(0f, 1f), m.sep, m.eyeSc, m.pupSc, m.wallDy, m.wallSx)) }
 }
 
 @Composable fun LogoLoop(size: Dp = 44.dp) = AnimMark(size, auto = true, loop = true, first = 0, ms = 1500)

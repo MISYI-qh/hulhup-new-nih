@@ -161,7 +161,7 @@ val kBuild get() = BuildConfig.BUILD
         Box(Modifier.size(204.dp).scale(scale).shadow(shadow.dp, CircleShape, ambientColor = Brand, spotColor = Brand).background(Brand, CircleShape)
             .pointerInput(Unit) { detectTapGestures(onPress = { down = true; tryAwaitRelease(); down = false }, onTap = { hap.performHapticFeedback(HapticFeedbackType.LongPress); sc.launch { burst.snapTo(0f); burst.animateTo(1f, tween(1000, easing = LinearEasing)) }; ctl.play?.invoke(null); onTap() }) },
             contentAlignment = Alignment.Center) {
-            AnimMark(104.dp, auto = true, ms = 1500, first = 0, colors = listOf(Color.White, Brand, BrandDeep), ctl = ctl)
+            AnimMark(122.dp, auto = true, ms = 1500, first = 0, colors = listOf(Color.White, Brand, BrandDeep), ctl = ctl)
         }
     }
 }
@@ -242,7 +242,8 @@ val kBuild get() = BuildConfig.BUILD
                 }
                 val ms = if (on) s.posMs else 0
                 val total = (if (s.dur > 0) s.dur else a.secs * 1000).coerceAtLeast(1)
-                Box(Modifier.weight(1f).padding(horizontal = 12.dp).height(6.dp).clip(RoundedCornerShape(4.dp)).background(ink().copy(alpha = .12f))) { Box(Modifier.fillMaxHeight().fillMaxWidth((ms.toFloat() / total).coerceIn(0f, 1f)).background(ink())) }
+                val frac = rememberPlayFrac(on) { if (s.dur > 0) s.dur else total }; val bar = ink()
+                Box(Modifier.weight(1f).padding(horizontal = 12.dp).height(6.dp).clip(RoundedCornerShape(4.dp)).background(ink().copy(alpha = .12f)).drawBehind { drawRect(bar, size = androidx.compose.ui.geometry.Size(size.width * frac(), size.height)) })
                 HText("${mmss(ms / 1000)} / ${mmss(a.secs)}", 13f, FontWeight.Bold, if (on) ink() else sub())
             }
             Spacer(Modifier.height(10.dp)); SpeedRow()

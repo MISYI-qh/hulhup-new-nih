@@ -57,6 +57,8 @@ object Store {
     var searches: MutableList<String> = mutableListOf()
 
     private lateinit var p: ExoPlayer
+    /** Posisi putar saat ini (ms), dibaca per frame oleh progres agar mulus. */
+    fun curMs(): Int = if (::p.isInitialized) p.currentPosition.toInt().coerceAtLeast(0) else 0
     private lateinit var bg: ExoPlayer
     private var bgTok = 0
     private var bgScope: Any? = null

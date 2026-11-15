@@ -38,7 +38,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(b: Bundle?) {
         val splash = installSplashScreen()
         super.onCreate(b)
-        splash.setKeepOnScreenCondition { !ready }
+        // Splash sistem polos (tanpa bingkai); logo penuh tampil lewat Intro Compose yang langsung menutupi layar.
+        splash.setKeepOnScreenCondition { false }
         Plat.attach(this)
         Store.init(this)
         Store.banner = { toast(it) }
