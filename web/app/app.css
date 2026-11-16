@@ -160,3 +160,6 @@ body:has(.ovl),body:has(.side.open){overflow:hidden}
 .topbar{padding-top:env(safe-area-inset-top)}
 button{-webkit-tap-highlight-color:transparent}
 .tap:focus-visible{outline-offset:-2px}
+
+:root{--mk-eye:#5B47F5;--mk-pup:#fff}@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--mk-eye:#fff;--mk-pup:#5B47F5}}
+.splash .mark{display:block}

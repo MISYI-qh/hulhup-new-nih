@@ -47,6 +47,6 @@ export default function AnimMark({ width, auto, loop, slow, tapPlay, first, ms =
     document.addEventListener('visibilitychange', vis);
     return () => { halt(); io.disconnect(); document.removeEventListener('visibilitychange', vis); };
   }, [width, auto, loop, slow, ms, colors]);
-  const box = { width: width * 1.6, height: H * 1.6, margin: `${-H * .3}px ${-width * .3}px` } as const;
+  const box = { display: 'block', flex: 'none', maxWidth: 'none', minWidth: width * 1.6, width: width * 1.6, height: H * 1.6, margin: `${-H * .3}px ${-width * .3}px` } as const;
   return <canvas ref={cv} role="img" aria-label={label || 'Hulhup'} style={{ ...box, cursor: tapPlay ? 'pointer' : undefined }} onClick={tapPlay ? () => (cv.current as any)?._play?.() : undefined} />;
 }
