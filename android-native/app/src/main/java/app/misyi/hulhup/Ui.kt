@@ -71,7 +71,7 @@ val LocalDark = compositionLocalOf { false }
 @Composable fun acc() = if (isDark()) Color(0xFF7DB4FF) else Color(0xFF2B6FDE)
 
 @Composable fun HText(s: String, size: Float = 15f, w: FontWeight = FontWeight.Normal, color: Color = ink(), modifier: Modifier = Modifier, maxLines: Int = Int.MAX_VALUE, align: TextAlign? = null, lh: Float? = null, ls: Float? = null, overflow: TextOverflow = TextOverflow.Clip) =
-    Text(s, modifier, color = color, fontSize = size.sp, fontWeight = w, maxLines = maxLines, textAlign = align, fontFamily = Outfit, lineHeight = lh?.let { (it * size).sp } ?: TextUnit.Unspecified, letterSpacing = ls?.sp ?: TextUnit.Unspecified, overflow = overflow)
+    Text(s, modifier, color = color, fontSize = size.sp, fontWeight = w, maxLines = maxLines, textAlign = align, fontFamily = Outfit, lineHeight = lh?.let { (if (it > 3f) it else it * size).sp } ?: TextUnit.Unspecified, letterSpacing = ls?.sp ?: TextUnit.Unspecified, overflow = overflow)
 
 /** Sentuhan dengan efek mengecil + getar halus (padanan Tap). */
 @Composable fun Tap(modifier: Modifier = Modifier, scale: Float = .94f, onTap: (() -> Unit)?, content: @Composable () -> Unit) {
