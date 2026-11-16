@@ -7,7 +7,9 @@ import { store, useStore } from '@/lib/store';
 
 /** Mulai penyimpanan (sesi, tema, bahasa, offline, hitungan tertunda) sekali di sisi klien. */
 export function Boot() {
-  useEffect(() => { store.banner = (m) => toast(m); store.init(); }, []);
+  const ready = useStore().ready;
+  useEffect(() => { store.banner = (m) => toast(m); store.init(); const t = setTimeout(() => document.getElementById('splash')?.classList.add('out'), 3000); return () => clearTimeout(t); }, []);
+  useEffect(() => { if (!ready) return; const t = setTimeout(() => document.getElementById('splash')?.classList.add('out'), 450); return () => clearTimeout(t); }, [ready]);
   return <Overlays />;
 }
 export function Brand({ onClick }: { onClick?: () => void }) {

@@ -10,7 +10,7 @@ import { FileBar } from './post';
 export function Avatar({ url, name, size }: { url?: string | null; name: string; size: number }) {
   const [bad, setBad] = useState(false);
   const init = (name || '?').trim().charAt(0).toUpperCase() || '?';
-  return <span className="avatar" style={{ width: size, height: size, fontSize: size * .42 }}>
+  return <span className="avatar" style={{ width: size, height: size, fontSize: size * .42, ...(url && !bad ? { background: 'var(--soft)' } : {}) }}>
     {url && !bad ? <img src={mediaUrl(url)} alt="" width={size} height={size} loading="lazy" decoding="async" onError={() => setBad(true)} /> : init}</span>;
 }
 export const Verified = ({ size = 15 }: { size?: number }) => <Icon n="verified_rounded" size={size} color="var(--blue)" style={{ marginLeft: 4 }} />;

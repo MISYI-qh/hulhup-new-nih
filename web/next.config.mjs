@@ -3,7 +3,11 @@ export default {
   poweredByHeader: false,
   reactStrictMode: true,
   images: { unoptimized: true },
-  async rewrites() { return [{ source: '/@:username', destination: '/u/:username' }, { source: '/@:username/:path*', destination: '/u/:username/:path*' }]; },
+  async rewrites() { return [
+    { source: '/hulhup.apk', destination: '/api/dl?f=hulhup.apk' },
+    { source: '/hulhup-32.apk', destination: '/api/dl?f=hulhup.apk' },
+    { source: '/version.json', destination: '/api/dl?f=version.json' },
+    { source: '/@:username', destination: '/u/:username' }, { source: '/@:username/:path*', destination: '/u/:username/:path*' }]; },
   async redirects() { return [{ source: '/u/:username/:path*', destination: '/@:username/:path*', permanent: true }]; },
   async headers() {
     return [

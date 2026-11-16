@@ -16,12 +16,19 @@ export const metadata: Metadata = {
 };
 export const viewport: Viewport = { themeColor: '#0B0B0B', colorScheme: 'light dark', width: 'device-width', initialScale: 1, viewportFit: 'cover' };
 
+const CRIT = 'html{background:#fff}@media(prefers-color-scheme:dark){html:not([data-theme=light]){background:#0b0b0b}}html[data-theme=dark]{background:#0b0b0b}body{margin:0}.splash{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:inherit;transition:opacity .45s ease,visibility .45s}.splash.out{opacity:0;visibility:hidden}.splash svg{animation:sfi .5s ease both}@keyframes sfi{from{opacity:0;transform:scale(.94)}}.se{fill:#5b47f5}.sp{fill:#fff}.sw{fill:#4330d0}@media(prefers-color-scheme:dark){html:not([data-theme=light]) .se{fill:#fff}html:not([data-theme=light]) .sp,html:not([data-theme=light]) .sw{fill:#5b47f5}}';
 export default function Root({ children }: { children: React.ReactNode }) {
   return (
     <html lang="id">
-      <head><link rel="preconnect" href={API} crossOrigin="" /><link rel="dns-prefetch" href={API} /></head>
+      <head><style dangerouslySetInnerHTML={{ __html: CRIT }} /><link rel="preconnect" href={API} crossOrigin="" /><link rel="dns-prefetch" href={API} /></head>
       <body>
-        <div className="splash" aria-hidden="true"><svg className="mark" width={112} height={78} viewBox="0 0 72 50" aria-hidden="true"><g><ellipse cx="21" cy="19" rx="12.5" ry="15" fill="var(--mk-eye)"/><ellipse cx="51" cy="19" rx="12.5" ry="15" fill="var(--mk-eye)"/><circle cx="23.2" cy="15.5" r="5.5" fill="var(--mk-pup)"/><circle cx="53.2" cy="15.5" r="5.5" fill="var(--mk-pup)"/></g><rect x="0" y="25" width="72" height="21" rx="7" fill="#4330D0"/></svg></div>
+        <div id="splash" className="splash" aria-hidden="true">
+          <svg viewBox="-.36 -.3 .72 .51" width="132" height="94">
+            <clipPath id="sc"><rect x="-1" y="-1" width="2" height="1.21" /></clipPath>
+            <g clipPath="url(#sc)" className="se"><ellipse cx="-.15" cy="-.06" rx=".125" ry=".15" /><ellipse cx=".15" cy="-.06" rx=".125" ry=".15" /></g>
+            <g className="sp"><circle cx="-.119" cy="-.095" r=".055" /><circle cx=".181" cy="-.095" r=".055" /></g>
+            <rect className="sw" x="-.36" y="0" width=".72" height=".21" rx=".07" />
+          </svg></div>
         <Boot />
         {children}
       </body>
