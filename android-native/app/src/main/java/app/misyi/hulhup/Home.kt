@@ -26,6 +26,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -158,7 +159,7 @@ val kBuild get() = BuildConfig.BUILD
             drawCircle(ring.copy(alpha = ((1 - k) * (.34f - i * .08f)).coerceIn(0f, 1f)), (104 + e * 60).dp.toPx(), center, style = Stroke((2.2f - i * .5f).dp.toPx()))
         }
     }, contentAlignment = Alignment.Center) {
-        Box(Modifier.size(204.dp).scale(scale).shadow(shadow.dp, CircleShape, ambientColor = Brand, spotColor = Brand).background(Brand, CircleShape)
+        Box(Modifier.size(204.dp).graphicsLayer { scaleX = scale; scaleY = scale }.shadow(shadow.dp, CircleShape, ambientColor = Brand, spotColor = Brand).background(Brand, CircleShape)
             .pointerInput(Unit) { detectTapGestures(onPress = { down = true; tryAwaitRelease(); down = false }, onTap = { hap.performHapticFeedback(HapticFeedbackType.LongPress); sc.launch { burst.snapTo(0f); burst.animateTo(1f, tween(1000, easing = LinearEasing)) }; ctl.play?.invoke(null); onTap() }) },
             contentAlignment = Alignment.Center) {
             AnimMark(122.dp, auto = true, ms = 1500, first = 0, colors = listOf(Color.White, Brand, BrandDeep), ctl = ctl)
@@ -176,7 +177,7 @@ val kBuild get() = BuildConfig.BUILD
             Row(Modifier.padding(vertical = 14.dp, horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) { Icon(i, null, Modifier.size(24.dp), tint = ink()); Spacer(Modifier.width(16.dp)); HText(s.t(k), 16f, FontWeight.SemiBold) }
         }
     if (open || fade > 0f) Box(Modifier.fillMaxSize().alpha(fade).background(Color.Black.copy(alpha = .45f)).pointerInput(open) { if (open) detectTapGestures { close() } })
-    Column(Modifier.offset(x = x).width(300.dp).fillMaxHeight().shadow(20.dp, RoundedCornerShape(topEnd = 36.dp, bottomEnd = 36.dp)).background(bgOf(), RoundedCornerShape(topEnd = 36.dp, bottomEnd = 36.dp))
+    Column(Modifier.graphicsLayer { translationX = x.toPx() }.width(300.dp).fillMaxHeight().shadow(20.dp, RoundedCornerShape(topEnd = 36.dp, bottomEnd = 36.dp)).background(bgOf(), RoundedCornerShape(topEnd = 36.dp, bottomEnd = 36.dp))
         .statusBarsPadding().navigationBarsPadding().padding(20.dp, 18.dp)) {
         HBrand()
         Spacer(Modifier.height(28.dp))

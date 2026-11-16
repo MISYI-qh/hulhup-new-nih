@@ -23,6 +23,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
@@ -261,7 +262,11 @@ suspend fun reportSheet(audio: Int? = null, user: String? = null, comment: Int? 
     val c = remember { Animatable(0f) }
     LaunchedEffect(Unit) { if (show) { c.animateTo(1f, tween(3400, easing = LinearEasing)); introDone = true; show = false } }
     content()
-    if (!show) return
+    if (show) IntroOverlay(c)
+}
+
+/** Lapisan intro: hanya bagian ini yang dikomposisi ulang tiap frame, bukan seluruh aplikasi. */
+@Composable private fun IntroOverlay(c: Animatable<Float, androidx.compose.animation.core.AnimationVector1D>) {
     val t = c.value
     fun ramp(a: Float, b: Float) = ((t - a) / (b - a)).coerceIn(0f, 1f)
     val down = easeInC(ramp(.05f, .17f)); val up = easeOutBackC(ramp(.21f, .38f))
@@ -285,14 +290,14 @@ suspend fun reportSheet(audio: Int? = null, user: String? = null, comment: Int? 
             Row(Modifier.padding(start = 14.dp)) {
                 letters.forEachIndexed { i, l ->
                     val p = easeOutCubicC((read * 6.6f - i).coerceIn(0f, 1f))
-                    if (p > 0f) Box(Modifier.alpha(p).offset(y = ((1 - p) * 16).dp)) { HText(l, 52f, FontWeight.Bold, fg, ls = -1.2f) }
+                    if (p > 0f) Box(Modifier.graphicsLayer { alpha = p; translationY = (1 - p) * 16.dp.toPx() }) { HText(l, 52f, FontWeight.Bold, fg, ls = -1.2f) }
                 }
             }
         }
     }
 }
 var introDone = false
-private fun Modifier.graphicsLayerScale(s: Float) = this.then(Modifier.scale(s))
+private fun Modifier.graphicsLayerScale(s: Float) = this.graphicsLayer { scaleX = s; scaleY = s }
 private fun easeInC(x: Float) = x * x * x
 private fun easeOutCubicC(x: Float) = 1 - (1 - x) * (1 - x) * (1 - x)
 private fun easeInOutC(x: Float) = if (x < .5f) 4 * x * x * x else 1 - Math.pow((-2 * x + 2).toDouble(), 3.0).toFloat() / 2

@@ -79,7 +79,7 @@ val LocalDark = compositionLocalOf { false }
     val sc by animateFloatAsState(if (d) scale else 1f, tween(130, easing = FastOutSlowInEasing), label = "tap")
     val al by animateFloatAsState(if (d) .85f else 1f, tween(130), label = "tapa")
     val hap = LocalHapticFeedback.current
-    Box(modifier.scale(sc).alpha(al).pointerInput(onTap) {
+    Box(modifier.graphicsLayer { scaleX = sc; scaleY = sc; alpha = al }.pointerInput(onTap) {
         detectTapGestures(onPress = { if (onTap != null) { d = true; tryAwaitRelease(); d = false } }, onTap = { if (onTap != null) { hap.performHapticFeedback(HapticFeedbackType.TextHandleMove); onTap() } })
     }) { content() }
 }
@@ -197,8 +197,8 @@ fun toast(m: String, bad: Boolean = false) { Overlay.toasts.add(ToastMsg(System.
     var show by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { show = true; delay(2600); show = false; delay(380); Overlay.toasts.remove(t) }
     val a by animateFloatAsState(if (show) 1f else 0f, tween(380), label = "toast")
-    Box(Modifier.fillMaxSize().statusBarsPadding().padding(top = 14.dp, start = 20.dp, end = 20.dp).alpha(a), contentAlignment = Alignment.TopCenter) {
-        Row(Modifier.offset(y = ((a - 1) * 60).dp).background(if (t.bad) Color(0xFF7A2A25) else Color(0xFF1F1F1F), RoundedCornerShape(26.dp)).padding(horizontal = 18.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
+    Box(Modifier.fillMaxSize().statusBarsPadding().padding(top = 14.dp, start = 20.dp, end = 20.dp).graphicsLayer { alpha = a }, contentAlignment = Alignment.TopCenter) {
+        Row(Modifier.graphicsLayer { translationY = (a - 1) * 60.dp.toPx() }.background(if (t.bad) Color(0xFF7A2A25) else Color(0xFF1F1F1F), RoundedCornerShape(26.dp)).padding(horizontal = 18.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(if (t.bad) Icons.Rounded.ErrorOutline else Icons.Rounded.CheckCircleOutline, null, Modifier.size(20.dp), tint = Cream)
             Spacer(Modifier.width(10.dp))
             HText(t.m, 14f, FontWeight.SemiBold, Cream)
