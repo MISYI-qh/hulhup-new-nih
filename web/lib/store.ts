@@ -320,10 +320,12 @@ export class Store {
   }
 
   // ---------- pemutar ----------
+  /** Waktu putar saat ini (ms), dibaca langsung dari elemen audio agar animasi tidak bergantung pada render React. */
+  get nowMs(): number { return this.p ? this.p.currentTime * 1000 : 0; }
   private audio(): HTMLAudioElement {
     if (!this.p) {
       const p = this.p = new Audio();
-      p.addEventListener('timeupdate', () => { this.pos = Math.floor(p.currentTime * 1000); this.notify(); });
+      p.addEventListener('timeupdate', () => { this.pos = Math.floor(p.currentTime * 1000); });
       p.addEventListener('loadedmetadata', () => { this.dur = Math.floor((p.duration || 0) * 1000); });
       p.addEventListener('ended', () => { this.playing = null; this.scope = null; if (this.dur > 0) this.pos = this.dur; this.notify(); });
     }

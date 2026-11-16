@@ -150,3 +150,13 @@ input,textarea{color:inherit;font-family:inherit}
 @keyframes splashout{to{opacity:0;visibility:hidden}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}.sk{animation:none}}
 @keyframes ring3{0%{transform:scale(1);opacity:.34}100%{transform:scale(1.58);opacity:0}}
+
+body:has(.ovl),body:has(.side.open){overflow:hidden}
+.hsheet,.side .panel,.wheel ol{overscroll-behavior:contain}
+.cmtbar textarea,.sheetfield textarea,input,textarea,select{font-size:16px}
+.toast{top:calc(14px + env(safe-area-inset-top))}
+.cmtbar{padding-bottom:calc(10px + env(safe-area-inset-bottom))}
+.hsheet{margin-bottom:calc(12px + env(safe-area-inset-bottom))}
+.topbar{padding-top:env(safe-area-inset-top)}
+button{-webkit-tap-highlight-color:transparent}
+.tap:focus-visible{outline-offset:-2px}

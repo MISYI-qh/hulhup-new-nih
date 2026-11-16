@@ -9,7 +9,7 @@ export default function AnimMark({ width, auto, loop, slow, tapPlay, first, ms =
   const cv = useRef<HTMLCanvasElement>(null), st = useRef({ v: first ?? Math.floor(Math.random() * kMarkAnims), last: -1, t0: 0, run: false, raf: 0, timer: 0 as any });
   const H = width * .5 / .72;
   useEffect(() => {
-    const c = cv.current!, ctx = c.getContext('2d')!, s = st.current, dpr = window.devicePixelRatio || 1;
+    const c = cv.current!, ctx = c.getContext('2d')!, s = st.current, dpr = Math.min(window.devicePixelRatio || 1, 2);
     c.width = width * dpr * 1.6; c.height = H * dpr * 1.6; // ruang ekstra untuk lompat/putar
     const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const dark = () => matchMedia('(prefers-color-scheme: dark)').matches;
@@ -38,7 +38,14 @@ export default function AnimMark({ width, auto, loop, slow, tapPlay, first, ms =
     (c as any)._play = play;
     draw(1 - 1e-9 > 0 ? 1 : 1); draw(s.v === 0 ? 1 : 1);
     if (auto && !still) s.timer = setTimeout(() => play(), loop ? 0 : 500);
-    return () => { cancelAnimationFrame(s.raf); clearTimeout(s.timer); };
+    // jeda saat tab tersembunyi atau logo di luar layar; lanjut saat terlihat lagi
+    let inView = true; const halt = () => { cancelAnimationFrame(s.raf); clearTimeout(s.timer); s.run = false; };
+    const resume = () => { if (auto && !still && inView && document.visibilityState === 'visible' && !s.run) s.timer = setTimeout(() => play(), 300); };
+    const io = new IntersectionObserver(([e]) => { inView = e.isIntersecting; inView ? resume() : halt(); });
+    io.observe(c);
+    const vis = () => (document.visibilityState === 'visible' ? resume() : halt());
+    document.addEventListener('visibilitychange', vis);
+    return () => { halt(); io.disconnect(); document.removeEventListener('visibilitychange', vis); };
   }, [width, auto, loop, slow, ms, colors]);
   const box = { width: width * 1.6, height: H * 1.6, margin: `${-H * .3}px ${-width * .3}px` } as const;
   return <canvas ref={cv} role="img" aria-label={label || 'Hulhup'} style={{ ...box, cursor: tapPlay ? 'pointer' : undefined }} onClick={tapPlay ? () => (cv.current as any)?._play?.() : undefined} />;

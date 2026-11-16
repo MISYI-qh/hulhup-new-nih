@@ -47,23 +47,46 @@ export function waveShape(seed: number, n: number): number[] {
   const raw = Array.from({ length: n }, () => rnd());
   return raw.map((a, i) => { const b = raw[(i + 1) % n], c = raw[(i + n - 1) % n], env = .55 + .45 * Math.sin(Math.PI * (i + .5) / n); return (.18 + .82 * (a * .6 + b * .2 + c * .2)) * env; });
 }
-export function Wave({ seed, progress, height = 32 }: { seed: number; progress: number; height?: number }) {
-  const cv = useRef<HTMLCanvasElement>(null);
+/** Satu loop rAF yang menulis langsung ke DOM (tanpa setState) selama audio `on` diputar. */
+export function useRaf(on: boolean, fallbackMs: number, f: (ms: number, dur: number) => void) {
+  const fr = useRef(f); fr.current = f;
   useEffect(() => {
-    const c = cv.current!, w = c.clientWidth, h = height, dpr = Math.min(devicePixelRatio || 1, 3);
-    c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
-    const g = c.getContext('2d')!; g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const cs = getComputedStyle(c), ink = cs.getPropertyValue('--ink').trim() || '#111', brand = cs.getPropertyValue('--brand').trim() || '#5b47f5';
+    if (!on) { fr.current(0, fallbackMs); return; }
+    let r = 0; const loop = () => { fr.current(store.nowMs, store.dur > 0 ? store.dur : fallbackMs); r = requestAnimationFrame(loop); };
+    r = requestAnimationFrame(loop); return () => cancelAnimationFrame(r);
+  }, [on, fallbackMs]);
+}
+/** Gelombang: gambar sekali (dua kanvas), kemajuan lewat clip-path yang diubah lewat ref. */
+export function Wave({ seed, on = false, totalMs = 15000, height = 32 }: { seed: number; on?: boolean; totalMs?: number; height?: number }) {
+  const base = useRef<HTMLCanvasElement>(null), top = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const w = base.current!.clientWidth, h = height, dpr = Math.min(devicePixelRatio || 1, 2);
+    const cs = getComputedStyle(base.current!), ink = cs.getPropertyValue('--ink').trim() || '#111';
     const rest = `color-mix(in srgb, ${ink} 20%, transparent)`;
-    const gap = 3, bw = 3, n = Math.min(80, Math.max(8, Math.floor((w + gap) / (bw + gap)))), hs = waveShape(seed, n), cur = Math.floor(progress * n);
-    g.clearRect(0, 0, w, h);
-    for (let i = 0; i < n; i++) {
-      const bh = Math.min(h, Math.max(4, h * hs[i]));
-      g.fillStyle = progress <= 0 ? rest : i < cur ? ink : i === cur ? brand : rest;
-      g.beginPath(); (g as any).roundRect(i * (bw + gap), (h - bh) / 2, bw, bh, 2); g.fill();
+    const gap = 3, bw = 3, n = Math.min(80, Math.max(8, Math.floor((w + gap) / (bw + gap)))), hs = waveShape(seed, n);
+    for (const [c, col] of [[base.current!, rest], [top.current!, ink]] as const) {
+      c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
+      const g = c.getContext('2d')!; g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h); g.fillStyle = col;
+      for (let i = 0; i < n; i++) { const bh = Math.min(h, Math.max(4, h * hs[i])); g.beginPath(); (g as any).roundRect(i * (bw + gap), (h - bh) / 2, bw, bh, 2); g.fill(); }
     }
-  });
-  return <canvas ref={cv} className="wave" style={{ width: '100%', height }} aria-hidden />;
+  }, [seed, height]);
+  useRaf(on, totalMs, (ms, dur) => { const e = top.current; if (e) e.style.clipPath = `inset(0 ${(1 - Math.min(1, Math.max(0, ms / dur))) * 100}% 0 0)`; });
+  return <div style={{ position: 'relative', width: '100%', height }} aria-hidden>
+    <canvas ref={base} className="wave" style={{ position: 'absolute', inset: 0, width: '100%', height }} />
+    <canvas ref={top} className="wave" style={{ position: 'absolute', inset: 0, width: '100%', height, clipPath: 'inset(0 100% 0 0)' }} /></div>;
+}
+/** Teks waktu yang berubah sekali per detik langsung di DOM. */
+export function TimeText({ on, secs, full = false }: { on: boolean; secs: number; full?: boolean }) {
+  const el = useRef<HTMLSpanElement>(null), last = useRef(-1);
+  const idle = secs > 0 ? mmss(secs) : '·';
+  useRaf(on, 0, (ms) => { const e = el.current; if (!e) return; const sec = on ? Math.floor(ms / 1000) : -2; if (sec === last.current) return; last.current = sec; e.textContent = on ? (full ? `${mmss(sec)} / ${mmss(secs)}` : mmss(sec)) : idle; });
+  return <span ref={el} style={{ fontVariantNumeric: 'tabular-nums' }}>{idle}</span>;
+}
+/** Batang kemajuan: hanya transform (scaleX) lewat ref. */
+export function ProgBar({ on, totalMs }: { on: boolean; totalMs: number }) {
+  const el = useRef<HTMLDivElement>(null);
+  useRaf(on, totalMs, (ms, dur) => { const e = el.current; if (e) e.style.transform = `scaleX(${on ? Math.min(1, Math.max(0, ms / dur)) : 0})`; });
+  return <div ref={el} style={{ height: '100%', background: 'var(--ink)', transformOrigin: 'left', transform: 'scaleX(0)', willChange: 'transform' }} />;
 }
 
 const rateText = (r: number) => (Number.isInteger(r) ? `${r}×` : `${String(r).replace(/0+$/, '')}×`);
@@ -73,8 +96,8 @@ export function FileBar({ keyId, url, secs, scope, onStart }: { keyId: number; u
   const total = Math.max(1, on && s.dur > 0 ? s.dur : secs > 0 ? secs * 1000 : 15000);
   return <div className={`fbar${on ? ' on' : ''}`} onClick={(e) => e.stopPropagation()}>
     <button className={`tap pbtn2${on ? ' on' : ''}`} aria-label={on ? 'Jeda' : 'Putar'} onClick={() => { if (!on) onStart?.(); s.playUrl(keyId, url, { scope }).catch(() => toast(s.t('e_server'), { bad: true })); }}><Icon n={on ? 'pause_rounded' : 'play_arrow_rounded'} size={24} /></button>
-    <div style={{ flex: 1, minWidth: 0 }}><Wave seed={keyId} progress={on ? Math.min(1, Math.max(0, s.pos / total)) : 0} /></div>
-    <span style={{ fontSize: 12.5, fontWeight: 700, color: on ? 'var(--ink)' : 'var(--sub)', fontVariantNumeric: 'tabular-nums' }}>{on ? mmss(Math.floor(s.pos / 1000)) : secs > 0 ? mmss(secs) : '·'}</span>
+    <div style={{ flex: 1, minWidth: 0 }}><Wave seed={keyId} on={on} totalMs={total} /></div>
+    <span style={{ fontSize: 12.5, fontWeight: 700, color: on ? 'var(--ink)' : 'var(--sub)' }}><TimeText on={on} secs={secs} /></span>
     <button className="tap rate" onClick={() => s.cycleRate()} style={{ color: s.rate === 1 ? 'var(--sub)' : 'var(--acc)' }}>{rateText(s.rate)}</button>
   </div>;
 }

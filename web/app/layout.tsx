@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   twitter: { card: 'summary' },
   icons: { icon: '/icons/Icon-192.png', apple: '/icons/Icon-192.png' },
 };
-export const viewport: Viewport = { themeColor: '#0B0B0B', colorScheme: 'light dark', width: 'device-width', initialScale: 1 };
+export const viewport: Viewport = { themeColor: '#0B0B0B', colorScheme: 'light dark', width: 'device-width', initialScale: 1, viewportFit: 'cover' };
 
 export default function Root({ children }: { children: React.ReactNode }) {
   return (

@@ -10,17 +10,17 @@ import { HupsFeed } from './feed';
 import { LinkEmbed, MentionText, Avatar, Verified, firstUrl } from './rich';
 import { PostActions, toggleOfflinePost } from './post';
 import { postCode } from '@/lib/links';
-import { mmss } from './post';
+import { ProgBar, TimeText } from './post';
 import { type A, store, useStore } from '@/lib/store';
 
 function TapButton({ onTap }: { onTap: () => void }) {
   const [down, setDown] = useState(false); const [burst, setBurst] = useState(0); const mark = useRef<HTMLDivElement>(null);
   return <div style={{ width: 330, height: 330, position: 'relative', display: 'grid', placeItems: 'center', maxWidth: '100%' }}>
-    {burst ? [0, 1, 2].map((i) => <span key={`${burst}${i}`} style={{ position: 'absolute', width: 208, height: 208, borderRadius: '50%', border: `${2.2 - i * .5}px solid var(--ink)`, opacity: 0, animation: `ring3 1s ${i * .18}s cubic-bezier(.2,.8,.2,1) both`, pointerEvents: 'none' }} />) : null}
+    {burst ? [0, 1, 2].map((i) => <span key={`${burst}${i}`} style={{ position: 'absolute', width: 208, height: 208, borderRadius: '50%', border: `${2.2 - i * .5}px solid var(--ink)`, opacity: 0, willChange: 'transform, opacity', animation: `ring3 1s ${i * .18}s cubic-bezier(.2,.8,.2,1) both`, pointerEvents: 'none' }} />) : null}
     <button className="tap" aria-label={store.t('rand_tab')} onPointerDown={() => setDown(true)} onPointerUp={() => setDown(false)} onPointerLeave={() => setDown(false)}
       onClick={() => { setBurst((b) => b + 1); (mark.current?.firstElementChild as any)?.__play?.(); try { navigator.vibrate?.(12); } catch {} onTap(); }}
       style={{ width: 204, height: 204, borderRadius: '50%', background: 'var(--brand)', display: 'grid', placeItems: 'center', transform: `scale(${down ? .94 : 1})`, transition: 'transform .15s ease-out, box-shadow .15s', boxShadow: `0 ${down ? 10 : 26}px ${down ? 24 : 52}px rgba(91,71,245,${down ? .22 : .38})` }}>
-      <div ref={mark}><AnimMark width={170} auto ms={1500} first={0} colors={['#fff', '#5b47f5', '#4330d0']} /></div>
+      <div ref={mark}><AnimMark width={124} auto ms={1500} first={0} colors={['#fff', '#5b47f5', '#4330d0']} /></div>
     </button></div>;
 }
 
@@ -53,8 +53,8 @@ export function PopupBody({ a, close }: { a: A; close: () => void }) {
     <div style={{ height: a.pprof || a.desc.trim() ? 14 : 4 }} />
     {a.url ? <div className="row2" style={{ background: 'var(--soft)', borderRadius: 26, padding: '8px 6px 8px 8px' }}>
       <button className={`tap pbtn2${on ? ' on' : ''}`} style={{ width: 44, height: 44, borderRadius: on ? 13 : 22 }} aria-label={on ? 'Jeda' : 'Putar'} onClick={() => s.play(a).catch(() => toast(s.t('e_server'), { bad: true }))}><Icon n={on ? 'pause_rounded' : 'play_arrow_rounded'} size={26} /></button>
-      <div style={{ flex: 1, margin: '0 12px', height: 6, borderRadius: 4, background: 'color-mix(in srgb, var(--ink) 12%, transparent)', overflow: 'hidden' }}><div style={{ height: '100%', width: `${on ? Math.min(100, s.pos / total * 100) : 0}%`, background: 'var(--ink)' }} /></div>
-      <span style={{ fontSize: 13, fontWeight: 700, color: on ? 'var(--ink)' : 'var(--sub)' }}>{mmss(on ? Math.floor(s.pos / 1000) : 0)} / {mmss(a.secs)}</span></div> : null}
+      <div style={{ flex: 1, margin: '0 12px', height: 6, borderRadius: 4, background: 'color-mix(in srgb, var(--ink) 12%, transparent)', overflow: 'hidden' }}><ProgBar on={on} totalMs={total} /></div>
+      <span style={{ fontSize: 13, fontWeight: 700, color: on ? 'var(--ink)' : 'var(--sub)' }}><TimeText on={on} secs={a.secs} full /></span></div> : null}
     {a.url ? <div style={{ marginTop: 10 }}><SpeedRow /></div> : null}
     <div style={{ height: 6 }} />
     <PostActions a={a} onComments={() => open(`/p/${postCode(a.id)}`)} />

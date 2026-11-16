@@ -201,7 +201,7 @@ export function ComposeScreen() {
       <div style={{ fontWeight: 800, fontSize: 16, marginTop: 12 }}>{s.t('add_audio')}</div><div style={{ color: 'var(--sub)', fontSize: 12.5, marginTop: 3 }}>{s.t('audio_req')}</div></button>
       : <div className="row2" style={{ padding: '10px 6px 10px 10px', borderRadius: 20, border: '1.4px solid color-mix(in srgb, var(--ink) 50%, transparent)', gap: 12 }}>
         <button className="tap" aria-label={playing ? 'Jeda' : 'Putar'} onClick={play} style={{ width: 44, height: 44, borderRadius: playing ? 13 : 22, background: playing ? 'var(--brand)' : 'var(--btn)', color: playing ? '#fff' : 'var(--cream)', display: 'grid', placeItems: 'center', flex: 'none' }}><Icon n={playing ? 'pause_rounded' : 'play_arrow_rounded'} size={24} /></button>
-        <div style={{ flex: 1, minWidth: 0 }}><Wave seed={clip.blob.size} progress={0} height={34} /></div>
+        <div style={{ flex: 1, minWidth: 0 }}><Wave seed={clip.blob.size} height={34} /></div>
         <b style={{ fontSize: 13.5 }}>{mmss(clip.secs)}</b><IconBtn n="refresh_rounded" color="var(--sub)" onClick={add} /><IconBtn n="close_rounded" color="var(--sub)" onClick={() => { au.current?.pause(); setClip(null); setPlaying(false); setBgm(false); }} /></div>}
     {clip ? <div className="row2" style={{ paddingTop: 14, gap: 12 }}><div style={{ flex: 1 }}><div style={{ fontWeight: 600, fontSize: 16 }}>{s.t('bgm_label')}</div><div style={{ color: 'var(--sub)', fontSize: 12.5 }}>{s.t('bgm_note')}</div></div><Toggle v={bgm} on={setBgm} /></div> : null}
     <div style={{ height: 14 }} />

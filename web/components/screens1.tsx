@@ -7,7 +7,7 @@ import { NeedLogin, Screen, useNav } from './shell';
 import { Empty, Field, IconBtn, Loader, PBtn, Seg, confirmDlg, sheet, toast } from './ui';
 import { audIcon, audText, AudChip } from './aud';
 import { Avatar, MentionText, Verified } from './rich';
-import { PostCard, FileBar, savePost, likeAudio, toggleOfflinePost, mmss } from './post';
+import { PostCard, FileBar, savePost, likeAudio, toggleOfflinePost, TimeText } from './post';
 import { postCode } from '@/lib/links';
 import { reportSheet } from './aud';
 import { A, Api, store, useStore } from '@/lib/store';
@@ -122,7 +122,7 @@ export function AudioRow({ a, mine, onDelete, showOwner, scope }: { a: A; mine?:
       <div style={{ fontWeight: 700, fontSize: 15, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden', color: a.desc.trim() ? undefined : 'var(--sub)' }}>{a.desc.trim() || s.t('untitled')}</div>
       {a.created > 0 ? <div style={{ color: 'var(--sub)', fontSize: 12.5, margin: '4px 0 3px' }}>{s.when(a.created)}</div> : null}
       <div className="row2" style={{ gap: 10, flexWrap: 'wrap' }}>
-        {a.url ? <span style={{ fontSize: 13, fontWeight: 700, color: on ? 'var(--ink)' : 'var(--sub)' }}>{on ? `${mmss(Math.floor(s.pos / 1000))} / ${mmss(a.secs)}` : mmss(a.secs)}</span> : null}
+        {a.url ? <span style={{ fontSize: 13, fontWeight: 700, color: on ? 'var(--ink)' : 'var(--sub)' }}><TimeText on={on} secs={a.secs} full /></span> : null}
         <AudChip rand={a.rand} to={a.to} />
         {showOwner ? <span style={{ color: 'var(--sub)', fontSize: 13 }}>{a.ownerName}</span> : null}
         <button className="tap" style={{ padding: 4, color: off ? 'var(--ink)' : 'var(--sub)' }} aria-label="Offline" onClick={(e) => { e.stopPropagation(); toggleOfflinePost(a); }}><Icon n={off ? 'offline_pin_rounded' : 'download_for_offline_outlined'} size={20} /></button>
