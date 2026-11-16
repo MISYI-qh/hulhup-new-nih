@@ -86,19 +86,20 @@ export function LinkEmbed({ url }: { url: string }) {
 }
 
 function PageCard({ url, p }: { url: string; p: any }) {
-  const img = proxied(`${p.image ?? ''}`), icon = proxied(`${p.icon ?? ''}`), site = `${p.site ?? p.host ?? ''}`;
+  const img = proxied(`${p.image ?? ''}`), icon = proxied(`${p.icon ?? ''}`), site = `${p.site ?? ''}` || `${p.host ?? ''}`;
+  const hide = (e: React.SyntheticEvent) => ((e.target as HTMLElement).style.display = 'none');
   return <a className="tap embed" style={{ display: 'block', marginRight: 8, textDecoration: 'none', color: 'inherit' }} href={linkUri(url)?.toString()} target="_blank" rel="noopener noreferrer nofollow ugc" onClick={(e) => e.stopPropagation()}>
-    {img ? <img src={img} alt="" style={{ aspectRatio: '1.91', objectFit: 'cover', width: '100%' }} onError={(e) => ((e.target as HTMLElement).style.display = 'none')} /> : null}
-    <div className="pg" style={{ padding: '10px 14px 12px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--sub)', fontSize: 12.5, fontWeight: 600 }}>{icon ? <img src={icon} alt="" width={14} height={14} style={{ borderRadius: 4, width: 14, height: 14 }} onError={(e) => ((e.target as HTMLElement).style.display = 'none')} /> : null}<span>{site}</span></div>
-      {p.title ? <b style={{ display: 'block', marginTop: 4, fontSize: 15, fontWeight: 800, lineHeight: 1.25, whiteSpace: 'normal' }}>{p.title}</b> : null}
-      {p.desc ? <span style={{ display: 'block', marginTop: 3, color: 'var(--sub)', fontSize: 13.5, lineHeight: 1.3, whiteSpace: 'normal', overflow: 'hidden', textOverflow: 'ellipsis', maxHeight: '2.6em' }}>{p.desc}</span> : null}
+    {img ? <img className="pimg" src={img} alt="" loading="lazy" decoding="async" onError={hide} /> : null}
+    <div className="pg">
+      <div className="site">{icon ? <img src={icon} alt="" width={14} height={14} style={{ borderRadius: 4, width: 14, height: 14, flex: 'none', background: 'none', objectFit: 'contain' }} onError={hide} /> : null}<span>{site}</span></div>
+      {p.title ? <b>{p.title}</b> : null}
+      {p.desc ? <div className="ds">{p.desc}</div> : null}
     </div></a>;
 }
 function ImageEmbed({ src, orig }: { src: string; orig: string }) {
   const [bad, setBad] = useState(false);
   if (bad) return <div className="embed" style={{ padding: 14, marginRight: 8, display: 'flex', gap: 10, color: 'var(--sub)' }}><Icon n="broken_image_outlined" />{host(orig || src)}</div>;
-  return <a className="tap embed" style={{ display: 'block', marginRight: 8, maxHeight: 420 }} href={src} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}><img src={src} alt="" onError={() => setBad(true)} style={{ maxHeight: 420 }} /></a>;
+  return <a className="tap embed im" style={{ display: 'block', marginRight: 8 }} href={src} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}><img src={src} alt="" loading="lazy" decoding="async" onError={() => setBad(true)} /></a>;
 }
 /** Video dari URL: tidak diunduh sampai diketuk (hemat kuota), lalu langsung diputar di tempat. */
 function VideoEmbed({ url }: { url: string }) {
