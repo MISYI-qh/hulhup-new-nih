@@ -36,7 +36,7 @@ export default function AnimMark({ width, auto, loop, slow, tapPlay, first, ms =
       s.raf = requestAnimationFrame(tick);
     };
     (c as any)._play = play;
-    draw(1 - 1e-9 > 0 ? 1 : 1); draw(s.v === 0 ? 1 : 1);
+    draw(1);
     if (auto && !still) s.timer = setTimeout(() => play(), loop ? 0 : 500);
     // jeda saat tab tersembunyi atau logo di luar layar; lanjut saat terlihat lagi
     let inView = true; const halt = () => { cancelAnimationFrame(s.raf); clearTimeout(s.timer); s.run = false; };

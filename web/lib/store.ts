@@ -322,6 +322,15 @@ export class Store {
   // ---------- pemutar ----------
   /** Waktu putar saat ini (ms), dibaca langsung dari elemen audio agar animasi tidak bergantung pada render React. */
   get nowMs(): number { return this.p ? this.p.currentTime * 1000 : 0; }
+  private sm = { ct: -1, ts: 0 };
+  /** Waktu putar yang dihaluskan: currentTime di browser naik berundak (20–250 ms), jadi disisipkan per frame supaya gerak progres tidak patah. */
+  get nowSmooth(): number {
+    const p = this.p; if (!p) return 0;
+    const ct = p.currentTime * 1000, now = performance.now();
+    if (p.paused || p.ended) { this.sm.ct = ct; this.sm.ts = now; return ct; }
+    if (ct !== this.sm.ct) { this.sm.ct = ct; this.sm.ts = now; return ct; }
+    return ct + Math.min(250, (now - this.sm.ts) * (p.playbackRate || 1));
+  }
   private audio(): HTMLAudioElement {
     if (!this.p) {
       const p = this.p = new Audio();

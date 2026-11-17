@@ -52,13 +52,13 @@ export function useRaf(on: boolean, fallbackMs: number, f: (ms: number, dur: num
   const fr = useRef(f); fr.current = f;
   useEffect(() => {
     if (!on) { fr.current(0, fallbackMs); return; }
-    let r = 0; const loop = () => { fr.current(store.nowMs, store.dur > 0 ? store.dur : fallbackMs); r = requestAnimationFrame(loop); };
+    let r = 0; const loop = () => { fr.current(store.nowSmooth, store.dur > 0 ? store.dur : fallbackMs); r = requestAnimationFrame(loop); };
     r = requestAnimationFrame(loop); return () => cancelAnimationFrame(r);
   }, [on, fallbackMs]);
 }
 /** Gelombang: gambar sekali (dua kanvas), kemajuan lewat clip-path yang diubah lewat ref. */
 export function Wave({ seed, on = false, totalMs = 15000, height = 32 }: { seed: number; on?: boolean; totalMs?: number; height?: number }) {
-  const base = useRef<HTMLCanvasElement>(null), top = useRef<HTMLCanvasElement>(null);
+  const base = useRef<HTMLCanvasElement>(null), top = useRef<HTMLCanvasElement>(null), mover = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const w = base.current!.clientWidth, h = height, dpr = Math.min(devicePixelRatio || 1, 2);
     const cs = getComputedStyle(base.current!), ink = cs.getPropertyValue('--ink').trim() || '#111';
@@ -70,10 +70,12 @@ export function Wave({ seed, on = false, totalMs = 15000, height = 32 }: { seed:
       for (let i = 0; i < n; i++) { const bh = Math.min(h, Math.max(4, h * hs[i])); g.beginPath(); (g as any).roundRect(i * (bw + gap), (h - bh) / 2, bw, bh, 2); g.fill(); }
     }
   }, [seed, height]);
-  useRaf(on, totalMs, (ms, dur) => { const e = top.current; if (e) e.style.clipPath = `inset(0 ${(1 - Math.min(1, Math.max(0, ms / dur))) * 100}% 0 0)`; });
+  // kemajuan hanya lewat transform (dua lapis saling berlawanan): tidak memicu layout maupun paint ulang kanvas
+  useRaf(on, totalMs, (ms, dur) => { const m = mover.current, t = top.current; if (!m || !t) return; const q = (1 - Math.min(1, Math.max(0, ms / dur))) * 100; m.style.transform = `translate3d(${-q}%,0,0)`; t.style.transform = `translate3d(${q}%,0,0)`; });
   return <div style={{ position: 'relative', width: '100%', height }} aria-hidden>
     <canvas ref={base} className="wave" style={{ position: 'absolute', inset: 0, width: '100%', height }} />
-    <canvas ref={top} className="wave" style={{ position: 'absolute', inset: 0, width: '100%', height, clipPath: 'inset(0 100% 0 0)' }} /></div>;
+    <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}><div ref={mover} style={{ position: 'absolute', inset: 0, overflow: 'hidden', transform: 'translate3d(-100%,0,0)', willChange: 'transform' }}>
+      <canvas ref={top} className="wave" style={{ position: 'absolute', inset: 0, width: '100%', height, transform: 'translate3d(100%,0,0)', willChange: 'transform' }} /></div></div></div>;
 }
 /** Teks waktu yang berubah sekali per detik langsung di DOM. */
 export function TimeText({ on, secs, full = false }: { on: boolean; secs: number; full?: boolean }) {

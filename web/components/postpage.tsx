@@ -62,11 +62,12 @@ export function PostScreen({ id, comment, seed }: { id: number; comment?: number
   useEffect(() => { const e = ta.current; if (e) { e.style.height = 'auto'; e.style.height = Math.min(140, e.scrollHeight) + 'px'; } }, [input]);
 
   const refreshPost = async () => { const p = await Api.req('GET', `/posts/${id}`); setA(new A(p.post)); };
+  const sendLock = useRef(false);
   const send = async () => {
-    const t = input.trim(); if (!t || t === autoTag.current.trim()) return; setSending(true); let cid: number | null = null;
+    const t = input.trim(); if (sendLock.current || !t || t === autoTag.current.trim()) return; sendLock.current = true; setSending(true); let cid: number | null = null;
     try { const j = await Api.req('POST', `/posts/${id}/comments`, { text: t, parent: replyTo?.id }); cid = Number(j.id); setInput(''); setReplyTo(null); autoTag.current = ''; await comments(); await refreshPost(); }
     catch (e) { if (cid != null) { try { await Api.req('DELETE', `/comments/${cid}`); } catch {} } toast(s.err(e), { bad: true }); }
-    setSending(false);
+    sendLock.current = false; setSending(false);
   };
   const reply = (c: any) => { const tag = `@${c.username} `; const cur = input; const body = cur.startsWith(autoTag.current) ? cur.slice(autoTag.current.length) : cur; autoTag.current = tag; setInput(tag + body); setReplyTo(c); ta.current?.focus(); };
   const del = async (c: any) => {
@@ -182,17 +183,18 @@ export function ComposeScreen() {
     const r = await sheet<Record<string, any>>((close) => <AccountPick init={picked} close={close as any} />); if (!r) return;
     setPicked(r); if (!Object.keys(r).length) { const l = audSplit(rand).filter((x) => x !== 'accounts'); setRand(l.length ? l.join(',') : 'public'); }
   };
+  const lock = useRef(false);
   const submit = async () => {
-    const t = text.trim();
+    if (lock.current) return; const t = text.trim();
     if (!clip && !t) { toast(s.t('e_empty'), { bad: true }); return; }
     if (audSplit(rand).includes('accounts') && !Object.keys(picked).length) { toast(s.t('e_need_accounts'), { bad: true }); return; }
-    setBusy(true); let id: number | null = null;
+    lock.current = true; setBusy(true); let id: number | null = null;
     try {
       const j = await Api.req('POST', '/posts', { text: t, audios: clip ? 1 : 0, ...(clip ? { bgm } : {}), pprof, rand: audSplit(rand), to: Object.keys(picked) });
       id = Number(j.id);
       if (clip) await Api.send(`/posts/${id}/audio?secs=${clip.secs}`, clip.blob, 'application/octet-stream');
       toast(s.t('posted')); n.back();
-    } catch (e) { if (id != null) { try { await Api.req('DELETE', `/audios/${id}`); } catch {} } toast(s.err(e), { bad: true }); setBusy(false); }
+    } catch (e) { if (id != null) { try { await Api.req('DELETE', `/audios/${id}`); } catch {} } toast(s.err(e), { bad: true }); lock.current = false; setBusy(false); }
   };
   const hasAcc = audSplit(rand).includes('accounts');
   return <Screen title={s.t('new_post')}><div style={{ padding: '4px 22px 40px' }}>
