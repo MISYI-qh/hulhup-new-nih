@@ -170,14 +170,8 @@ suspend fun postMenu(a: A, onDeleted: (() -> Unit)? = null) {
             .background(cardC(), RoundedCornerShape(28.dp)).border(1.dp, ink().copy(alpha = .07f), RoundedCornerShape(28.dp)).padding(16.dp, 14.dp, 8.dp, 4.dp)) {
             OwnerRow(a, more = { sc.launch { postMenu(a, onDeleted) } })
             Box(Modifier.padding(top = 8.dp, end = 8.dp)) { AudChip(a.rand, a.to) }
-            if (text.isNotEmpty()) BoxWithConstraints(Modifier.padding(0.dp, 10.dp, 8.dp, 0.dp)) {
-                val w = constraints.maxWidth
-                val over = a.long || tm.measure(AnnotatedString(text), st, maxLines = 6, constraints = androidx.compose.ui.unit.Constraints(maxWidth = w)).hasVisualOverflow
-                Column {
-                    MentionText(text, st, maxLines = 6)
-                    if (over) HText(s.t("read_more"), 14f, FontWeight.Bold, acc(), Modifier.padding(top = 4.dp))
-                }
-            }
+            // Di daftar Hups dan profil, teks post tampil penuh (pemotongan + Selengkapnya hanya di popup Acak).
+            if (text.isNotEmpty()) Box(Modifier.padding(0.dp, 10.dp, 8.dp, 0.dp)) { MentionText(text, st) }
             firstUrl(text)?.let { LinkEmbed(it) }
             if (a.files.isNotEmpty()) Box(Modifier.padding(end = 8.dp)) { if (a.bgm) BgmBar(a) else AudioBars(a, scope) }
             Spacer(Modifier.height(4.dp))

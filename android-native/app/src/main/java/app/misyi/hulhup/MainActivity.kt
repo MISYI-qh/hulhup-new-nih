@@ -47,7 +47,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         lifecycleScope.launch {
             // Status masuk benar di layar pertama, tapi tidak menahan layar pembuka bila internet mati atau lambat.
-            withTimeoutOrNull(3000) { Store.refresh() }
+            val init = launch { Store.refresh() }
+            withTimeoutOrNull(1200) { init.join() }
             Nav.reset(*initial(intent))
             ready = true
         }

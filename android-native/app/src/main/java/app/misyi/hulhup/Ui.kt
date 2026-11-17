@@ -79,8 +79,9 @@ val LocalDark = compositionLocalOf { false }
     val sc by animateFloatAsState(if (d) scale else 1f, tween(130, easing = FastOutSlowInEasing), label = "tap")
     val al by animateFloatAsState(if (d) .85f else 1f, tween(130), label = "tapa")
     val hap = LocalHapticFeedback.current
+    var lastTap by remember { mutableLongStateOf(0L) }
     Box(modifier.graphicsLayer { scaleX = sc; scaleY = sc; alpha = al }.pointerInput(onTap) {
-        detectTapGestures(onPress = { if (onTap != null) { d = true; tryAwaitRelease(); d = false } }, onTap = { if (onTap != null) { hap.performHapticFeedback(HapticFeedbackType.TextHandleMove); onTap() } })
+        detectTapGestures(onPress = { if (onTap != null) { d = true; tryAwaitRelease(); d = false } }, onTap = { if (onTap != null) { val n = System.currentTimeMillis(); if (n - lastTap < 350) return@detectTapGestures; lastTap = n; hap.performHapticFeedback(HapticFeedbackType.TextHandleMove); onTap() } })
     }) { content() }
 }
 
@@ -386,10 +387,12 @@ class AnimMarkCtl { var play: ((Int?) -> Unit)? = null }
 
 /** Kerangka pemuatan berdenyut halus (pengganti putaran kosong): kartu dengan avatar, nama, dan baris teks. */
 @Composable fun Loader() {
+    // Muncul pelan setelah jeda singkat, supaya layar yang cepat selesai tidak berkedip kerangka.
+    val appear by produceState(0f) { delay(150); androidx.compose.animation.core.animate(0f, 1f, animationSpec = tween(220)) { v, _ -> value = v } }
     val t = androidx.compose.animation.core.rememberInfiniteTransition(label = "sk")
     val a by t.animateFloat(.55f, 1f, androidx.compose.animation.core.infiniteRepeatable(tween(850, easing = FastOutSlowInEasing), androidx.compose.animation.core.RepeatMode.Reverse), label = "a")
     val c = soft()
-    Column(Modifier.fillMaxSize().padding(20.dp, 8.dp).graphicsLayer { alpha = a }) {
+    Column(Modifier.fillMaxSize().padding(20.dp, 8.dp).graphicsLayer { alpha = a * appear }) {
         repeat(4) {
             Column(Modifier.padding(bottom = 12.dp).fillMaxWidth().background(cardC(), RoundedCornerShape(28.dp)).border(1.dp, ink().copy(alpha = .07f), RoundedCornerShape(28.dp)).padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
