@@ -1,3 +1,20 @@
+const API = process.env.NEXT_PUBLIC_API_URL || 'https://hulhup-api.vercel.app';
+// CSP: skrip hanya dari situs sendiri (inline dibutuhkan Next untuk hidrasi); gambar lewat proxy API; media tautan boleh https.
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline'",
+  `img-src 'self' data: blob: ${API}`,
+  "media-src 'self' blob: data: https:",
+  "font-src 'self' data:",
+  `connect-src 'self' ${API}`,
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+  "upgrade-insecure-requests",
+].join('; ');
+
 /** @type {import('next').NextConfig} */
 export default {
   poweredByHeader: false,
@@ -16,7 +33,11 @@ export default {
       { source: '/(.*)', headers: [
       { key: 'X-Content-Type-Options', value: 'nosniff' },
       { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-      { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+      { key: 'X-Frame-Options', value: 'DENY' },
+      { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains' },
+      { key: 'Permissions-Policy', value: 'microphone=(self), camera=(), geolocation=(), payment=(), usb=(), interest-cohort=()' },
+      { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+      { key: 'Content-Security-Policy', value: CSP },
     ] }];
   },
 };

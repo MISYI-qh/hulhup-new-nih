@@ -275,7 +275,9 @@ test('foto profil: paket DKS1 (berkas asli + foto tersimpan) dan tanda AI dari b
   assert.equal(me.avatar_ai, false); assert.equal(me.avatar_ai_kind, '');
   // unggah polos (aplikasi lama) tetap jalan
   assert.equal((await put(small)).ok, true);
-  assert.equal((await call('GET', '/deks/selftest')).ok, true);
+  process.env.CRON_SECRET = 'rahasia-deks-uji'; // diagnostik internal sekarang butuh rahasia
+  assert.equal((await call('GET', '/deks/selftest', { token: 'rahasia-deks-uji' })).ok, true);
+  delete process.env.CRON_SECRET;
 });
 
 test('hubungan custom: nama sendiri jadi audiens, filter, dan privasi profil', async () => {
@@ -336,4 +338,27 @@ test('pratinjau tautan: aman dan terurai', async () => {
   assert.equal((await call('GET', '/preview?url=javascript:1', { token: a })).error, 'bad_url');
   assert.equal((await call('GET', '/preview?url=' + encodeURIComponent('http://127.0.0.1/'), { token: a })).preview, null);
   assert.equal((await call('GET', '/preview?url=' + encodeURIComponent('http://169.254.169.254/latest'), { token: a })).preview, null);
+});
+
+test('keamanan: SSRF alamat khusus, diagnostik internal, masukan aneh, tanpa kebocoran', async () => {
+  const { privateIp } = await import('../lib/preview.js');
+  for (const ip of ['127.0.0.1', '10.0.0.5', '169.254.169.254', '::1', '[::1]', '::ffff:127.0.0.1', '::ffff:7f00:1', '::ffff:a9fe:a9fe', 'fd00::1', 'fe80::1', '64:ff9b::7f00:1', '100.64.0.1', '192.168.1.1', '0.0.0.0', '224.0.0.1']) assert.equal(privateIp(ip), true, ip);
+  for (const ip of ['8.8.8.8', '1.1.1.1', '2606:4700:4700::1111']) assert.equal(privateIp(ip), false, ip);
+  // diagnostik hanya untuk pemegang CRON_SECRET
+  delete process.env.CRON_SECRET;
+  assert.equal((await call('GET', '/deks/selftest')).error, 'not_found');
+  assert.equal((await call('GET', '/health?push=1')).push, undefined);
+  process.env.CRON_SECRET = 'rahasia-uji-123';
+  assert.equal((await call('GET', '/deks/selftest')).error, 'not_found');
+  assert.equal((await call('GET', '/cron/reminder', {})).error, 'unauthorized');
+  delete process.env.CRON_SECRET;
+  // masukan tidak valid untuk tipe kolom -> 400, bukan 500
+  const t = await reg('sectest');
+  assert.equal((await call('POST', '/posts/1/comments', { token: t, body: { text: 'x', parent: 'abc' } })).ok, false);
+  // login: akun tidak ada dan sandi salah memberi kode sama
+  const x = await call('POST', '/login', { body: { username: 'tidakada', password: 'secret1' }, ip: '7.7.7.7' });
+  const y = await call('POST', '/login', { body: { username: 'sectest', password: 'salah12' }, ip: '7.7.7.8' });
+  assert.deepEqual([x.error, x.status], [y.error, y.status]);
+  // /img tanpa tanda tangan ditolak
+  assert.equal((await call('GET', '/img?u=aHR0cDovLzEyNy4wLjAuMS8&s=abc')).error, 'not_found');
 });

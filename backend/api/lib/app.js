@@ -4,7 +4,7 @@ import { preview, imgUrlOf, fetchImage } from './preview.js';
 import { q, one, many, tx } from './db.js';
 import { ApiErr, now, sha, token, hashPw, checkPw, dayStr, okBirth, ageOf, imageMime, audioMime, readBody } from './util.js';
 import { storeFor, putAudio, getAudio, delAudio } from './blobs.js';
-import { randomInt } from 'node:crypto';
+import { randomInt, timingSafeEqual } from 'node:crypto';
 import { pushLater, pushDiag, pushReminders } from './push.js';
 import { deksImage, deksAudio, brief } from './deks/index.js';
 import { runSelfTest } from './deks/selftest.js';
@@ -219,7 +219,9 @@ async function authUser(req) {
 }
 
 function ipOf(req) {
-  return (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket?.remoteAddress || 'x';
+  // Di Vercel, x-vercel-forwarded-for / x-real-ip diisi platform (tidak bisa dipalsukan klien).
+  const h = req.headers;
+  return String(h['x-vercel-forwarded-for'] || h['x-real-ip'] || h['x-forwarded-for'] || '').split(',')[0].trim() || req.socket?.remoteAddress || 'x';
 }
 
 function todayOf(req) {
@@ -242,6 +244,8 @@ async function issueRecovery(userId) {
   await q('update users set rec_hash=$2, rec_salt=$3 where id=$1', [userId, hash, salt]);
   return raw.replace(/(.{4})(?=.)/g, '$1-');
 }
+
+const DUMMY = { salt: '00'.repeat(16), hash: '00'.repeat(64) };
 
 // ---------- penangan ----------
 const routes = [];
@@ -273,7 +277,8 @@ route('POST', /^\/login$/, async (c) => {
   await hit(`login:${c.ip}`, 20, 600);
   await hit(`loginu:${username}`, 8, 600);
   const u = await one('select * from users where username=$1', [username]);
-  if (!u || !(await checkPw(String(c.body.password ?? '').trim(), u.pass_salt, u.pass_hash))) throw new ApiErr('bad_credentials', 401);
+  const okPw = u ? await checkPw(String(c.body.password ?? '').trim(), u.pass_salt, u.pass_hash) : (await checkPw(String(c.body.password ?? '').trim(), DUMMY.salt, DUMMY.hash), false); // waktu sama walau akun tidak ada
+  if (!u || !okPw) throw new ApiErr('bad_credentials', 401);
   if (u.status !== 'active') throw new ApiErr('banned', 403);
   return { token: await newSession(u.id, c.req), user: await uv(u, u, c.today) };
 });
@@ -286,7 +291,8 @@ route('POST', /^\/recover$/, async (c) => {
   if (pw.length < 6 || pw.length > 100 || /\s/.test(pw)) throw new ApiErr('bad_password');
   const u = await one('select * from users where username=$1', [username]);
   const code = recNorm(c.body.code);
-  if (!u || !u.rec_hash || code.length !== 12 || !(await checkPw(code, u.rec_salt, u.rec_hash))) throw new ApiErr('bad_recovery', 401);
+  const okRec = u && u.rec_hash && code.length === 12 ? await checkPw(code, u.rec_salt, u.rec_hash) : (await checkPw(code || 'x', DUMMY.salt, DUMMY.hash), false); // waktu sama walau akun/kode tidak ada
+  if (!u || !okRec) throw new ApiErr('bad_recovery', 401);
   if (u.status !== 'active') throw new ApiErr('banned', 403);
   const { salt, hash } = await hashPw(pw);
   await tx(async (t) => {
@@ -1205,16 +1211,25 @@ route('POST', /^\/comments\/(\d+)\/like$/, async (c, m) => {
   });
 });
 
+/** Diagnostik internal hanya untuk pemegang CRON_SECRET. */
+function cronOk(req, url) {
+  const k = process.env.CRON_SECRET; if (!k) return false;
+  const got = Buffer.from(String(req.headers.authorization || '').replace('Bearer ', '') || String(url.searchParams.get('key') || ''));
+  const ka = Buffer.from(k);
+  return got.length === ka.length && timingSafeEqual(got, ka);
+}
+
 export async function handle(req, url) {
   const m0 = req.method;
   const path = url.pathname.replace(/\/+$/, '') || '/';
   if (path === '/cron/reminder') {
     const k = process.env.CRON_SECRET, got = String(req.headers.authorization || '').replace('Bearer ', '') || url.searchParams.get('key');
-    if (!k || got !== k) throw new ApiErr('unauthorized', 401);
+    const ga = Buffer.from(String(got)), ka = Buffer.from(String(k || ''));
+    if (!k || ga.length !== ka.length || !timingSafeEqual(ga, ka)) throw new ApiErr('unauthorized', 401);
     return { ok: true, ...(await pushReminders()) };
   }
-  if (path === '/' || path === '/health') { if (url.searchParams.get('warm')) await one('select 1 as x'); if (url.searchParams.get('push')) return { ok: true, push: await pushDiag() }; return { ok: true, service: 'hulhup-api' }; }
-  if (path === '/deks/selftest') return runSelfTest();
+  if (path === '/' || path === '/health') { if (url.searchParams.get('warm')) await one('select 1 as x'); if (url.searchParams.get('push') && cronOk(req, url)) return { ok: true, push: await pushDiag() }; return { ok: true, service: 'hulhup-api' }; }
+  if (path === '/deks/selftest') { if (!cronOk(req, url)) throw new ApiErr('not_found', 404); return runSelfTest(); }
   const me = await authUser(req);
   const ip = ipOf(req);
   if (!/^\/users\/[a-z0-9_]+\/(avatar|cover)$/.test(path)) await hit(`ip:${ip}`, 600, 60); // foto profil di-cache lama; tidak dihitung agar daftar panjang tidak terblokir
@@ -1229,7 +1244,10 @@ export async function handle(req, url) {
       try { ctx.body = raw.length ? JSON.parse(raw.toString('utf8')) : {}; } catch { throw new ApiErr('bad_file'); }
       if (typeof ctx.body !== 'object' || ctx.body === null || Array.isArray(ctx.body)) ctx.body = {};
     }
-    return fn(ctx, m);
+    try { return await fn(ctx, m); } catch (e) {
+      if (e && typeof e.code === 'string' && /^22/.test(e.code)) throw new ApiErr('bad_request', 400); // masukan tak valid untuk tipe kolom
+      throw e;
+    }
   }
   throw new ApiErr('not_found', 404);
 }

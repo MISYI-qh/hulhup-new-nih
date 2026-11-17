@@ -6,7 +6,7 @@ const ORIGINS = new Set(['https://hulhup.my.id', 'https://www.hulhup.my.id']);
 
 function cors(req, res) {
   const o = req.headers.origin;
-  if (o && (ORIGINS.has(o) || /^http:\/\/localhost(:\d+)?$/.test(o))) {
+  if (o && (ORIGINS.has(o) || (process.env.VERCEL_ENV !== 'production' && /^http:\/\/localhost(:\d+)?$/.test(o)))) {
     res.setHeader('Access-Control-Allow-Origin', o);
     res.setHeader('Vary', 'Origin');
     res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Today');
@@ -19,6 +19,9 @@ export default async function handler(req, res) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'no-referrer');
   res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=()');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'; sandbox");
   cors(req, res);
   if (req.method === 'OPTIONS') { res.statusCode = 204; return res.end(); }
   try {

@@ -11,14 +11,23 @@ const MAX_BYTES = 700 * 1024, TIMEOUT = 6000, MAX_HOPS = 4;
 let ready = null;
 const ensure = () => ready ??= q(`create table if not exists link_previews (h text primary key, data jsonb, at bigint not null)`).catch((e) => { ready = null; throw e; });
 
+const BLOCK = new net.BlockList();
+for (const [a, n] of [['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8], ['169.254.0.0', 16], ['172.16.0.0', 12], ['192.0.0.0', 24], ['192.0.2.0', 24], ['192.88.99.0', 24], ['192.168.0.0', 16], ['198.18.0.0', 15], ['198.51.100.0', 24], ['203.0.113.0', 24], ['224.0.0.0', 4], ['240.0.0.0', 4]]) BLOCK.addSubnet(a, n, 'ipv4');
+for (const [a, n] of [['::', 128], ['::1', 128], ['fc00::', 7], ['fe80::', 10], ['fec0::', 10], ['ff00::', 8], ['2001:db8::', 32], ['2001::', 32], ['2002::', 16], ['64:ff9b::', 96], ['64:ff9b:1::', 48], ['100::', 64]]) BLOCK.addSubnet(a, n, 'ipv6');
+
+/** Alamat yang tidak boleh dituju server (jaringan dalam/khusus). Bentuk ::ffff:a.b.c.d dan ::ffff:hhhh:hhhh dikembalikan ke IPv4. */
 export function privateIp(ip) {
-  if (net.isIPv4(ip)) {
-    const [a, b] = ip.split('.').map(Number);
-    return a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || a >= 224;
+  let v = String(ip || '').trim().toLowerCase().replace(/^\[|\]$/g, '').replace(/%.*$/, '');
+  if (net.isIPv4(v)) return BLOCK.check(v, 'ipv4');
+  if (!net.isIPv6(v)) return true;
+  const mapped = v.match(/^(?:0{0,4}:){0,5}(?::)?ffff:(?:(\d+\.\d+\.\d+\.\d+)|([0-9a-f]{1,4}):([0-9a-f]{1,4}))$/);
+  if (mapped) {
+    if (mapped[1]) return privateIp(mapped[1]);
+    const hi = parseInt(mapped[2], 16), lo = parseInt(mapped[3], 16);
+    return privateIp(`${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`);
   }
-  const v = ip.toLowerCase();
-  if (v.startsWith('::ffff:')) return privateIp(v.slice(7));
-  return v === '::' || v === '::1' || v.startsWith('fc') || v.startsWith('fd') || v.startsWith('fe8') || v.startsWith('fe9') || v.startsWith('fea') || v.startsWith('feb') || v.startsWith('ff');
+  if (/^::ffff:/.test(v) || /^0*:0*:0*:0*:0*:ffff:/.test(v)) return true; // bentuk ::ffff: lain yang tidak bisa diurai: tolak
+  return BLOCK.check(v, 'ipv6');
 }
 
 // Alamat diperiksa tepat saat koneksi dibuat, jadi tidak bisa dibelokkan ke jaringan dalam (SSRF / DNS rebinding).
@@ -35,7 +44,7 @@ function get(url) {
     const u = new URL(url);
     if (!/^https?:$/.test(u.protocol) || u.username || u.password) return reject(new Error('bad_url'));
     if (u.port && u.port !== '80' && u.port !== '443') return reject(new Error('bad_port'));
-    if (net.isIP(u.hostname) && privateIp(u.hostname)) return reject(new Error('blocked'));
+    if (net.isIP(u.hostname.replace(/^\[|\]$/g, '')) && privateIp(u.hostname)) return reject(new Error('blocked'));
     const lib = u.protocol === 'https:' ? https : http;
     const req = lib.request(u, { method: 'GET', lookup: safeLookup, timeout: TIMEOUT, headers: { 'user-agent': 'Mozilla/5.0 (compatible; HulhupBot/1.0; +https://hulhup.my.id)', accept: 'text/html,application/xhtml+xml,image/*,video/*,audio/*;q=0.8', 'accept-language': 'id,en;q=0.8' } }, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) { res.resume(); return resolve({ redirect: new URL(res.headers.location, u).toString() }); }
@@ -120,7 +129,7 @@ export async function preview(raw) {
 }
 
 // ── Proxy gambar: gambar dari situs luar dimuat lewat server ini, sehingga situs asal tidak melihat IP pengguna. ──
-const SECRET = () => createHmac('sha256', 'img-proxy').update(process.env.DATABASE_URL || process.env.PGLITE || 'dev').digest();
+const SECRET = () => createHmac('sha256', 'img-proxy').update(process.env.IMG_SECRET || process.env.DATABASE_URL || process.env.PGLITE || 'dev').digest();
 const sig = (u) => createHmac('sha256', SECRET()).update(u).digest('base64url').slice(0, 22);
 /** Alamat proxy bertanda tangan: hanya URL yang kami keluarkan sendiri yang dilayani (bukan proxy terbuka). */
 export const imgSrc = (u) => (u ? `/img?u=${Buffer.from(u).toString('base64url')}&s=${sig(u)}` : '');
@@ -136,7 +145,7 @@ function getImg(url) {
   return new Promise((resolve, reject) => {
     const u = new URL(url);
     if (!/^https?:$/.test(u.protocol) || u.username || u.password || (u.port && u.port !== '80' && u.port !== '443')) return reject(new Error('bad_url'));
-    if (net.isIP(u.hostname) && privateIp(u.hostname)) return reject(new Error('blocked'));
+    if (net.isIP(u.hostname.replace(/^\[|\]$/g, '')) && privateIp(u.hostname)) return reject(new Error('blocked'));
     const lib = u.protocol === 'https:' ? https : http;
     const req = lib.request(u, { method: 'GET', lookup: safeLookup, timeout: 8000, headers: { 'user-agent': 'Mozilla/5.0 (compatible; HulhupBot/1.0; +https://hulhup.my.id)', accept: 'image/*' } }, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) { res.resume(); return resolve({ redirect: new URL(res.headers.location, u).toString() }); }
