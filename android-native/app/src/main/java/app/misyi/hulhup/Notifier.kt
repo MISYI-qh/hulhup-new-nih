@@ -40,20 +40,23 @@ object Notifier {
     /** Minta izin notifikasi (Android 13+). Aman dipanggil berulang. */
     fun allow(): Boolean { if (!enabled()) permissionRequester?.invoke(); return enabled() }
 
-    fun build(c: Context, title: String, body: String, sub: String): NotificationCompat.Builder {
+    fun build(c: Context, title: String, body: String, sub: String, path: String? = null): NotificationCompat.Builder {
         ensureChannel(c)
-        val open = PendingIntent.getActivity(c, 0, Intent(c, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        // Ketuk notifikasi membuka layar yang tepat (alamat yang sama dengan web), mis. /notifications.
+        val open = Intent(c, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        if (path != null) { open.action = Intent.ACTION_VIEW; open.data = android.net.Uri.parse("https://hulhup.my.id$path") }
+        val pi = PendingIntent.getActivity(c, path?.hashCode() ?: 0, open, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         return NotificationCompat.Builder(c, CH).setSmallIcon(R.drawable.ic_stat_hulhup)
             .setLargeIcon(BitmapFactory.decodeResource(c.resources, R.drawable.hulhup_large))
             .setColor(0xFF5B47F5.toInt()).setSubText(sub).setContentTitle(title).setContentText(body)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(body)).setPriority(NotificationCompat.PRIORITY_HIGH).setAutoCancel(true).setContentIntent(open)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body)).setPriority(NotificationCompat.PRIORITY_HIGH).setAutoCancel(true).setContentIntent(pi)
     }
 
-    fun show(id: Int, title: String, body: String, sub: String) {
+    fun show(id: Int, title: String, body: String, sub: String, path: String? = null) {
         try {
             val c = Store.app
             if (!enabled()) return
-            NotificationManagerCompat.from(c).notify(id, build(c, title, body, sub).build())
+            NotificationManagerCompat.from(c).notify(id, build(c, title, body, sub, path).build())
         } catch (_: SecurityException) {} catch (_: Exception) {}
     }
 
@@ -130,7 +133,7 @@ class NotifWorker(c: Context, p: WorkerParameters) : CoroutineWorker(c, p) {
                 val en = sp.getString("lang", "id") == "en"
                 val c = applicationContext
                 if (Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(c, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED)
-                    NotificationManagerCompat.from(c).notify(1, Notifier.build(c, "Hulhup", if (en) "You have $n new notifications" else "Kamu punya $n notifikasi baru", if (en) "Notification" else "Notifikasi").build())
+                    NotificationManagerCompat.from(c).notify(1, Notifier.build(c, "Hulhup", if (en) "You have $n new notifications" else "Kamu punya $n notifikasi baru", if (en) "Notification" else "Notifikasi", "/notifications").build())
             }
             sp.edit().putInt("pushed", n).apply()
         } catch (_: Exception) {}

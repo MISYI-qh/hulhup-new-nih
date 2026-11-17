@@ -174,7 +174,7 @@ object Store {
                 refresh()
                 if (unreadSocial > pushed) {
                     val msg = t("push_unread").replace("{n}", "$unreadSocial")
-                    banner?.invoke(msg); Notifier.show(1, "Hulhup", msg, t("notif"))
+                    banner?.invoke(msg); Notifier.show(1, "Hulhup", msg, t("notif"), "/notifications")
                 }
                 pushed = unreadSocial; sp.edit().putInt("pushed", pushed).apply()
                 val viaFcm = Push.register(lang)
@@ -208,7 +208,7 @@ object Store {
             refresh()
             if (unreadSocial > pushed) {
                 val msg = t("push_unread").replace("{n}", "$unreadSocial")
-                banner?.invoke(msg); Notifier.show(1, "Hulhup", msg, t("notif"))
+                banner?.invoke(msg); Notifier.show(1, "Hulhup", msg, t("notif"), "/notifications")
             }
             pushed = unreadSocial; sp.edit().putInt("pushed", pushed).apply()
         } catch (_: Exception) {}
