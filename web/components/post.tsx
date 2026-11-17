@@ -162,18 +162,25 @@ export function postMenu(a: A, onDeleted?: () => void) {
 }
 
 /** Kartu post (daftar Hups, profil): teks dipangkas 6 baris; teks lengkap di halaman post. */
+const fullTexts = new Map<number, Promise<string | null>>();
+const loadFullText = (id: number) => { let p = fullTexts.get(id); if (!p) { p = Api.req('GET', `/posts/${id}`).then((j) => (typeof j.text === 'string' ? j.text : null)).catch(() => { fullTexts.delete(id); return null; }); fullTexts.set(id, p); } return p; };
+/** Di daftar Hups teks tampil penuh; post panjang diambil utuh saat kartu mendekati layar. */
 export function PostCard({ a, scope, onDeleted }: { a: A; scope?: unknown; onDeleted?: () => void }) {
   const s = useStore(); const r = useRouter();
-  const text = (a.text ?? a.desc).trim();
-  const ref = useRef<HTMLDivElement>(null); const [over, setOver] = useState(false);
+  const ref = useRef<HTMLDivElement>(null); const [full, setFull] = useState<string | null>(null);
+  const text = (full ?? a.text ?? a.desc).trim();
   useEffect(() => { store.countView(a); }, [a.id]);
-  useEffect(() => { const e = ref.current?.querySelector('.htext') as HTMLElement | null; if (e) setOver(a.long || e.scrollHeight > e.clientHeight + 2); }, [text, a.long]);
+  useEffect(() => {
+    if (!a.long || a.text || full != null) return; const el = ref.current; if (!el) return;
+    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { io.disconnect(); loadFullText(a.id).then((t) => t != null && setFull(t)); } }, { rootMargin: '700px 0px' });
+    io.observe(el); return () => io.disconnect();
+  }, [a.id, a.long, a.text, full]);
   const url = firstUrl(text);
   return <article ref={ref} className="hcard tap" style={{ display: 'block', cursor: 'pointer', textAlign: 'left' }} data-id={a.id} onClick={() => r.push(`/p/${postCode(a.id)}`)}
     itemScope itemType="https://schema.org/SocialMediaPosting">
     <OwnerRow a={a} more={() => postMenu(a, onDeleted)} />
     <div style={{ padding: '8px 8px 0 0' }}><AudChip rand={a.rand} to={a.to} /></div>
-    {text ? <div style={{ padding: '10px 8px 0 0' }}><MentionText text={text} clamp={6} />{over ? <div className="more">{s.t('read_more')}</div> : null}</div> : null}
+    {text ? <div style={{ padding: '10px 8px 0 0' }}><MentionText text={text} /></div> : null}
     {url ? <LinkEmbed url={url} /> : null}
     {a.files.length ? <div style={{ paddingRight: 8 }}>{a.bgm ? <BgmBar a={a} /> : <AudioBars a={a} scope={scope} />}</div> : null}
     <div style={{ height: 4 }} />

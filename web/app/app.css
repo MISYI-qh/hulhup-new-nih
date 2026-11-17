@@ -166,3 +166,7 @@ button{-webkit-tap-highlight-color:transparent}
 
 :root{--mk-eye:#5B47F5;--mk-pup:#fff}@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--mk-eye:#fff;--mk-pup:#5B47F5}}
 .splash .mark{display:block}
+
+/* skeleton muncul halus (setelah 120 ms) supaya tidak berkedip saat pindah halaman cepat */
+[aria-busy=true]{opacity:0;animation:skin .22s .12s ease both}@keyframes skin{from{opacity:0}to{opacity:1}}
+.avatar img{background:var(--brand)}
