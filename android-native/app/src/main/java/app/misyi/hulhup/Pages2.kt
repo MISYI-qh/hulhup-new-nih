@@ -651,7 +651,7 @@ private fun Modifier.androidx_focus(f: androidx.compose.ui.focus.FocusRequester)
     }
     Column(Modifier.fillMaxSize()) {
         TopBar(back = true, title = s.t("notif"), actions = {
-            if (!items.isNullOrEmpty()) Tap(onTap = { selecting = !selecting; sel.clear() }) { HText(if (selecting) s.t("cancel") else s.t("notif_edit"), 15f, FontWeight.Bold, modifier = Modifier.padding(10.dp)) }
+            if (!items.isNullOrEmpty()) Tap(onTap = { selecting = !selecting; sel.clear() }) { HText(if (selecting) s.t("cancel") else s.t("notif_edit"), 15f, FontWeight.Bold, modifier = Modifier.padding(14.dp, 15.dp)) }
         })
         if (selecting) Row(Modifier.padding(20.dp, 0.dp, 20.dp, 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             PBtn(s.t("notif_del_sel").replace("{n}", "${sel.size}"), if (sel.isEmpty()) null else ({ delete(false) }), ghost = true, modifier = Modifier.weight(1f))

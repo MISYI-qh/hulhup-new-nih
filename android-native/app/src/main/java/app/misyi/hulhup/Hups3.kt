@@ -175,7 +175,7 @@ import org.json.JSONObject
             MentionBar(input.text) { input = TextFieldValue(it, TextRange(it.length)) }
             if (replyTo != null) Row(Modifier.padding(bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 HText(s.t("replying").replace("{n}", replyTo!!.optString("name")), 13f, FontWeight.Bold, acc(), Modifier.weight(1f))
-                Tap(onTap = { val cur = input.text; if (cur.startsWith(autoTag)) input = TextFieldValue(cur.substring(autoTag.length)); autoTag = ""; replyTo = null }) { Icon(Icons.Rounded.Close, null, Modifier.size(18.dp), tint = sub()) }
+                Tap(onTap = { val cur = input.text; if (cur.startsWith(autoTag)) input = TextFieldValue(cur.substring(autoTag.length)); autoTag = ""; replyTo = null }) { Icon(Icons.Rounded.Close, null, Modifier.padding(11.dp).size(26.dp), tint = sub()) }
             }
             Row(verticalAlignment = Alignment.Bottom) {
                 Box(Modifier.weight(1f).background(soft(), RoundedCornerShape(24.dp)).padding(horizontal = 16.dp, vertical = 12.dp)) {
