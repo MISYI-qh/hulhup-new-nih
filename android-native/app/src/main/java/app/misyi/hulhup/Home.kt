@@ -186,7 +186,7 @@ val kBuild get() = BuildConfig.BUILD
             item(Icons.Rounded.Tune, "settings", net = true) { go("/settings") }
             if (s.me != null) item(Icons.Outlined.Send, "sent_title") { go("/sent") }
             item(Icons.Rounded.DownloadDone, "offline_t") { go("/offline") }
-            Tap(Modifier.fillMaxWidth(), onTap = { close(); sc.launch { if (s.checkUpdate(true)) showUpdate() else toast(s.t("upd_none")) } }) {
+            Tap(Modifier.fillMaxWidth(), onTap = { close(); appScope.launch { if (s.checkUpdate(true)) showUpdate() else toast(s.t("upd_none")) } }) {
                 Row(Modifier.padding(vertical = 14.dp, horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Rounded.SystemUpdate, null, Modifier.size(24.dp), tint = ink()); Spacer(Modifier.width(16.dp)); HText(s.t("upd_menu"), 16f, FontWeight.SemiBold) }
             }
             Tap(Modifier.fillMaxWidth(), onTap = { more = !more }) {
@@ -274,6 +274,9 @@ val kBuild get() = BuildConfig.BUILD
 }
 
 // ───────── Pembaruan ─────────
+/** Lingkup tingkat aplikasi: tidak ikut batal saat sheet/menu yang memulainya tertutup. */
+val appScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main.immediate)
+
 suspend fun showUpdate() { sheet<Unit> { done -> UpdateBody { done(null) } } }
 
 @Composable private fun UpdateBody(close: () -> Unit) {
@@ -290,7 +293,7 @@ suspend fun showUpdate() { sheet<Unit> { done -> UpdateBody { done(null) } } }
         step(1, "upd_s1"); step(2, "upd_s2"); step(3, "upd_s3"); step(4, "upd_s4")
         HText(s.t("upd_fail"), 12.5f, color = sub(), lh = 17.5f)
         Spacer(Modifier.height(16.dp))
-        PBtn(s.t("upd_dl"), { close(); sc.launch { downloadApk(s.kApkUrl) } }, icon = Icons.Rounded.Download)
+        PBtn(s.t("upd_dl"), { close(); appScope.launch { downloadApk(s.kApkUrl) } }, icon = Icons.Rounded.Download)
     }
 }
 
@@ -317,6 +320,6 @@ suspend fun downloadApk(url: String) { sheet<Unit> { done -> ApkDl(url) { done(n
         else LinearProgressIndicator(progress = { if (failed) 0f else if (done) 1f else p }, modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(8.dp)), color = Brand, trackColor = soft())
         Spacer(Modifier.height(12.dp)); HText(msg, 14f, color = if (failed) Heart else sub(), align = TextAlign.Center, lh = 19.6f, modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(16.dp))
-        if (failed) PBtn(s.t("retry"), { run++ }, icon = Icons.Rounded.Refresh) else if (done) PBtn(s.t("done"), close, ghost = true)
+        if (failed) PBtn(s.t("retry"), { run++ }, icon = Icons.Rounded.Refresh) else if (done) { PBtn(s.t("upd_btn"), { Plat.installApk(java.io.File(s.app.cacheDir, "hulhup.apk")) }, icon = Icons.Rounded.SystemUpdate); Spacer(Modifier.height(8.dp)); PBtn(s.t("done"), close, ghost = true) }
     }
 }

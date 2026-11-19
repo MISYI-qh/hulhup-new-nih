@@ -86,6 +86,11 @@ object Plat {
     /** Buka pemasang sistem untuk APK yang sudah diunduh. */
     fun installApk(f: File) {
         val a = act ?: return
+        // Android 8+: izin "pasang aplikasi tidak dikenal" per aplikasi; arahkan ke pengaturannya dulu bila belum aktif.
+        if (!a.packageManager.canRequestPackageInstalls()) {
+            a.startActivity(Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${a.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            return
+        }
         val u = FileProvider.getUriForFile(a, "${a.packageName}.files", f)
         a.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(u, "application/vnd.android.package-archive").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK))
     }
