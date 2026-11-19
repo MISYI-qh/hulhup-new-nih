@@ -7,6 +7,7 @@ import { Empty, Field, IconBtn, Loader, PBtn, Seg, Toggle, confirmDlg, sheet, to
 import { AiTag, Avatar, MentionText } from './rich';
 import { Pick, askLabel, audIcon, chooseSheet, profileAud, relKinds, reportSheet, withLabels } from './aud';
 import { PostCard } from './post';
+import LogoRefresh from './LogoRefresh';
 import { BirthField, StreakChip, UserTile, newRecovery } from './screens1';
 import { A, Api, U, store, useStore } from '@/lib/store';
 
@@ -64,12 +65,12 @@ export function RelationsScreen({ u }: { u: string }) {
     <span onClick={edit ? (e) => { e.stopPropagation(); rename(r); } : undefined} style={{ cursor: edit ? 'pointer' : undefined }}>{chip(`${r.type}`, r.label)}</span>{act}</span>} />;
   const head = (t: string) => <div style={{ margin: '6px 0 10px 4px', color: 'var(--sub)', fontWeight: 700, fontSize: 13 }}>{t}</div>;
   const empty = !rels.length && !rin.length && !rout.length;
-  return <Screen title={s.t('rel_title')}>{loading ? <Loader /> : err ? <Empty icon="cloud_off_rounded" text={err} /> : <div className="pad" style={{ paddingBottom: 40}}>
+  return <Screen title={s.t('rel_title')}>{loading ? <Loader k="rel" /> : err ? <Empty icon="cloud_off_rounded" text={err} /> : <LogoRefresh onRefresh={load}><div className="pad" style={{ paddingBottom: 40}}>
     {locked ? <Empty icon="lock_outline_rounded" text={s.t('rel_locked')} /> : empty ? <Empty icon="diversity_3_rounded" text={s.t('rel_none')} /> : null}
     {rin.length ? <>{head(s.t('rel_in'))}{rin.map((r) => row(r, <><IconBtn n="check_rounded" onClick={() => req(() => Api.req('POST', `/relations/${r.username}/accept`), s.t('rel_made'))} /><IconBtn n="close_rounded" onClick={() => req(() => Api.req('POST', `/relations/${r.username}/decline`), s.t('rel_ended'))} /></>))}</> : null}
     {rout.length ? <>{head(s.t('rel_out'))}{rout.map((r) => row(r, <IconBtn n="close_rounded" onClick={() => req(() => Api.req('DELETE', `/relations/${r.username}`), s.t('rel_ended'))} />))}</> : null}
     {rels.length ? <>{rin.length || rout.length ? head(s.t('rel_title')) : null}{rels.map((r) => row(r, mine ? <IconBtn n="link_off_rounded" onClick={() => end(r.username, r.name)} /> : null, mine))}</> : null}
-    {mine ? <><div style={{ height: 16 }} /><PBtn ghost icon="label_outline_rounded" onClick={async () => { await sheet<void>((close) => <LabelsSheet close={close as any} />); load(); }}>{s.t('lbl_manage')}</PBtn></> : null}</div>}</Screen>;
+    {mine ? <><div style={{ height: 16 }} /><PBtn ghost icon="label_outline_rounded" onClick={async () => { await sheet<void>((close) => <LabelsSheet close={close as any} />); load(); }}>{s.t('lbl_manage')}</PBtn></> : null}</div></LogoRefresh>}</Screen>;
 }
 
 // ---------- profil ----------
@@ -118,7 +119,7 @@ export function ProfileScreen({ username, tab0 = 0 }: { username: string | null;
   const shown = tab === 2 ? liked : tab === 3 ? saved : list;
   const gone = (id: number) => { setList((c) => c.filter((e) => e.id !== id)); setLiked((c) => c.filter((e) => e.id !== id)); setSaved((c) => c.filter((e) => e.id !== id)); };
   return <Screen back actions={mine ? <><IconBtn n="notifications_none_rounded" dot={s.unread > 0} onClick={() => n.push('/notifications')} label={s.t('notif')} /><IconBtn n="edit_outlined" label={s.t('edit_profile')} onClick={() => { if (s.needNet()) n.push('/settings/profile'); }} /></> : null}>
-    {loading || !s.ready ? <Loader /> : err || !user ? <Empty icon="cloud_off_rounded" text={err ?? ''} action={<button className="tap pbtn" style={{ width: 160 }} onClick={() => { setLoading(true); load(); }}>{s.t('retry')}</button>} /> : <div style={{ paddingBottom: 40 }}>
+    {loading || !s.ready ? <Loader k="profile" /> : err || !user ? <Empty icon="cloud_off_rounded" text={err ?? ''} action={<button className="tap pbtn" style={{ width: 160 }} onClick={() => { setLoading(true); load(); }}>{s.t('retry')}</button>} /> : <LogoRefresh onRefresh={load}><div style={{ paddingBottom: 40 }}>
       <div style={{ padding: '10px 24px 0' }}><button className="tap" disabled={!user.avatar} onClick={() => setView(true)} aria-label={user.name} style={{ display: 'block', borderRadius: '50%' }}><Avatar url={user.avatar} name={user.name} size={96} /></button></div>
       <div style={{ padding: '16px 24px 0', textAlign: 'left' }}>
         <div className="row2" style={{ gap: 6 }}><h1 style={{ margin: 0, fontWeight: 800, fontSize: 24, letterSpacing: -.5 }}>{user.name}</h1>{user.verified ? <Icon n="verified_rounded" size={22} color="var(--blue)" /> : null}</div>
@@ -138,7 +139,7 @@ export function ProfileScreen({ username, tab0 = 0 }: { username: string | null;
       {locked && !mine ? <Empty icon="lock_outline_rounded" text={s.t('locked')} /> : !shown.length ? <Empty icon="graphic_eq_rounded" text={tab === 2 ? s.t('empty_liked') : tab === 3 ? s.t('empty_saved') : s.t('no_posts')} />
         : <div style={{ padding: '0 20px' }}>{shown.map((a) => <PostCard key={`${tab}_${a.id}`} a={a} scope={scope.current} onDeleted={() => gone(a.id)} />)}</div>}
       {view && user.avatar ? <ImageViewer url={user.avatar} name={user.name} close={() => setView(false)} /> : null}
-    </div>}</Screen>;
+    </div></LogoRefresh>}</Screen>;
 }
 
 // ---------- edit profil ----------
@@ -200,7 +201,7 @@ export function EditProfileScreen() {
   const [name, setName] = useState(me?.name ?? ''), [user, setUser] = useState(me?.username ?? ''), [bio, setBio] = useState(me?.bio ?? ''), [age, setAge] = useState(me?.birth ?? '');
   const [busy, setBusy] = useState(false), [up, setUp] = useState(false), [view, setView] = useState(false);
   useEffect(() => { if (me) { setName(me.name); setUser(me.username); setBio(me.bio); setAge(me.birth); } }, [s.ready]); // eslint-disable-line
-  if (!me) return <Screen title={s.t('edit_profile')}>{s.ready ? <NeedLogin /> : <Loader />}</Screen>;
+  if (!me) return <Screen title={s.t('edit_profile')}>{s.ready ? <NeedLogin /> : <Loader k="form" />}</Screen>;
   const change = async () => {
     const f = await pickFile('image/*'); if (!f) return; setUp(true);
     try { const orig = new Uint8Array(await f.arrayBuffer()); const small = await shrinkAvatar(f); await Api.send('/me/avatar', packAvatar(orig, small).buffer as ArrayBuffer, 'image/jpeg'); await s.refresh(); } catch (e) { toast(s.err(e), { bad: true }); }
@@ -258,7 +259,7 @@ export function SettingsScreen({ section }: { section?: string }) {
 
 export function PwScreen() {
   const s = useStore(); const n = useNav(); const [o, setO] = useState(''), [nw, setN] = useState(''), [busy, setBusy] = useState(false);
-  if (!s.me) return <Screen title={s.t('change_pw')}>{s.ready ? <NeedLogin /> : <Loader />}</Screen>;
+  if (!s.me) return <Screen title={s.t('change_pw')}>{s.ready ? <NeedLogin /> : <Loader k="form" />}</Screen>;
   return <Screen title={s.t('change_pw')}><div className="pad stack" style={{ gap: 14, paddingTop: 8, paddingBottom: 40 }}>
     <Field label={s.t('old_pw')} value={o} onChange={setO} secret auto="current-password" /><Field label={s.t('new_pw')} value={nw} onChange={setN} secret auto="new-password" /><div style={{ height: 6 }} />
     <PBtn loading={busy} onClick={async () => { setBusy(true); try { await Api.req('POST', '/me/password', { old: o, new: nw }); toast(s.t('saved')); n.back(); } catch (e) { toast(s.err(e), { bad: true }); setBusy(false); } }}>{s.t('save')}</PBtn></div></Screen>;
@@ -269,10 +270,10 @@ export function SessionsScreen() {
   const s = useStore(); const [items, setItems] = useState<any[] | null>(null); const [err, setErr] = useState<string | null>(null);
   const load = async () => { try { setItems((await Api.req('GET', '/me/sessions')).items); setErr(null); } catch (e) { setErr(store.err(e)); } };
   useEffect(() => { if (s.ready && s.me) load(); }, [s.ready, s.me?.username]);
-  if (!s.me) return <Screen title={s.t('sess_t')}>{s.ready ? <NeedLogin /> : <Loader />}</Screen>;
+  if (!s.me) return <Screen title={s.t('sess_t')}>{s.ready ? <NeedLogin /> : <Loader k="form" />}</Screen>;
   const out = async (it: any) => { if (!(await confirmDlg(s.t('sess_out'), s.t('sess_out_q'), s.t('sess_out'), true))) return; try { await Api.req('DELETE', `/me/sessions/${it.id}`); toast(s.t('logout_others_done')); load(); } catch (e) { toast(s.err(e), { bad: true }); } };
   const all = async () => { try { await Api.req('POST', '/me/logout-others'); toast(s.t('logout_others_done')); load(); } catch (e) { toast(s.err(e), { bad: true }); } };
-  return <Screen title={s.t('sess_t')}>{!items && !err ? <Loader /> : err ? <Empty icon="cloud_off_rounded" text={err} action={<button className="tap pbtn" style={{ width: 160 }} onClick={load}>{s.t('retry')}</button>} /> : <div className="pad" style={{ paddingTop: 8, paddingBottom: 40 }}>
+  return <Screen title={s.t('sess_t')}>{!items && !err ? <Loader k="rows" /> : err ? <Empty icon="cloud_off_rounded" text={err} action={<button className="tap pbtn" style={{ width: 160 }} onClick={load}>{s.t('retry')}</button>} /> : <div className="pad" style={{ paddingTop: 8, paddingBottom: 40 }}>
     {items!.map((it) => <div key={it.id} className="row2" style={{ background: 'var(--soft)', borderRadius: 24, padding: '14px 12px 14px 16px', marginBottom: 10 }}>
       <Icon n={`${it.device}`.toLowerCase().includes('app') ? 'smartphone_rounded' : 'language_rounded'} size={26} />
       <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 700, fontSize: 15.5 }}>{it.device}</div><div style={{ marginTop: 3, fontSize: 13, fontWeight: 600, color: it.current === true ? 'var(--blue)' : 'var(--sub)' }}>{it.current === true ? s.t('sess_this') : `${s.t('sess_active')} ${s.when(Number(it.last_seen))}`}</div></div>

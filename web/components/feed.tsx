@@ -4,6 +4,7 @@ import { A, Api, store, useStore } from '@/lib/store';
 import { Empty, Loader, PBtn } from './ui';
 import { PostCard, bgmUrl } from './post';
 import { HIcon } from './Icon';
+import LogoRefresh from './LogoRefresh';
 
 /** Umpan Hups: muat awal, segarkan diam-diam tiap 6 dtk, muat lagi saat menggulir, backsound otomatis untuk post yang di tengah layar. */
 export function HupsFeed({ filter, base = '/hups', header }: { filter: string; base?: string; header?: React.ReactNode }) {
@@ -60,9 +61,9 @@ export function HupsFeed({ filter, base = '/hups', header }: { filter: string; b
 
   if (loading) return <Loader />;
   if (error) return <Empty icon="cloud_off_rounded" text={error} action={<div style={{ width: 160 }}><PBtn onClick={() => { setLoading(true); load(); }}>{s.t('retry')}</PBtn></div>} />;
-  return <div ref={sc} style={{ padding: '6px 16px 110px' }}>
+  return <LogoRefresh onRefresh={load}><div ref={sc} style={{ padding: '6px 16px 110px' }}>
     {header}
     {!items.length ? <div style={{ paddingTop: 60 }}><div className="empty"><div className="ic"><HIcon k="hups" size={32} color="var(--sub)" /></div><div>{s.t('no_hups')}</div></div></div>
       : items.map((a, i) => <div key={a.id} className="rise" style={{ animationDelay: `${(i < 8 ? i : 0) * 80}ms` }}><PostCard a={a} scope={scope.current} onDeleted={() => setItems((c) => c.filter((e) => e.id !== a.id))} /></div>)}
-  </div>;
+  </div></LogoRefresh>;
 }

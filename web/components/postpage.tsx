@@ -90,7 +90,7 @@ export function PostScreen({ id, comment, seed }: { id: number; comment?: number
     <div className="topbar" style={{ position: 'static' }}>
       <IconBtn n="arrow_back_ios_new_rounded" onClick={() => n.back()} label="Kembali" /><div className="ttl" role="heading" aria-level={1}>{s.t('hups')}</div>
       <div style={{ display: 'flex' }}>{p ? <IconBtn n="more_horiz_rounded" label="Menu" onClick={() => postMenu(p, () => n.back())} /> : null}</div></div>
-    <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', overscrollBehavior: 'contain', minHeight: 0 }}>{loading && !p ? <Loader /> : err && !p ? <Empty icon="lock_outline_rounded" text={err} /> : p ? <div style={{ padding: '4px 18px 24px' }}>
+    <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', overscrollBehavior: 'contain', minHeight: 0 }}>{loading && !p ? <Loader k="post" /> : err && !p ? <Empty icon="lock_outline_rounded" text={err} /> : p ? <div style={{ padding: '4px 18px 24px' }}>
       <OwnerRow a={p} />
       {text ? <div style={{ paddingTop: 14, userSelect: 'text' }}><MentionText text={text} style={{ fontSize: 17, lineHeight: 1.55 }} /></div> : null}
       {url ? <LinkEmbed url={url} /> : null}
@@ -173,7 +173,7 @@ export function ComposeScreen() {
   const [text, setText] = useState(''), [clip, setClip] = useState<Clip | null>(null), [playing, setPlaying] = useState(false), [pprof, setPprof] = useState(true), [busy, setBusy] = useState(false), [bgm, setBgm] = useState(false);
   const [rand, setRand] = useState('public'), [picked, setPicked] = useState<Record<string, any>>({}); const au = useRef<HTMLAudioElement | null>(null);
   useEffect(() => () => { au.current?.pause(); }, []);
-  if (!s.me) return <Screen title={s.t('new_post')}>{s.ready ? <NeedLogin /> : <Loader />}</Screen>;
+  if (!s.me) return <Screen title={s.t('new_post')}>{s.ready ? <NeedLogin /> : <Loader k="form" />}</Screen>;
   const add = async () => { const c = await sheet<Clip>((close) => <RecordSheet close={close as any} />); if (!c) return; au.current?.pause(); setPlaying(false); setClip(c); };
   const play = () => {
     if (!clip) return; if (playing) { au.current?.pause(); setPlaying(false); return; }

@@ -10,15 +10,21 @@ export function Boot() {
   const ready = useStore().ready;
   const hide = () => {
     const el = document.getElementById('splash'); if (!el || el.classList.contains('out')) return;
-    // satu frame setelah konten siap, supaya fade-out tidak bertabrakan dengan paint pertama
     requestAnimationFrame(() => requestAnimationFrame(() => {
       el.classList.add('out');
       const rm = () => el.remove();
-      el.addEventListener('transitionend', rm, { once: true }); setTimeout(rm, 900);
+      el.addEventListener('transitionend', rm, { once: true }); setTimeout(rm, 700);
     }));
   };
-  useEffect(() => { store.banner = (m) => toast(m); store.init(); const t = setTimeout(hide, 3000); return () => clearTimeout(t); }, []);
-  useEffect(() => { if (!ready) return; const t = setTimeout(hide, 220); return () => clearTimeout(t); }, [ready]);
+  useEffect(() => {
+    store.banner = (m) => toast(m); store.init();
+    const el = document.getElementById('splash'); if (!el) return;
+    // Intro penuh (3400 ms, sekali per sesi): splash memudar sendiri lalu dilepas. Kunjungan lanjutan: logo diam, lepas saat siap.
+    const full = !document.documentElement.classList.contains('ni');
+    if (full) { const on = (e: AnimationEvent) => { if (e.target === el && e.animationName === 'iw-fade') el.remove(); }; el.addEventListener('animationend', on); const t = setTimeout(() => el.remove(), 4200); return () => { clearTimeout(t); el.removeEventListener('animationend', on); }; }
+    const t = setTimeout(hide, 3000); return () => clearTimeout(t);
+  }, []);
+  useEffect(() => { if (!ready || !document.documentElement.classList.contains('ni')) return; const t = setTimeout(hide, 220); return () => clearTimeout(t); }, [ready]);
   return <Overlays />;
 }
 export function Brand({ onClick }: { onClick?: () => void }) {

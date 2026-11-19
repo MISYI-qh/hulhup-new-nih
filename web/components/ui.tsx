@@ -60,12 +60,15 @@ export function Toggle({ v, on }: { v: boolean; on: (v: boolean) => void }) {
 export function Seg<T extends string | number>({ items, value, on }: { items: [T, string][]; value: T; on: (v: T) => void }) {
   return <div className="seg" role="tablist">{items.map(([k, l]) => <b key={String(k)} role="tab" aria-selected={k === value} className={k === value ? 'on' : ''} onClick={() => on(k)}>{l}</b>)}</div>;
 }
-export function Skeleton({ n = 3 }: { n?: number }) {
-  return <div className="pad" style={{ paddingTop: 8 }} aria-busy="true" aria-label="Memuat">{Array.from({ length: n }, (_, i) => <div className="skc" key={i}>
-    <div className="row2"><div className="sk" style={{ width: 42, height: 42, borderRadius: '50%' }} /><div style={{ flex: 1, display: 'grid', gap: 7 }}><div className="sk" style={{ height: 12, width: '45%' }} /><div className="sk" style={{ height: 10, width: '28%' }} /></div></div>
-    <div className="sk" style={{ height: 12 }} /><div className="sk" style={{ height: 12, width: '82%' }} /><div className="sk" style={{ height: 40, borderRadius: 20 }} /></div>)}</div>;
+import { SkFeed, SkForm, SkNotif, SkPostPage, SkProfile, SkRel, SkRows, SkStreak, SkUsers } from './skel';
+export type LoaderKind = 'feed' | 'profile' | 'users' | 'rel' | 'notif' | 'post' | 'streak' | 'form' | 'rows';
+export function Loader({ k = 'feed' }: { k?: LoaderKind }) {
+  switch (k) {
+    case 'profile': return <SkProfile />; case 'users': return <SkUsers />; case 'rel': return <SkRel />; case 'notif': return <SkNotif />;
+    case 'post': return <SkPostPage />; case 'streak': return <SkStreak />; case 'form': return <SkForm />; case 'rows': return <SkRows />;
+    default: return <SkFeed />;
+  }
 }
-export function Loader() { return <Skeleton n={3} />; }
 export function Empty({ icon, text, action }: { icon: string; text: string; action?: React.ReactNode }) {
   return <div className="empty"><div className="ic"><Icon n={icon} size={30} color="var(--sub)" /></div><div>{text}</div>{action}</div>;
 }

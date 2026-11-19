@@ -147,7 +147,7 @@ export function FollowsScreen({ u, kind }: { u: string; kind: 'followers' | 'fol
     if (!(await confirmDlg(s.t('remove_follower'), s.t('remove_follower_q').replace('{name}', `${x.name}`), s.t('remove'), true))) return;
     try { await Api.req('DELETE', `/me/followers/${x.username}`); setUsers((c) => c!.filter((e) => e !== x)); toast(s.t('follower_removed')); await s.refresh(); } catch (e) { toast(s.err(e), { bad: true }); }
   };
-  return <Screen title={s.t(kind)}>{err ? <Empty icon="cloud_off_rounded" text={err} /> : !users ? <Loader /> : !users.length ? <Empty icon="group_outlined" text={s.t('empty_list')} />
+  return <Screen title={s.t(kind)}>{err ? <Empty icon="cloud_off_rounded" text={err} /> : !users ? <Loader k="users" /> : !users.length ? <Empty icon="group_outlined" text={s.t('empty_list')} />
     : <div className="pad" style={{ paddingBottom: 40 }}>{users.map((x) => <UserTile key={x.username} u={x} trailing={own ? <button className="tap" style={{ padding: '9px 14px', background: 'var(--bg)', borderRadius: 18, color: 'var(--heart)', fontWeight: 700, fontSize: 13 }} onClick={(e) => { e.preventDefault(); e.stopPropagation(); remove(x); }}>{s.t('remove')}</button> : undefined} />)}</div>}</Screen>;
 }
 
@@ -182,7 +182,7 @@ export function StreakScreen() {
   }
   const mn = MONTHS[s.lang][month.getMonth()];
   const legend = (c: string, t: string, ring = false) => <span className="row2" style={{ gap: 6, color: 'var(--sub)', fontSize: 12.5 }}><i style={{ width: 14, height: 14, borderRadius: '50%', background: ring ? undefined : c, boxShadow: ring ? `inset 0 0 0 2px ${c}` : undefined }} />{t}</span>;
-  return <Screen title={s.t('streak_cal')}>{loading ? <Loader /> : err ? <Empty icon="cloud_off_rounded" text={err} /> : <div className="pad" style={{ paddingBottom: 40 }}>
+  return <Screen title={s.t('streak_cal')}>{loading ? <Loader k="streak" /> : err ? <Empty icon="cloud_off_rounded" text={err} /> : <div className="pad" style={{ paddingBottom: 40 }}>
     <StreakChip streak={streak} days={total} />
     <div className="row2" style={{ marginTop: 18 }}><IconBtn n="chevron_left_rounded" color={canPrev ? undefined : 'color-mix(in srgb, var(--sub) 30%, transparent)'} onClick={() => canPrev && setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))} />
       <div style={{ flex: 1, textAlign: 'center', fontWeight: 800, fontSize: 18 }}>{mn} {month.getFullYear()}</div>
@@ -267,7 +267,7 @@ export function NotifScreen() {
   };
   return <Screen title={s.t('notif')} actions={items?.length ? <button className="tap" style={{ padding: 10, fontWeight: 700 }} onClick={() => { setSelecting(!selecting); setSel(new Set()); }}>{selecting ? s.t('cancel') : s.t('notif_edit')}</button> : null}>
     {selecting ? <div className="row2" style={{ padding: '0 20px 8px', gap: 10 }}><div style={{ flex: 1 }}><PBtn ghost onClick={sel.size ? () => del(false) : undefined}>{s.t('notif_del_sel').replace('{n}', `${sel.size}`)}</PBtn></div><div style={{ flex: 1 }}><PBtn color="var(--heart)" onClick={() => del(true)}>{s.t('notif_del_all')}</PBtn></div></div> : null}
-    {err ? <Empty icon="cloud_off_rounded" text={err} /> : !items ? <Loader /> : <div className="pad" style={{ paddingBottom: 40}}>
+    {err ? <Empty icon="cloud_off_rounded" text={err} /> : !items ? <Loader k="notif" /> : <div className="pad" style={{ paddingBottom: 40}}>
       {s.me && (s.me.streak > 0 || s.me.days > 0) ? <div style={{ marginBottom: 14 }}><StreakChip streak={s.me.streak} days={s.me.days} open /></div> : null}
       {!items.length ? <Empty icon="notifications_none_rounded" text={s.t('empty_notif')} /> : null}
       {items.map((x) => selecting

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import './app.css';
+import './intro.css';
 import { Boot } from '@/components/shell';
 import { ORIGIN, API } from '@/lib/api';
 
@@ -16,19 +17,22 @@ export const metadata: Metadata = {
 };
 export const viewport: Viewport = { themeColor: '#0B0B0B', colorScheme: 'light dark', width: 'device-width', initialScale: 1, viewportFit: 'cover' };
 
-const CRIT = 'html{background:#fff}@media(prefers-color-scheme:dark){html:not([data-theme=light]){background:#0b0b0b}}html[data-theme=dark]{background:#0b0b0b}body{margin:0}.splash{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:inherit;will-change:opacity;transition:opacity .4s cubic-bezier(.4,0,.2,1),visibility 0s .4s}.splash.out{opacity:0;visibility:hidden;pointer-events:none}.splash.out svg{transform:scale(1.06);transition:transform .4s cubic-bezier(.4,0,.2,1)}.splash:not(.out){animation:sfo .45s 5s both}@keyframes sfo{to{opacity:0;visibility:hidden}}.splash svg{animation:sfi .5s ease both}@keyframes sfi{from{opacity:0;transform:scale(.94)}}.se{fill:#5b47f5}.sp{fill:#fff}.sw{fill:#4330d0}@media(prefers-color-scheme:dark){html:not([data-theme=light]) .se{fill:#fff}html:not([data-theme=light]) .sp,html:not([data-theme=light]) .sw{fill:#5b47f5}}';
+const CRIT = '@font-face{font-family:Outfit;font-weight:400;font-display:swap;src:url(/fonts/outfit-400.woff2) format("woff2")}@font-face{font-family:Outfit;font-weight:700;font-display:swap;src:url(/fonts/outfit-700.woff2) format("woff2")}html{background:#fff;color:#111}@media(prefers-color-scheme:dark){html:not([data-theme=light]){background:#0b0b0b;color:#f2f2f2}}html[data-theme=dark]{background:#0b0b0b;color:#f2f2f2}html[data-theme=light]{color:#111}body{margin:0}.splash{position:fixed;inset:0;z-index:100;background:inherit;color:inherit;transition:opacity .3s cubic-bezier(.4,0,.2,1),visibility 0s .3s}.splash.out{opacity:0;visibility:hidden;pointer-events:none}';
+const NI = "try{if(sessionStorage.getItem('hi')||matchMedia('(prefers-reduced-motion:reduce)').matches)document.documentElement.classList.add('ni');else sessionStorage.setItem('hi','1')}catch(e){}";
 export default function Root({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="id">
-      <head><style dangerouslySetInnerHTML={{ __html: CRIT }} /><link rel="preconnect" href={API} crossOrigin="" /><link rel="dns-prefetch" href={API} /></head>
+    <html lang="id" suppressHydrationWarning>
+      <head><style dangerouslySetInnerHTML={{ __html: CRIT }} /><script dangerouslySetInnerHTML={{ __html: NI }} />
+        <link rel="preload" href="/fonts/outfit-700.woff2" as="font" type="font/woff2" crossOrigin="" /><link rel="preload" href="/fonts/outfit-400.woff2" as="font" type="font/woff2" crossOrigin="" />
+        <link rel="preconnect" href={API} crossOrigin="" /><link rel="dns-prefetch" href={API} /></head>
       <body>
         <div id="splash" className="splash" aria-hidden="true">
-          <svg viewBox="-.36 -.3 .72 .51" width="132" height="94">
-            <clipPath id="sc"><rect x="-1" y="-1" width="2" height="1.21" /></clipPath>
-            <g clipPath="url(#sc)" className="se"><ellipse cx="-.15" cy="-.06" rx=".125" ry=".15" /><ellipse cx=".15" cy="-.06" rx=".125" ry=".15" /></g>
-            <g className="sp"><circle cx="-.119" cy="-.095" r=".055" /><circle cx=".181" cy="-.095" r=".055" /></g>
-            <rect className="sw" x="-.36" y="0" width=".72" height=".21" rx=".07" />
-          </svg></div>
+          <svg className="iw-wave" viewBox="0 0 420 420"><circle className="w0" cx="210" cy="210" r="210" /><circle className="w1" cx="210" cy="210" r="210" /></svg>
+          <div className="iw"><div className="iw-mk">
+            <div className="iw-clip"><div className="iw-eg"><i className="iw-e a" /><i className="iw-e b" /><i className="iw-p a" /><i className="iw-p b" /></div></div>
+            <i className="iw-w" /></div>
+            {['H', 'u', 'l', 'h', 'u', 'p'].map((c, i) => <span key={i} className={`iw-l iw-l${i}`}><span className="iw-word">{c}</span></span>)}
+          </div></div>
         <Boot />
         {children}
       </body>
