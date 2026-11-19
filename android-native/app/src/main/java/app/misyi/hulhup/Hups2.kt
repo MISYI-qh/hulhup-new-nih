@@ -249,11 +249,7 @@ suspend fun postMenu(a: A, onDeleted: (() -> Unit)? = null) {
 
     if (loading) { Loader(); return }
     if (error != null) { Empty(Icons.Rounded.CloudOff, error!!, action = { PBtn(s.t("retry"), { loading = true; sc.launch { load() } }, modifier = Modifier.width(160.dp)) }); return }
-    val pst = androidx.compose.material3.pulltorefresh.rememberPullToRefreshState()
-    PullToRefreshBox(isRefreshing = refreshing, onRefresh = { sc.launch { refreshing = true; load(); refreshing = false } }, state = pst, indicator = {
-        androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator(modifier = Modifier.align(Alignment.TopCenter), state = pst, isRefreshing = refreshing, containerColor = Color.Transparent, color = Color.Transparent)
-        if (refreshing || pst.distanceFraction > .3f) Box(Modifier.align(Alignment.TopCenter).padding(top = 10.dp)) { LogoLoop(34.dp) }
-    }) {
+    LogoRefresh({ load() }) {
         if (items.isEmpty()) LazyColumn(Modifier.fillMaxSize()) { item { Spacer(Modifier.height(80.dp)); Empty(Icons.Outlined.Forum, s.t("no_hups"), custom = { HIcon(HK.hups, size = 32.dp, color = sub()) }) } }
         else LazyColumn(Modifier.fillMaxSize(), state = ls, contentPadding = PaddingValues(16.dp, 6.dp, 16.dp, 110.dp)) {
             itemsIndexed(items, key = { _, a -> a.id }) { i, a ->

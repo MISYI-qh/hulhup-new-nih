@@ -101,7 +101,7 @@ private fun JSONObject.list(k: String) = optJSONArray(k)?.objects() ?: emptyList
         })
         Box(Modifier.weight(1f)) {
             val u = user
-            if (loading) Loader()
+            if (loading) Loader("profile")
             else if (error != null) Empty(Icons.Rounded.CloudOff, error!!, action = { PBtn(s.t("retry"), { loading = true; tick++ }, modifier = Modifier.width(160.dp)) })
             else if (u != null) {
                 val shown = when (tab) { 2 -> liked; 3 -> saved; else -> list }
@@ -182,7 +182,7 @@ private fun JSONObject.list(k: String) = optJSONArray(k)?.objects() ?: emptyList
     Column(Modifier.fillMaxSize()) {
         TopBar(back = true, title = s.t(kind))
         val l = users
-        if (error != null) Empty(Icons.Rounded.CloudOff, error!!) else if (l == null) Loader() else if (l.isEmpty()) Empty(Icons.Outlined.Group, s.t("empty_list"))
+        if (error != null) Empty(Icons.Rounded.CloudOff, error!!) else if (l == null) Loader("users") else if (l.isEmpty()) Empty(Icons.Outlined.Group, s.t("empty_list"))
         else LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(20.dp, 4.dp, 20.dp, 40.dp)) {
             itemsIndexed(l, key = { _, u -> u.optString("username") }) { i, u ->
                 val own = kind == "followers" && uname == s.me?.username
@@ -276,7 +276,7 @@ private fun JSONObject.list(k: String) = optJSONArray(k)?.objects() ?: emptyList
     Column(Modifier.fillMaxSize()) {
         TopBar(back = true, title = s.t("rel_title"))
         Box(Modifier.weight(1f)) {
-            if (loading) Loader() else if (error != null) Empty(Icons.Rounded.CloudOff, error!!)
+            if (loading) Loader("rel") else if (error != null) Empty(Icons.Rounded.CloudOff, error!!)
             else LogoRefresh({ load() }) {
                 Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp, 4.dp, 20.dp, 40.dp)) {
                     if (locked) Empty(Icons.Outlined.Lock, s.t("rel_locked")) else if (empty) Empty(Icons.Rounded.Diversity3, s.t("rel_none"))
@@ -522,9 +522,9 @@ fun sidecar(b: ByteArray): ByteArray {
         TopBar(back = true, title = s.t("sess_t"))
         Box(Modifier.weight(1f)) {
             val list = items
-            if (list == null && error == null) Loader()
+            if (list == null && error == null) Loader("sessions")
             else if (error != null) Empty(Icons.Rounded.CloudOff, error!!, action = { PBtn(s.t("retry"), { error = null; sc.launch { load() } }, modifier = Modifier.width(160.dp)) })
-            else LogoRefresh({ load() }) {
+            else Box(Modifier.fillMaxSize()) {
                 Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp, 8.dp, 20.dp, 40.dp)) {
                     for (it in list!!) {
                         val cur = it.optBoolean("current")
@@ -659,7 +659,7 @@ private fun Modifier.androidx_focus(f: androidx.compose.ui.focus.FocusRequester)
         }
         Box(Modifier.weight(1f)) {
             val l = items
-            if (l == null && error == null) Loader() else if (error != null) Empty(Icons.Rounded.CloudOff, error!!)
+            if (l == null && error == null) Loader("notif") else if (error != null) Empty(Icons.Rounded.CloudOff, error!!)
             else Column(Modifier.verticalScroll(rememberScrollState()).padding(20.dp, 4.dp, 20.dp, 40.dp)) {
                 val me = s.me
                 if (me != null && (me.streak > 0 || me.days > 0)) Box(Modifier.padding(bottom = 14.dp)) { StreakChip(me.streak, me.days, open = true) }

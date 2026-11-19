@@ -28,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -40,15 +41,58 @@ import org.json.JSONObject
 
 val Fire = Color(0xFFE8833A)
 
-/** Tarik untuk menyegarkan dengan logo bergerak (padanan LogoRefresh). */
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Tarik untuk menyegarkan (LOADING_SPEC §2): isi ikut tertarik dengan offset karet 88*(1-exp(-dy/120)), logo 34 di celah,
+ * tahan di 56 minimal 700 ms, kembali 260 ms (cubic-bezier .2,.8,.2,1). Hanya aktif saat isi sudah di paling atas.
+ */
 @Composable fun LogoRefresh(onRefresh: suspend () -> Unit, content: @Composable BoxScope.() -> Unit) {
-    val sc = rememberCoroutineScope(); var refreshing by remember { mutableStateOf(false) }
-    val pst = androidx.compose.material3.pulltorefresh.rememberPullToRefreshState()
-    PullToRefreshBox(isRefreshing = refreshing, onRefresh = { sc.launch { refreshing = true; onRefresh(); refreshing = false } }, state = pst, indicator = {
-        PullToRefreshDefaults.Indicator(modifier = Modifier.align(Alignment.TopCenter), state = pst, isRefreshing = refreshing, containerColor = Color.Transparent, color = Color.Transparent)
-        if (refreshing || pst.distanceFraction > .3f) Box(Modifier.align(Alignment.TopCenter).padding(top = 10.dp)) { LogoLoop(34.dp) }
-    }, content = content)
+    val sc = rememberCoroutineScope(); val d = androidx.compose.ui.platform.LocalDensity.current
+    val off = remember { mutableFloatStateOf(0f) }
+    val st = remember { floatArrayOf(0f, 0f) } // [0] = tarikan mentah (px), [1] = 1 bila sedang menyegarkan
+    val maxPx = with(d) { 88.dp.toPx() }; val armPx = with(d) { 56.dp.toPx() }; val kPx = with(d) { 120.dp.toPx() }; val fadePx = with(d) { 24.dp.toPx() }
+    val ease = remember { androidx.compose.animation.core.CubicBezierEasing(.2f, .8f, .2f, 1f) }
+    fun rubber(dy: Float) = maxPx * (1f - kotlin.math.exp(-dy / kPx))
+    fun anim(to: Float) = sc.launch { androidx.compose.animation.core.animate(off.floatValue, to, animationSpec = androidx.compose.animation.core.tween(260, easing = ease)) { v, _ -> off.floatValue = v } }
+    val conn = remember {
+        object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+            override fun onPreScroll(available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
+                if (st[1] > 0f || source != androidx.compose.ui.input.nestedscroll.NestedScrollSource.UserInput) return androidx.compose.ui.geometry.Offset.Zero
+                if (st[0] > 0f && available.y < 0f) { val take = kotlin.math.max(available.y, -st[0]); st[0] += take; off.floatValue = rubber(st[0]); return androidx.compose.ui.geometry.Offset(0f, take) }
+                return androidx.compose.ui.geometry.Offset.Zero
+            }
+            override fun onPostScroll(consumed: androidx.compose.ui.geometry.Offset, available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
+                if (st[1] > 0f || source != androidx.compose.ui.input.nestedscroll.NestedScrollSource.UserInput) return androidx.compose.ui.geometry.Offset.Zero
+                if (available.y > 0f && kotlin.math.abs(available.y) > kotlin.math.abs(available.x)) { st[0] += available.y; off.floatValue = rubber(st[0]); return androidx.compose.ui.geometry.Offset(0f, available.y) }
+                return androidx.compose.ui.geometry.Offset.Zero
+            }
+            override suspend fun onPreFling(available: androidx.compose.ui.unit.Velocity): androidx.compose.ui.unit.Velocity {
+                if (st[1] > 0f || st[0] <= 0f) return androidx.compose.ui.unit.Velocity.Zero
+                val release = off.floatValue; st[0] = 0f
+                if (release >= armPx) {
+                    st[1] = 1f
+                    sc.launch {
+                        androidx.compose.animation.core.animate(release, armPx, animationSpec = androidx.compose.animation.core.tween(260, easing = ease)) { v, _ -> off.floatValue = v }
+                        val t0 = System.currentTimeMillis()
+                        try { onRefresh() } catch (_: Exception) {}
+                        val rest = 700 - (System.currentTimeMillis() - t0); if (rest > 0) kotlinx.coroutines.delay(rest)
+                        androidx.compose.animation.core.animate(armPx, 0f, animationSpec = androidx.compose.animation.core.tween(260, easing = ease)) { v, _ -> off.floatValue = v }
+                        st[1] = 0f
+                    }
+                } else anim(0f)
+                return available
+            }
+        }
+    }
+    val showLogo by remember { derivedStateOf { off.floatValue > 1f } }
+    Box(Modifier.fillMaxSize().nestedScroll(conn)) {
+        if (showLogo) Box(Modifier.align(Alignment.TopCenter).graphicsLayer {
+            val o = off.floatValue
+            translationY = o / 2f - size.height / 2f
+            alpha = kotlin.math.min(1f, o / fadePx)
+            val k = .6f + .4f * kotlin.math.min(1f, o / armPx); scaleX = k; scaleY = k
+        }) { LogoLoop(34.dp) }
+        Box(Modifier.fillMaxSize().graphicsLayer { translationY = off.floatValue }) { content() }
+    }
 }
 
 fun JSONObject.users(k: String): List<JSONObject> = optJSONArray(k)?.objects() ?: emptyList()
@@ -191,7 +235,7 @@ suspend fun newRecovery() {
             val p = people
             when {
                 error != null -> Empty(Icons.Rounded.CloudOff, error!!)
-                p == null -> Loader()
+                p == null -> Loader("post")
                 to == null -> if (p.isEmpty()) Empty(Icons.Outlined.Send, s.t("sent_none")) else Column(Modifier.verticalScroll(rememberScrollState()).padding(20.dp, 4.dp, 20.dp, 40.dp)) {
                     HText(s.t("sent_hint"), 13f, color = sub(), modifier = Modifier.padding(start = 6.dp, bottom = 10.dp))
                     p.forEachIndexed { i, u ->
@@ -250,7 +294,7 @@ suspend fun newRecovery() {
     }
     Column(Modifier.fillMaxSize()) {
         TopBar(back = true, title = s.t("streak_cal"))
-        if (loading) Loader() else if (error != null) Empty(Icons.Rounded.CloudOff, error!!) else {
+        if (loading) Loader("streak") else if (error != null) Empty(Icons.Rounded.CloudOff, error!!) else {
             fun iso(y: Int, m: Int, d: Int) = "%04d-%02d-%02d".format(y, m + 1, d)
             val ty = now.get(java.util.Calendar.YEAR); val tm = now.get(java.util.Calendar.MONTH); val td = now.get(java.util.Calendar.DAY_OF_MONTH)
             val todayKey = ty * 372 + tm * 31 + td

@@ -265,32 +265,35 @@ suspend fun reportSheet(audio: Int? = null, user: String? = null, comment: Int? 
     if (show) IntroOverlay(c)
 }
 
-/** Lapisan intro: hanya bagian ini yang dikomposisi ulang tiap frame, bukan seluruh aplikasi. */
+/** Lapisan intro (LOADING_SPEC §1, 3400 ms): seluruh gerak dihitung di fase gambar/layer dari satu Animatable, tanpa komposisi ulang per frame. */
 @Composable private fun IntroOverlay(c: Animatable<Float, androidx.compose.animation.core.AnimationVector1D>) {
-    val t = c.value
-    fun ramp(a: Float, b: Float) = ((t - a) / (b - a)).coerceIn(0f, 1f)
-    val down = easeInC(ramp(.05f, .17f)); val up = easeOutBackC(ramp(.21f, .38f))
-    val rise = if (t < .2f) 1 - down else up
-    val read = easeInOutC(ramp(.40f, .84f)); val look = -.4f + 3.0f * read
-    val blink = if (t > .88f && t < .95f) sin((t - .88f) / .07f * PI).toFloat() else 0f
-    val pop = 1 + .07f * sin(PI * ramp(.21f, .45f)).toFloat()
-    val fade = 1 - ramp(.95f, 1f) * ramp(.95f, 1f)
-    val wave = ramp(.22f, .62f); val mc = markColors(); val fg = ink()
-    Box(Modifier.fillMaxSize().alpha(fade).background(bgOf()), contentAlignment = Alignment.Center) {
-        if (wave > 0 && wave < 1) androidx.compose.foundation.Canvas(Modifier.size(420.dp)) {
-            for (i in 0 until 2) {
+    val mc = markColors(); val fg = ink()
+    fun ramp(t: Float, a: Float, b: Float) = ((t - a) / (b - a)).coerceIn(0f, 1f)
+    fun read(t: Float) = easeInOutC(ramp(t, .40f, .84f))
+    val widths = remember { floatArrayOf(36.76f, 26.83f, 12.37f, 28.54f, 26.83f, 29.74f) }
+    val tw = remember { widths.sum() }
+    Box(Modifier.fillMaxSize().graphicsLayer { val f = ramp(c.value, .95f, 1f); alpha = 1f - f * f }.background(bgOf()), contentAlignment = Alignment.Center) {
+        androidx.compose.foundation.Canvas(Modifier.size(420.dp)) {
+            val wave = ramp(c.value, .22f, .62f)
+            if (wave > 0f && wave < 1f) for (i in 0 until 2) {
                 val k = (wave * 1.3f - i * .22f).coerceIn(0f, 1f); if (k <= 0f || k >= 1f) continue
                 val e = 1 - (1 - k) * (1 - k) * (1 - k)
                 drawCircle(mc[0].copy(alpha = (1 - k) * .28f), (40 + e * 170).dp.toPx(), center, style = Stroke(2.4.dp.toPx()))
             }
         }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            androidx.compose.foundation.Canvas(Modifier.size(96.dp, 96.dp * .5f / .72f).graphicsLayerScale(pop)) { peek(mc[0], mc[1], mc[2], MarkP(rise.coerceIn(0f, 1.06f), look, blink)) }
-            val letters = listOf("H", "u", "l", "h", "u", "p")
+        // Logo + huruf selalu tersusun; seluruh grup digeser supaya tetap di tengah selagi huruf muncul.
+        Row(Modifier.graphicsLayer { translationX = (14f + tw) * (1f - read(c.value)) / 2f * density }, verticalAlignment = Alignment.CenterVertically) {
+            androidx.compose.foundation.Canvas(Modifier.size(96.dp, 96.dp * .5f / .72f).graphicsLayer { val t = c.value; val pop = 1 + .07f * sin(PI * ramp(t, .21f, .45f)).toFloat(); scaleX = pop; scaleY = pop }) {
+                val t = c.value
+                val down = easeInC(ramp(t, .05f, .17f)); val up = easeOutBackC(ramp(t, .21f, .38f))
+                val rise = if (t < .2f) 1 - down else up
+                val look = -.4f + 3.0f * read(t)
+                val blink = if (t > .88f && t < .95f) sin((t - .88f) / .07f * PI).toFloat() else 0f
+                peek(mc[0], mc[1], mc[2], MarkP(rise.coerceIn(0f, 1.06f), look, blink))
+            }
             Row(Modifier.padding(start = 14.dp)) {
-                letters.forEachIndexed { i, l ->
-                    val p = easeOutCubicC((read * 6.6f - i).coerceIn(0f, 1f))
-                    if (p > 0f) Box(Modifier.graphicsLayer { alpha = p; translationY = (1 - p) * 16.dp.toPx() }) { HText(l, 52f, FontWeight.Bold, fg, ls = -1.2f) }
+                "Hulhup".forEachIndexed { i, l ->
+                    Box(Modifier.graphicsLayer { val p = easeOutCubicC((read(c.value) * 6.6f - i).coerceIn(0f, 1f)); alpha = p; translationY = (1 - p) * 16.dp.toPx() }) { HText(l.toString(), 52f, FontWeight.Bold, fg, ls = -1.2f) }
                 }
             }
         }

@@ -140,7 +140,7 @@ import org.json.JSONObject
     Column(Modifier.fillMaxSize()) {
         TopBar(back = true, title = s.t("hups"), actions = { if (p != null) IconBtn(Icons.Rounded.MoreHoriz) { sc.launch { postMenu(p) { Nav.back() } } } })
         Box(Modifier.weight(1f)) {
-            if (loading && p == null) Loader()
+            if (loading && p == null) Loader("postpage")
             else if (error != null && p == null) Empty(Icons.Outlined.Lock, error!!)
             else if (p != null) {
                 tick; s.rev

@@ -385,27 +385,6 @@ class AnimMarkCtl { var play: ((Int?) -> Unit)? = null }
     Box(Modifier.graphicsLayer { alpha = a.value; translationY = (1f - a.value) * 14.dp.toPx() }) { content() }
 }
 
-/** Kerangka pemuatan berdenyut halus (pengganti putaran kosong): kartu dengan avatar, nama, dan baris teks. */
-@Composable fun Loader() {
-    // Muncul pelan setelah jeda singkat, supaya layar yang cepat selesai tidak berkedip kerangka.
-    val appear by produceState(0f) { delay(150); androidx.compose.animation.core.animate(0f, 1f, animationSpec = tween(220)) { v, _ -> value = v } }
-    val t = androidx.compose.animation.core.rememberInfiniteTransition(label = "sk")
-    val a by t.animateFloat(.55f, 1f, androidx.compose.animation.core.infiniteRepeatable(tween(850, easing = FastOutSlowInEasing), androidx.compose.animation.core.RepeatMode.Reverse), label = "a")
-    val c = soft()
-    Column(Modifier.fillMaxSize().padding(20.dp, 8.dp).graphicsLayer { alpha = a * appear }) {
-        repeat(4) {
-            Column(Modifier.padding(bottom = 12.dp).fillMaxWidth().background(cardC(), RoundedCornerShape(28.dp)).border(1.dp, ink().copy(alpha = .07f), RoundedCornerShape(28.dp)).padding(16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(42.dp).background(c, CircleShape)); Spacer(Modifier.width(10.dp))
-                    Column { Box(Modifier.width(120.dp).height(12.dp).background(c, RoundedCornerShape(6.dp))); Spacer(Modifier.height(7.dp)); Box(Modifier.width(70.dp).height(9.dp).background(c, RoundedCornerShape(5.dp))) }
-                }
-                Spacer(Modifier.height(14.dp)); Box(Modifier.fillMaxWidth().height(12.dp).background(c, RoundedCornerShape(6.dp)))
-                Spacer(Modifier.height(8.dp)); Box(Modifier.fillMaxWidth(.7f).height(12.dp).background(c, RoundedCornerShape(6.dp)))
-            }
-        }
-    }
-}
-
 @Composable fun Empty(icon: ImageVector?, text: String, action: (@Composable () -> Unit)? = null, custom: (@Composable () -> Unit)? = null) = In(0) {
     Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
