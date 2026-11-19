@@ -76,7 +76,7 @@ object Strings {
         "speed" to listOf("Kecepatan", "Speed"),
         "upd_down" to listOf("Mengunduh pembaruan…", "Downloading update…"),
         "upd_inst" to listOf("Membuka pemasang…", "Opening installer…"),
-        "upd_fail" to listOf("Gagal memperbarui. Periksa sinyal lalu coba lagi. Jika muncul "Aplikasi tidak terpasang", hapus aplikasi lama lalu pasang ulang APK yang kamu terima (cukup sekali).", "Update failed. Check your connection and try again. If you see "App not installed", uninstall the old app and install the APK you received again (only once)."),
+        "upd_fail" to listOf("Gagal memperbarui. Periksa sinyal lalu coba lagi. Jika muncul \"Aplikasi tidak terpasang\", hapus aplikasi lama lalu pasang ulang APK yang kamu terima (cukup sekali).", "Update failed. Check your connection and try again. If you see \"App not installed\", uninstall the old app and install the APK you received again (only once)."),
         "upd_now" to listOf("Perbarui sekarang", "Update now"),
         "upd_note" to listOf("Perbarui langsung dari aplikasi, tanpa perlu membuka situs. Akunmu tetap aman.", "Update right inside the app, no website needed. Your account stays safe."),
         "upd_s1" to listOf("Tekan tombol di bawah, unduhan berjalan di dalam aplikasi.", "Tap the button below; the download runs inside the app."),
