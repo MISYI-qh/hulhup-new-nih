@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -234,7 +235,7 @@ private suspend fun fetchQuote(id: Int): A? {
     if (!done) { Box(Modifier.padding(top = 10.dp, end = 8.dp).fillMaxWidth().height(112.dp).clip(shape).background(soft())); return }
     if (q == null) {
         Row(Modifier.padding(top = 10.dp, end = 8.dp).fillMaxWidth().clip(shape).background(soft()).border(1.dp, ink().copy(alpha = .1f), shape).padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(androidx.compose.material.icons.Icons.Outlined.Lock, null, Modifier.size(18.dp), tint = sub()); Spacer(Modifier.width(8.dp)); HText(s.t("quote_na"), 14f, FontWeight.SemiBold, sub())
+            Icon(Icons.Outlined.Lock, null, Modifier.size(18.dp), tint = sub()); Spacer(Modifier.width(8.dp)); HText(s.t("quote_na"), 14f, FontWeight.SemiBold, sub())
         }
         return
     }
