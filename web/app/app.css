@@ -185,3 +185,8 @@ button{-webkit-tap-highlight-color:transparent}
 .act{min-height:44px;min-width:44px;box-sizing:border-box}
 .fbar .pbtn2{width:44px;height:44px;border-radius:22px}
 @media(hover:hover){.tap:not(:disabled):hover{opacity:.86}.tap:disabled{cursor:default;opacity:.5}}
+
+.embed.frame{overflow:hidden;border-radius:20px;width:calc(100% - 8px)}
+.embed.frame iframe{display:block;max-height:none;object-fit:initial}
+.frame-open{position:absolute;right:8px;top:8px;z-index:2;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:rgba(0,0,0,.45);color:#fff;opacity:0;transition:opacity .2s}
+.embed.frame:hover .frame-open{opacity:1}

@@ -5,7 +5,7 @@ import { Icon, HIcon } from './Icon';
 import { Api, store, useStore } from '@/lib/store';
 import { toast, PBtn } from './ui';
 import { useRouter } from 'next/navigation';
-import { firstUrl, kindOfUrl, linkRe, linkUri, proxied, trimLink, mediaUrl, quoteRef, postCode } from '@/lib/links';
+import { firstUrl, kindOfUrl, linkRe, linkUri, proxied, trimLink, mediaUrl, quoteRef, mediaRef, embedOf, postCode } from '@/lib/links';
 import { A } from '@/lib/store';
 import { FileBar, fileKey } from './post';
 
@@ -29,7 +29,7 @@ export function openLink(raw: string, push: (p: string) => void) {
 
 /** Teks dengan @nama dan tautan yang bisa diketuk. */
 export function MentionText({ text, className, style, clamp, hideQuote }: { text: string; className?: string; style?: React.CSSProperties; clamp?: number; hideQuote?: boolean }) {
-  const out: React.ReactNode[] = []; let last = 0, k = 0; const q = hideQuote ? quoteRef(text) : null;
+  const out: React.ReactNode[] = []; let last = 0, k = 0; const q = hideQuote ? (quoteRef(text) ?? mediaRef(text, !!store.me)) : null;
   const re = new RegExp(`${linkRe().source}|@([a-z0-9_]{3,20})`, 'gi');
   for (const m of text.matchAll(re)) {
     const raw = m[0], tag = m[2] != null, shown = tag ? raw : trimLink(raw);
@@ -106,8 +106,9 @@ const host = (u: string) => { try { return new URL(u).hostname.replace(/^www\./,
 /** Tampilan otomatis untuk tautan di post: gambar, video, audio, atau kartu halaman, tanpa mengetuk tautannya. */
 export function LinkEmbed({ url }: { url: string }) {
   const s = useStore(); const [p, setP] = useState<any | null>(null);
-  const k = kindOfUrl(url);
-  useEffect(() => { let on = true; if (k === 'page' || k === 'image') fetchPreview(url).then((x) => on && setP(x)); return () => { on = false; }; }, [url, k, s.me?.username]);
+  const k = kindOfUrl(url), fr = embedOf(url);
+  useEffect(() => { let on = true; if (!fr && (k === 'page' || k === 'image')) fetchPreview(url).then((x) => on && setP(x)); return () => { on = false; }; }, [url, k, s.me?.username]);
+  if (fr) return <FrameEmbedView e={fr} url={url} />;
   if (k === 'video') return <VideoEmbed url={url} />;
   if (k === 'audio') return <AudioEmbed url={url} host={host(url)} />;
   if (!p) return null;
@@ -117,6 +118,21 @@ export function LinkEmbed({ url }: { url: string }) {
     case 'audio': return <AudioEmbed url={`${p.url}`} host={host(url)} />;
   }
   return <PageCard url={url} p={p} />;
+}
+
+/** Pemutar sematan situs lain langsung tampil di dalam post (iframe resmi, dimuat malas saat mendekati layar). */
+function FrameEmbedView({ e, url }: { e: import('@/lib/links').FrameEmbed; url: string }) {
+  const ref = useRef<HTMLDivElement>(null); const [seen, setSeen] = useState(false);
+  useEffect(() => {
+    const el = ref.current; if (!el || seen) return;
+    if (typeof IntersectionObserver === 'undefined') { setSeen(true); return; }
+    const io = new IntersectionObserver(([x]) => { if (x.isIntersecting) { io.disconnect(); setSeen(true); } }, { rootMargin: '400px 0px' });
+    io.observe(el); return () => io.disconnect();
+  }, [seen]);
+  return <div ref={ref} className="embed frame" style={{ marginRight: 8, background: 'var(--soft)', position: 'relative', ...(e.ratio ? { aspectRatio: e.ratio, maxHeight: 560 } : { height: e.h }) }} onClick={(x) => x.stopPropagation()}>
+    {seen ? <iframe src={e.src} title={e.host} loading="lazy" allow="autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" sandbox="allow-scripts allow-same-origin allow-presentation allow-popups allow-popups-to-escape-sandbox" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }} /> : null}
+    <a href={url} target="_blank" rel="noopener noreferrer nofollow ugc" aria-label={e.host} className="frame-open" onClick={(x) => x.stopPropagation()}><Icon n="open_in_new_rounded" size={16} /></a>
+  </div>;
 }
 
 function PageCard({ url, p }: { url: string; p: any }) {

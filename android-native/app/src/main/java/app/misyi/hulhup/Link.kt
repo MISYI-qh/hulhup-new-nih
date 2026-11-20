@@ -123,6 +123,7 @@ private suspend fun fetchPreview(url: String): JSONObject? {
 /** Tampilan otomatis untuk tautan di post: gambar, video, audio, atau kartu halaman. Tanpa perlu mengetuk tautannya. */
 @Composable fun LinkEmbed(url: String) {
     val k = kindOfUrl(url); val host = (try { Uri.parse(url).host ?: "" } catch (_: Exception) { "" }).removePrefix("www.")
+    embedOf(url)?.let { FrameEmbed(it, url); return }
     if (k == UrlKind.Video) { VideoEmbed(url); return }
     if (k == UrlKind.Audio) { AudioEmbed(url, host); return }
     var p by remember(url) { mutableStateOf<JSONObject?>(null) }
@@ -255,5 +256,76 @@ private suspend fun fetchQuote(id: Int): A? {
                 Row(verticalAlignment = Alignment.CenterVertically) { HIcon(HK.comment, size = 16.dp, color = sub()); Spacer(Modifier.width(5.dp)); HText("${q.comments}", 13f, FontWeight.SemiBold, sub()) }
             }
         }
+    }
+}
+
+// ───────── sematan situs populer (YouTube, Instagram, TikTok, Vimeo, Spotify, SoundCloud) ─────────
+class FrameSpec(val src: String, val ratio: Float?, val h: Int?, val host: String)
+fun embedOf(url: String): FrameSpec? {
+    val u = linkUri(url) ?: return null
+    val h = (u.host ?: "").lowercase().replace(Regex("^(www|m|mobile|music)\\."), ""); val seg = (u.path ?: "").split('/').filter { it.isNotEmpty() }
+    fun ok(x: String?) = x != null && Regex("^[\\w-]{5,40}$").matches(x)
+    val yt = "https://www.youtube-nocookie.com/embed/"
+    if (h == "youtu.be" && ok(seg.getOrNull(0))) return FrameSpec("$yt${seg[0]}?rel=0&playsinline=1", 16f / 9, null, "YouTube")
+    if (h == "youtube.com") {
+        val v = u.getQueryParameter("v")
+        if (seg.getOrNull(0) == "watch" && ok(v)) return FrameSpec("$yt$v?rel=0&playsinline=1", 16f / 9, null, "YouTube")
+        if (seg.getOrNull(0) in listOf("shorts", "embed", "live") && ok(seg.getOrNull(1))) return FrameSpec("$yt${seg[1]}?rel=0&playsinline=1", if (seg[0] == "shorts") 9f / 16 else 16f / 9, null, "YouTube")
+    }
+    if (h == "instagram.com") {
+        val kinds = listOf("p", "reel", "reels", "tv")
+        val i = if (seg.getOrNull(0) in kinds) 1 else if (seg.getOrNull(1) in listOf("p", "reel")) 2 else -1
+        if (i > 0 && ok(seg.getOrNull(i))) { val kd = seg[i - 1].let { if (it == "reels") "reel" else it }; return FrameSpec("https://www.instagram.com/$kd/${seg[i]}/embed/", null, 620, "Instagram") }
+    }
+    if (h == "tiktok.com") { val i = seg.indexOf("video"); val id = if (i >= 0) seg.getOrNull(i + 1) else null; if (id != null && Regex("^\\d{8,25}$").matches(id)) return FrameSpec("https://www.tiktok.com/embed/v2/$id", null, 740, "TikTok") }
+    if (h == "vimeo.com" && Regex("^\\d{5,12}$").matches(seg.getOrNull(0) ?: "")) return FrameSpec("https://player.vimeo.com/video/${seg[0]}", 16f / 9, null, "Vimeo")
+    if (h == "open.spotify.com") {
+        val j = if (seg.getOrNull(0)?.startsWith("intl-") == true) 1 else 0; val t = seg.getOrNull(j); val id = seg.getOrNull(j + 1)
+        if (t in listOf("track", "album", "playlist", "episode", "show", "artist") && ok(id)) return FrameSpec("https://open.spotify.com/embed/$t/$id", null, if (t == "track" || t == "episode") 152 else 352, "Spotify")
+    }
+    if (h == "soundcloud.com" && seg.size >= 2) return FrameSpec("https://w.soundcloud.com/player/?url=${Uri.encode("https://soundcloud.com" + u.path)}&color=%236d4aff&visual=false", null, 166, "SoundCloud")
+    return null
+}
+
+/** Tautan media pertama di teks (foto/video/audio langsung atau sematan situs): disembunyikan karena medianya tampil langsung. */
+fun mediaRef(text: String, images: Boolean = true): QuoteRef? {
+    for (m in linkRe.findAll(text)) {
+        val raw = trimLink(m.value); if (raw.isEmpty() || raw.startsWith("@")) continue
+        val u = linkUri(raw)?.toString() ?: continue
+        val k = kindOfUrl(u); if (k == UrlKind.Image && !images) return null
+        return if (k != UrlKind.Page || embedOf(u) != null) QuoteRef(0, m.range.first, raw.length) else null
+    }
+    return null
+}
+/** Bagian teks yang disembunyikan: URL kutipan post Hulhup, atau URL media yang tampil langsung. */
+fun hiddenRef(text: String): QuoteRef? = quoteRef(text) ?: mediaRef(text, Store.me != null)
+
+@SuppressLint("SetJavaScriptEnabled")
+@Composable private fun FrameEmbed(e: FrameSpec, url: String) {
+    val holder = remember { arrayOfNulls<WebView>(1) }
+    DisposableEffect(Unit) { onDispose { holder[0]?.let { try { it.stopLoading(); it.loadUrl("about:blank"); it.destroy() } catch (_: Exception) {} }; holder[0] = null } }
+    val shape = RoundedCornerShape(20.dp)
+    val base = Modifier.padding(top = 10.dp, end = 8.dp).fillMaxWidth().clip(shape).background(soft())
+    val sized = if (e.ratio != null) base.aspectRatio(e.ratio) else base.height(e.h!!.dp)
+    val html = remember(e.src) { "<!doctype html><html><head><meta name=viewport content=\"width=device-width,initial-scale=1\"><style>html,body{margin:0;height:100%;background:transparent;overflow:hidden}iframe{border:0;width:100%;height:100%}</style></head><body><iframe src=\"${e.src}\" allow=\"autoplay; encrypted-media; fullscreen; picture-in-picture\" allowfullscreen referrerpolicy=\"strict-origin-when-cross-origin\"></iframe></body></html>" }
+    Box(sized) {
+        AndroidView(modifier = Modifier.fillMaxSize(), factory = { ctx ->
+            WebView(ctx).apply {
+                holder[0] = this
+                settings.javaScriptEnabled = true; settings.domStorageEnabled = true; settings.mediaPlaybackRequiresUserGesture = true
+                settings.javaScriptCanOpenWindowsAutomatically = false; settings.setSupportMultipleWindows(false)
+                isVerticalScrollBarEnabled = false; isHorizontalScrollBarEnabled = false; overScrollMode = android.view.View.OVER_SCROLL_NEVER
+                setBackgroundColor(0)
+                webChromeClient = WebChromeClient()
+                webViewClient = object : WebViewClient() {
+                    override fun shouldOverrideUrlLoading(v: WebView, r: WebResourceRequest): Boolean {
+                        if (!r.isForMainFrame) return false
+                        val s = r.url.toString(); if (s.startsWith("about:")) return false
+                        openLink(url); return true
+                    }
+                }
+                loadDataWithBaseURL("https://hulhup.my.id", html, "text/html", "utf-8", null)
+            }
+        })
     }
 }

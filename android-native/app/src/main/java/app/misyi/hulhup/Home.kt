@@ -227,8 +227,8 @@ val kBuild get() = BuildConfig.BUILD
             }
         }
         if (!a.pprof && a.created > 0) HText(s.`when`(a.created), 13f, color = sub(), modifier = Modifier.padding(bottom = 6.dp))
-        val d = a.desc.trim(); val qr = quoteRef(d)
-        val dShown = if (qr == null) d else (d.substring(0, qr.at).trimEnd() + d.substring(qr.at + qr.len).trimStart().let { if (it.isEmpty()) "" else "\n$it" }).trim()
+        val d = a.desc.trim(); val qr = quoteRef(d); val hr = hiddenRef(d)
+        val dShown = if (hr == null) d else (d.substring(0, hr.at).trimEnd() + d.substring(hr.at + hr.len).trimStart().let { if (it.isEmpty()) "" else "\n$it" }).trim()
         if (dShown.isNotEmpty()) Tap(Modifier.fillMaxWidth(), .99f, onTap = { close(); openPost(a) }) {
             val t = buildAnnotatedString { append(dShown); if (a.long) withStyle(SpanStyle(color = acc(), fontWeight = FontWeight.Bold)) { append(" …  ${s.t("read_more")}") } }
             androidx.compose.material3.Text(t, Modifier.padding(top = if (a.pprof) 12.dp else 0.dp), fontSize = 15.sp, lineHeight = 21.sp, maxLines = 6, overflow = TextOverflow.Ellipsis, color = ink(), fontFamily = Outfit)

@@ -8,6 +8,7 @@ const CSP = [
   "media-src 'self' blob: data: https:",
   "font-src 'self' data:",
   `connect-src 'self' ${API}`,
+  "frame-src https://www.youtube-nocookie.com https://www.instagram.com https://www.tiktok.com https://player.vimeo.com https://open.spotify.com https://w.soundcloud.com",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",

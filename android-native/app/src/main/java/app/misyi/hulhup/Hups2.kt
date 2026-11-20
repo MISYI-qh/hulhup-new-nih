@@ -45,7 +45,7 @@ val mentionRe = Regex("${linkRe.pattern}|@([a-z0-9_]{3,20})", RegexOption.IGNORE
 @Composable fun MentionText(text: String, style: TextStyle, maxLines: Int = Int.MAX_VALUE, selectable: Boolean = false, hideQuote: Boolean = false) {
     val link = acc(); val sc = rememberCoroutineScope()
     val shownMap = remember(text) { mutableListOf<Triple<Int, Int, String>>() }
-    val q = remember(text, hideQuote) { if (hideQuote) quoteRef(text) else null }
+    val q = remember(text, hideQuote) { if (hideQuote) hiddenRef(text) else null }
     val ann = remember(text, link, q) {
         shownMap.clear()
         buildAnnotatedString {
