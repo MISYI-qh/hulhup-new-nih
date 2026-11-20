@@ -23,5 +23,20 @@ export function kindOfUrl(url: string): UrlKind {
 export const proxied = (s: string) => (s.startsWith('/') ? API + s : s);
 export const mediaUrl = (u: string) => (u.startsWith('/') ? API + u : u);
 /** Kode pendek post: /p/<kode>. */
+import { dec } from './code';
 export { enc as postCode, dec as postId } from './code';
 export const ORIGIN_URL = 'https://hulhup.my.id';
+
+/** Post Hulhup yang ditempel sebagai tautan (hulhup.my.id/p/<kode> atau id angka): tampil sebagai kutipan, bukan tautan. Hanya yang pertama. */
+export type QuoteRef = { id: number; at: number; len: number };
+export function quoteRef(text: string): QuoteRef | null {
+  if (!text || !/hulhup\.my\.id\/p\//i.test(text)) return null;
+  for (const m of text.matchAll(linkRe())) {
+    const raw = trimLink(m[0]); const u = linkUri(raw); if (!u) continue;
+    const h = u.hostname.toLowerCase(); if (h !== 'hulhup.my.id' && h !== 'www.hulhup.my.id') continue;
+    const seg = u.pathname.split('/').filter(Boolean); if (seg[0] !== 'p' || seg.length !== 2) continue;
+    const id = /^\d{1,10}$/.test(seg[1]) ? Number(seg[1]) : /^[0-9A-Za-z]{7}$/.test(seg[1]) ? dec(seg[1]) : null;
+    if (id && id > 0) return { id, at: m.index!, len: raw.length };
+  }
+  return null;
+}

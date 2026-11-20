@@ -7,7 +7,7 @@ import { Brand, useNav } from './shell';
 import { IconBtn, PBtn, TopBar, sheet, toast } from './ui';
 import { audIcon, audSplit, audText, filterAud, multiSheet, withLabels, reportSheet } from './aud';
 import { HupsFeed } from './feed';
-import { LinkEmbed, MentionText, Avatar, Verified, firstUrl } from './rich';
+import { LinkEmbed, QuoteCard, MentionText, Avatar, Verified, firstUrl, quoteRef } from './rich';
 import { PostActions, toggleOfflinePost } from './post';
 import { postCode } from '@/lib/links';
 import { ProgBar, TimeText } from './post';
@@ -38,7 +38,7 @@ export function SpeedRow() {
 export function PopupBody({ a, close }: { a: A; close: () => void }) {
   const s = useStore(); const n = useNav(); const on = s.playing === a.id;
   const total = Math.max(1, s.dur > 0 ? s.dur : a.secs * 1000);
-  const off = s.isOffline(a.id), url = firstUrl(a.desc);
+  const off = s.isOffline(a.id), q = quoteRef(a.desc), url = q ? null : firstUrl(a.desc);
   const open = (p: string) => { close(); n.push(p); };
   return <div className="stack" style={{ gap: 0 }}>
     {a.pprof ? <button className="tap row2" style={{ textAlign: 'left' }} onClick={() => open(`/@${a.owner}`)}>
@@ -48,8 +48,8 @@ export function PopupBody({ a, close }: { a: A; close: () => void }) {
       <Icon n="chevron_right_rounded" color="var(--sub)" /></button>
       : a.created > 0 ? <div className="hsub" style={{ marginBottom: 6 }}>{s.when(a.created)}</div> : null}
     {a.desc.trim() ? <div style={{ paddingTop: a.pprof ? 12 : 0, cursor: 'pointer' }} onClick={() => open(`/p/${postCode(a.id)}`)}>
-      <MentionText text={a.desc.trim()} clamp={6} style={{ fontSize: 15.5, lineHeight: 1.45 }} />{a.long ? <span className="more">…{s.t('read_more')}</span> : null}</div> : null}
-    {url ? <LinkEmbed url={url} /> : null}
+      <MentionText text={a.desc.trim()} hideQuote clamp={6} style={{ fontSize: 15.5, lineHeight: 1.45 }} />{a.long ? <span className="more">…{s.t('read_more')}</span> : null}</div> : null}
+    {q ? <QuoteCard id={q.id} /> : url ? <LinkEmbed url={url} /> : null}
     <div style={{ height: a.pprof || a.desc.trim() ? 14 : 4 }} />
     {a.url ? <div className="row2" style={{ background: 'var(--soft)', borderRadius: 26, padding: '8px 6px 8px 8px' }}>
       <button className={`tap pbtn2${on ? ' on' : ''}`} style={{ width: 44, height: 44, borderRadius: on ? 13 : 22 }} aria-label={on ? 'Jeda' : 'Putar'} onClick={() => s.play(a).catch(() => toast(s.t('e_server'), { bad: true }))}><Icon n={on ? 'pause_rounded' : 'play_arrow_rounded'} size={26} /></button>

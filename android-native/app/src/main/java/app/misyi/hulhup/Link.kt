@@ -30,6 +30,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
@@ -190,5 +191,68 @@ private suspend fun fetchPreview(url: String): JSONObject? {
     Column(Modifier.padding(end = 8.dp)) {
         FileBar(key, url, 0)
         HText("$name · ${Store.t("ext_note").replace("{h}", host)}", 11.5f, color = sub(), modifier = Modifier.padding(6.dp, 4.dp, 0.dp, 0.dp), maxLines = 2, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+// ───────── kutipan post Hulhup (seperti Threads) ─────────
+/** Posisi dan id post Hulhup pertama yang ditempel sebagai tautan (hulhup.my.id/p/<kode> atau id angka), atau null. */
+class QuoteRef(val id: Int, val at: Int, val len: Int)
+fun quoteRef(text: String): QuoteRef? {
+    if (text.isEmpty() || !text.contains("hulhup.my.id/p/", ignoreCase = true)) return null
+    for (m in linkRe.findAll(text)) {
+        val raw = trimLink(m.value); val u = linkUri(raw) ?: continue
+        val h = (u.host ?: "").lowercase(); if (h != "hulhup.my.id" && h != "www.hulhup.my.id") continue
+        val seg = (u.path ?: "").split('/').filter { it.isNotEmpty() }; if (seg.size != 2 || seg[0] != "p") continue
+        val id = if (Regex("^\\d{1,9}$").matches(seg[1])) seg[1].toLong() else PostCode.dec(seg[1])
+        if (id != null && id > 0 && id <= Int.MAX_VALUE) return QuoteRef(id.toInt(), m.range.first, raw.length)
+    }
+    return null
+}
+
+private val quoteCache = HashMap<String, A?>()
+private val quoteFlight = HashMap<String, kotlinx.coroutines.Deferred<A?>>()
+/** Satu permintaan per post dan akun; jalan di appScope supaya tidak ikut batal saat kartu keluar layar. */
+private suspend fun fetchQuote(id: Int): A? {
+    val key = "$id:${Store.me?.username ?: ""}"
+    if (quoteCache.containsKey(key)) return quoteCache[key]
+    val d = quoteFlight.getOrPut(key) {
+        appScope.async {
+            val r = try { A(Api.req("GET", "/posts/$id").getJSONObject("post")) } catch (e: java.io.IOException) { quoteFlight.remove(key); return@async null } catch (_: Exception) { null }
+            quoteCache[key] = r; quoteFlight.remove(key); r
+        }
+    }
+    return d.await()
+}
+
+/** Kutipan post Hulhup di dalam post lain: langsung tampil tanpa diketuk; ketuk membuka post aslinya. */
+@Composable fun QuoteCard(id: Int) {
+    val s = Store
+    var a by remember(id, s.me?.username) { mutableStateOf<A?>(null) }; var done by remember(id, s.me?.username) { mutableStateOf(false) }
+    LaunchedEffect(id, s.me?.username) { a = fetchQuote(id); done = true }
+    val shape = RoundedCornerShape(20.dp)
+    val q = a
+    if (!done) { Box(Modifier.padding(top = 10.dp, end = 8.dp).fillMaxWidth().height(112.dp).clip(shape).background(soft())); return }
+    if (q == null) {
+        Row(Modifier.padding(top = 10.dp, end = 8.dp).fillMaxWidth().clip(shape).background(soft()).border(1.dp, ink().copy(alpha = .1f), shape).padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(androidx.compose.material.icons.Icons.Outlined.Lock, null, Modifier.size(18.dp), tint = sub()); Spacer(Modifier.width(8.dp)); HText(s.t("quote_na"), 14f, FontWeight.SemiBold, sub())
+        }
+        return
+    }
+    val text = (q.text ?: q.desc).trim()
+    Tap(Modifier.padding(top = 10.dp, end = 8.dp), .99f, onTap = { openPost(q) }) {
+        Column(Modifier.fillMaxWidth().clip(shape).border(1.dp, ink().copy(alpha = .14f), shape).padding(14.dp, 12.dp, 14.dp, 10.dp)) {
+            if (q.pprof) Row(verticalAlignment = Alignment.CenterVertically) {
+                Avatar(q.ownerAvatar, q.ownerName, 26.dp); Spacer(Modifier.width(8.dp))
+                HText(q.ownerName, 14.5f, FontWeight.ExtraBold, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                if (q.ownerVerified) Icon(Icons.Rounded.Verified, null, Modifier.padding(start = 4.dp).size(14.dp), tint = Blue)
+                HText("  ${q.owner} · ${s.`when`(q.created)}", 13f, color = sub(), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+            }
+            if (text.isNotEmpty()) HText(text.trimEnd(), 15f, modifier = Modifier.padding(top = 8.dp), maxLines = 6, overflow = TextOverflow.Ellipsis, lh = 21f)
+            if (q.files.isNotEmpty() && !q.bgm) Box(Modifier.padding(top = 4.dp)) { FileBar(fileKey(q, 0), q.files[0].optString("url"), q.files[0].optInt("secs")) { Store.countPlay(q) } }
+            Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(18.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(verticalAlignment = Alignment.CenterVertically) { HIcon(HK.sorot, size = 16.dp, color = sub()); Spacer(Modifier.width(5.dp)); HText("${q.likes}", 13f, FontWeight.SemiBold, sub()) }
+                Row(verticalAlignment = Alignment.CenterVertically) { HIcon(HK.comment, size = 16.dp, color = sub()); Spacer(Modifier.width(5.dp)); HText("${q.comments}", 13f, FontWeight.SemiBold, sub()) }
+            }
+        }
     }
 }

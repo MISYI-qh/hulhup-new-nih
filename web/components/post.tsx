@@ -6,7 +6,7 @@ import { Icon, HIcon } from './Icon';
 import { Api, store, useStore, type A } from '@/lib/store';
 import { PBtn, IconBtn, sheet, toast, confirmDlg } from './ui';
 import { AudChip, reportSheet } from './aud';
-import { Avatar, AiTag, LinkEmbed, MentionText, Verified, firstUrl } from './rich';
+import { Avatar, AiTag, LinkEmbed, QuoteCard, MentionText, Verified, firstUrl, quoteRef } from './rich';
 import { postCode, ORIGIN_URL } from '@/lib/links';
 
 export const postLink = (id: number) => `${ORIGIN_URL}/p/${postCode(id)}`;
@@ -177,13 +177,13 @@ export function PostCard({ a, scope, onDeleted }: { a: A; scope?: unknown; onDel
     const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { io.disconnect(); loadFullText(a.id).then((t) => t != null && setFull(t)); } }, { rootMargin: '700px 0px' });
     io.observe(el); return () => io.disconnect();
   }, [a.id, a.long, a.text, full]);
-  const url = firstUrl(text);
+  const q = quoteRef(text), url = q ? null : firstUrl(text);
   return <article ref={ref} className="hcard tap" style={{ display: 'block', cursor: 'pointer', textAlign: 'left' }} data-id={a.id} onClick={() => r.push(`/p/${postCode(a.id)}`)}
     itemScope itemType="https://schema.org/SocialMediaPosting">
     <OwnerRow a={a} more={() => postMenu(a, onDeleted)} />
     <div style={{ padding: '8px 8px 0 0' }}><AudChip rand={a.rand} to={a.to} /></div>
-    {text ? <div style={{ padding: '10px 8px 0 0' }}><MentionText text={text} /></div> : null}
-    {url ? <LinkEmbed url={url} /> : null}
+    {text ? <div style={{ padding: '10px 8px 0 0' }}><MentionText text={text} hideQuote /></div> : null}
+    {q ? <QuoteCard id={q.id} /> : url ? <LinkEmbed url={url} /> : null}
     {a.files.length ? <div style={{ paddingRight: 8 }}>{a.bgm ? <BgmBar a={a} /> : <AudioBars a={a} scope={scope} />}</div> : null}
     <div style={{ height: 4 }} />
     <PostActions a={a} />

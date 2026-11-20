@@ -108,6 +108,7 @@ object Strings {
         "v_all" to listOf("Semua", "Everyone"),
         "v_fol" to listOf("Pengikut", "Followers"),
         "v_me" to listOf("Aku", "Me"),
+        "quote_na" to listOf("Post tidak tersedia", "Post unavailable"),
         "ext_note" to listOf("Diputar dari {h}. Situs itu dapat melihat alamat IP-mu.", "Plays from {h}. That site can see your IP address."),
         "noedit" to listOf("Post tidak bisa diedit, hanya dihapus.", "Posts cannot be edited, only deleted."),
         "search" to listOf("Cari", "Search"),

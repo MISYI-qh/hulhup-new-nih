@@ -4,7 +4,7 @@ import { Icon, HIcon } from './Icon';
 import { NeedLogin, Screen, useNav } from './shell';
 import { Empty, Field, IconBtn, Loader, PBtn, Toggle, confirmDlg, sheet, toast } from './ui';
 import { Pick, askLabel, reportSheet, uploadAud, audSplit, withLabels } from './aud';
-import { Avatar, LinkEmbed, MentionBar, MentionText, firstUrl } from './rich';
+import { Avatar, LinkEmbed, QuoteCard, MentionBar, MentionText, firstUrl, quoteRef } from './rich';
 import { ActBtn, AudioBars, BgmBar, FileBar, OwnerRow, PostActions, Wave, commentLink, mmss, postMenu, shareUrl } from './post';
 import { A, ApiErr, Api, store, useStore } from '@/lib/store';
 
@@ -85,15 +85,15 @@ export function PostScreen({ id, comment, seed }: { id: number; comment?: number
     const walk = (c: any, d: number) => { out.push([c, d]); for (const k of kids.get(c.id) ?? []) walk(k, d + 1); };
     top.forEach((c) => walk(c, 0)); return out;
   };
-  const p = a; const url = firstUrl(text);
+  const p = a; const q = quoteRef(text), url = q ? null : firstUrl(text);
   return <div className="app" style={{ height: '100dvh' }}>
     <div className="topbar" style={{ position: 'static' }}>
       <IconBtn n="arrow_back_ios_new_rounded" onClick={() => n.back()} label="Kembali" /><div className="ttl" role="heading" aria-level={1}>{s.t('hups')}</div>
       <div style={{ display: 'flex' }}>{p ? <IconBtn n="more_horiz_rounded" label="Menu" onClick={() => postMenu(p, () => n.back())} /> : null}</div></div>
     <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', overscrollBehavior: 'contain', minHeight: 0 }}>{loading && !p ? <Loader k="post" /> : err && !p ? <Empty icon="lock_outline_rounded" text={err} /> : p ? <div style={{ padding: '4px 18px 24px' }}>
       <OwnerRow a={p} />
-      {text ? <div style={{ paddingTop: 14, userSelect: 'text' }}><MentionText text={text} style={{ fontSize: 17, lineHeight: 1.55 }} /></div> : null}
-      {url ? <LinkEmbed url={url} /> : null}
+      {text ? <div style={{ paddingTop: 14, userSelect: 'text' }}><MentionText text={text} hideQuote style={{ fontSize: 17, lineHeight: 1.55 }} /></div> : null}
+      {q ? <QuoteCard id={q.id} /> : url ? <LinkEmbed url={url} /> : null}
       {p.files.length ? <div style={{ paddingTop: 6 }}>{p.bgm ? <BgmBar a={p} /> : <AudioBars a={p} scope={scope.current} />}</div> : null}
       <div style={{ height: 10 }} /><PostActions a={p} onComments={() => ta.current?.focus()} />
       <hr style={{ border: 0, borderTop: '1px solid var(--hair)', margin: '12px 0' }} />
@@ -173,6 +173,7 @@ export function ComposeScreen() {
   const [text, setText] = useState(''), [clip, setClip] = useState<Clip | null>(null), [playing, setPlaying] = useState(false), [pprof, setPprof] = useState(true), [busy, setBusy] = useState(false), [bgm, setBgm] = useState(false);
   const [rand, setRand] = useState('public'), [picked, setPicked] = useState<Record<string, any>>({}); const au = useRef<HTMLAudioElement | null>(null);
   useEffect(() => () => { au.current?.pause(); }, []);
+  const lock = useRef(false);
   if (!s.me) return <Screen title={s.t('new_post')}>{s.ready ? <NeedLogin /> : <Loader k="form" />}</Screen>;
   const add = async () => { const c = await sheet<Clip>((close) => <RecordSheet close={close as any} />); if (!c) return; au.current?.pause(); setPlaying(false); setClip(c); };
   const play = () => {
@@ -183,7 +184,6 @@ export function ComposeScreen() {
     const r = await sheet<Record<string, any>>((close) => <AccountPick init={picked} close={close as any} />); if (!r) return;
     setPicked(r); if (!Object.keys(r).length) { const l = audSplit(rand).filter((x) => x !== 'accounts'); setRand(l.length ? l.join(',') : 'public'); }
   };
-  const lock = useRef(false);
   const submit = async () => {
     if (lock.current) return; const t = text.trim();
     if (!clip && !t) { toast(s.t('e_empty'), { bad: true }); return; }

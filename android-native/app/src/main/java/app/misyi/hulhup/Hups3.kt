@@ -148,8 +148,9 @@ import org.json.JSONObject
                     item {
                         Column {
                             OwnerRow(p)
-                            if (text.isNotEmpty()) Box(Modifier.padding(top = 14.dp)) { MentionText(text, TextStyle(fontSize = 17.sp, lineHeight = (17 * 1.55).sp), selectable = true) }
-                            firstUrl(text)?.let { LinkEmbed(it) }
+                            if (text.isNotEmpty()) Box(Modifier.padding(top = 14.dp)) { MentionText(text, TextStyle(fontSize = 17.sp, lineHeight = (17 * 1.55).sp), selectable = true, hideQuote = true) }
+                            val qr = quoteRef(text)
+                            if (qr != null) QuoteCard(qr.id) else firstUrl(text)?.let { LinkEmbed(it) }
                             if (p.files.isNotEmpty()) Box(Modifier.padding(top = 6.dp)) { if (p.bgm) BgmBar(p) else AudioBars(p, owner) }
                             Spacer(Modifier.height(10.dp))
                             PostActions(p) { try { focus.requestFocus() } catch (_: Exception) {} }
