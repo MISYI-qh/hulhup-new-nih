@@ -36,7 +36,12 @@ fun pageFor(name: String): Screen? {
     val seg = path.split('/').filter { it.isNotEmpty() }.map { java.net.URLDecoder.decode(it, "UTF-8") }
     if (seg.isEmpty() || seg[0] == "acak") return Screen("/") { HomePage(0) }
     val s = Store
-    if (seg[0].startsWith("@") && seg[0].length > 1) { val u = seg[0].substring(1).lowercase(); return profileScreen(u, 0) }
+    if (seg[0].startsWith("@") && seg[0].length > 1) {
+        val u = seg[0].substring(1).lowercase()
+        if (seg.size == 1) return profileScreen(u, 0)
+        // /@nama/followers, /following, /relations, /hups, /acak → jalur yang sama dengan /u/nama/...
+        return pageFor("/u/" + u + "/" + seg.drop(1).joinToString("/"))
+    }
     return when (seg[0]) {
         "hups" -> Screen("/hups") { HomePage(1) }
         "p" -> { val id = seg.getOrNull(1)?.let { it.toIntOrNull() ?: PostCode.dec(it)?.toInt() } ?: return null

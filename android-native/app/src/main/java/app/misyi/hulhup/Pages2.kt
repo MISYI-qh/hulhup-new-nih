@@ -125,10 +125,10 @@ private fun JSONObject.list(k: String) = optJSONArray(k)?.objects() ?: emptyList
                                     if (u.bio.isNotEmpty()) Box(Modifier.padding(top = 12.dp)) { MentionText(u.bio, androidx.compose.ui.text.TextStyle(fontSize = 15.sp, lineHeight = 21.75.sp, fontFamily = Outfit)) }
                                     Spacer(Modifier.height(16.dp))
                                     FlowRow(horizontalArrangement = Arrangement.spacedBy(22.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        @Composable fun stat(n: Int, label: String, kind: String) = Tap(onTap = { go("/@$uname/$kind") }) { Row(verticalAlignment = Alignment.CenterVertically) { HText(s.fmt(n), 17f, FontWeight.ExtraBold); Spacer(Modifier.width(6.dp)); HText(label, 14f, color = sub()) } }
+                                        @Composable fun stat(n: Int, label: String, kind: String) = Tap(onTap = { go("/@$uname/$kind") }) { Row(Modifier.heightIn(min = 40.dp), verticalAlignment = Alignment.CenterVertically) { HText(s.fmt(n), 17f, FontWeight.ExtraBold); Spacer(Modifier.width(6.dp)); HText(label, 14f, color = sub()) } }
                                         stat(u.followers, s.t("followers"), "followers"); stat(u.following, s.t("following"), "following")
                                         if (mine || u.rels >= 0) Tap(onTap = { go("/@$uname/relations") }) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) { HText(s.fmt(relCount), 17f, FontWeight.ExtraBold); Spacer(Modifier.width(6.dp)); HText(s.t("rel_title"), 14f, color = sub()); if (mine && relIn > 0) Box(Modifier.padding(start = 6.dp).size(8.dp).background(Heart, CircleShape)) }
+                                            Row(Modifier.heightIn(min = 40.dp), verticalAlignment = Alignment.CenterVertically) { HText(s.fmt(relCount), 17f, FontWeight.ExtraBold); Spacer(Modifier.width(6.dp)); HText(s.t("rel_title"), 14f, color = sub()); if (mine && relIn > 0) Box(Modifier.padding(start = 6.dp).size(8.dp).background(Heart, CircleShape)) }
                                         }
                                     }
                                     if (mine && (u.streak > 0 || u.days > 0)) Box(Modifier.padding(top = 14.dp)) { StreakChip(u.streak, u.days, open = true) }
@@ -650,8 +650,8 @@ private fun Modifier.androidx_focus(f: androidx.compose.ui.focus.FocusRequester)
         }
     }
     Column(Modifier.fillMaxSize()) {
-        TopBar(back = true, title = s.t("notif"), actions = {
-            if (!items.isNullOrEmpty()) Tap(onTap = { selecting = !selecting; sel.clear() }) { HText(if (selecting) s.t("cancel") else s.t("notif_edit"), 15f, FontWeight.Bold, modifier = Modifier.padding(14.dp, 15.dp)) }
+        TopBar(back = true, title = s.t("notif"), nActions = 2, actions = {
+            if (!items.isNullOrEmpty()) Tap(onTap = { selecting = !selecting; sel.clear() }) { Box(Modifier.height(48.dp).padding(horizontal = 14.dp), contentAlignment = Alignment.Center) { HText(if (selecting) s.t("cancel") else s.t("notif_edit"), 15f, FontWeight.Bold, maxLines = 1) } }
         })
         if (selecting) Row(Modifier.padding(20.dp, 0.dp, 20.dp, 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             PBtn(s.t("notif_del_sel").replace("{n}", "${sel.size}"), if (sel.isEmpty()) null else ({ delete(false) }), ghost = true, modifier = Modifier.weight(1f))
