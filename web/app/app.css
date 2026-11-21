@@ -179,7 +179,6 @@ button{-webkit-tap-highlight-color:transparent}
 
 /* skeleton muncul halus (setelah 120 ms) supaya tidak berkedip saat pindah halaman cepat */
 [aria-busy=true]{opacity:0;animation:skin .22s .12s ease both}@keyframes skin{from{opacity:0}to{opacity:1}}
-.avatar img{background:var(--brand)}
 
 /* area ketuk minimal 44px dan umpan balik sentuh/hover yang konsisten */
 .act{min-height:44px;min-width:44px;box-sizing:border-box}
