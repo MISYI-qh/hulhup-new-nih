@@ -64,7 +64,7 @@ export function embedOf(url: string): FrameEmbed | null {
 /** Situs sosial yang medianya diambil server (og:video / sematan resmi) dan tampil sebagai pemutar atau kartu. */
 export function socialHost(url: string): boolean {
   const u = linkUri(url); if (!u) return false;
-  return /^(?:[\w-]+\.)*(instagram\.com|tiktok\.com|facebook\.com|fb\.watch|threads\.net|x\.com|twitter\.com)$/i.test(u.hostname);
+  return /^(?:[\w-]+\.)*(instagram\.com|tiktok\.com|facebook\.com|fb\.watch|threads\.net|threads\.com|x\.com|twitter\.com)$/i.test(u.hostname);
 }
 /** Tautan pertama di teks yang berupa media (foto/video/audio langsung atau sematan situs): posisinya disembunyikan karena medianya tampil langsung. */
 export function mediaRef(text: string, images = true): { at: number; len: number } | null {

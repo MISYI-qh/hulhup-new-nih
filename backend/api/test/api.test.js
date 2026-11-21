@@ -69,6 +69,20 @@ test('pengunggah ikut mendengar audio publiknya sendiri; maks 15 dtk', async () 
   assert.equal((await call('GET', '/random?f=friend', { token: t })).audio, null);
 });
 
+test('media URL: urutan tersimpan, hanya http/https, post hanya-media boleh', async () => {
+  const a = await reg('meda');
+  const urls = ['https://x.com/a.jpg', 'https://x.com/b.mp4', 'https://x.com/c.mp3', 'https://x.com/a.jpg'];
+  const r = await call('POST', '/posts', { token: a, body: { text: '', audios: 0, media: urls } });
+  assert.ok(r.id, JSON.stringify(r));
+  assert.deepEqual((await call('GET', `/posts/${r.id}`, { token: a })).post.media, urls.slice(0, 3));
+  assert.equal((await call('POST', '/posts', { token: a, body: { text: 'x', audios: 0, media: ['javascript:alert(1)'] } })).error, 'bad_request');
+  assert.equal((await call('POST', '/posts', { token: a, body: { text: 'x', audios: 0, media: 'nope' } })).error, 'bad_request');
+  const big = Array.from({ length: 101 }, (_, i) => 'https://x.com/' + i);
+  assert.equal((await call('POST', '/posts', { token: a, body: { text: 'x', audios: 0, media: big } })).error, 'too_long');
+  const p = await call('POST', '/posts', { token: a, body: { text: 'tanpa media', audios: 0 } });
+  assert.deepEqual((await call('GET', `/posts/${p.id}`, { token: a })).post.media, []);
+});
+
 test('akun dibanned diblokir', async () => {
   const t = await reg('dave');
   const { q } = await import('../lib/db.js');

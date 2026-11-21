@@ -6,7 +6,7 @@ import { Icon, HIcon } from './Icon';
 import { Api, store, useStore, type A } from '@/lib/store';
 import { PBtn, IconBtn, sheet, toast, confirmDlg } from './ui';
 import { AudChip, reportSheet } from './aud';
-import { Avatar, AiTag, LinkEmbed, QuoteCard, MentionText, Verified, firstUrl, quoteRef } from './rich';
+import { Avatar, AiTag, LinkEmbed, MediaStrip, QuoteCard, MentionText, Verified, firstUrl, quoteRef } from './rich';
 import { postCode, ORIGIN_URL } from '@/lib/links';
 
 export const postLink = (id: number) => `${ORIGIN_URL}/p/${postCode(id)}`;
@@ -184,6 +184,7 @@ export function PostCard({ a, scope, onDeleted }: { a: A; scope?: unknown; onDel
     <div style={{ padding: '8px 8px 0 0' }}><AudChip rand={a.rand} to={a.to} /></div>
     {text ? <div style={{ padding: '10px 8px 0 0' }}><MentionText text={text} hideQuote /></div> : null}
     {q ? <QuoteCard id={q.id} /> : url ? <LinkEmbed url={url} /> : null}
+    <MediaStrip items={a.media} />
     {a.files.length ? <div style={{ paddingRight: 8 }}>{a.bgm ? <BgmBar a={a} /> : <AudioBars a={a} scope={scope} />}</div> : null}
     <div style={{ height: 4 }} />
     <PostActions a={a} />

@@ -157,7 +157,7 @@ async function uv(u, me, today) {
   };
 }
 
-const AUD_SQL = `select a.id, a.descr, a.secs, a.pprof, a.rand, a.created, a.likes, a.plays, a.views, a.owner, a.body_len, a.in_rand, a.in_hups, a.n_audio, a.comments, a.bgm, a.bgm_idx, a.ai, a.ai_kind, a.body btext, u.username ou, u.name oname, u.av_ver oav, u.av_ai oai, u.av_ai_kind oaik, u.verified ov, u.pvis opvis,
+const AUD_SQL = `select a.id, a.descr, a.secs, a.pprof, a.rand, a.created, a.likes, a.plays, a.views, a.owner, a.body_len, a.in_rand, a.in_hups, a.n_audio, a.comments, a.bgm, a.bgm_idx, a.media, a.ai, a.ai_kind, a.body btext, u.username ou, u.name oname, u.av_ver oav, u.av_ai oai, u.av_ai_kind oaik, u.verified ov, u.pvis opvis,
   exists(select 1 from likes l where l.audio_id=a.id and l.user_id=$1) liked, exists(select 1 from saves sv where sv.post_id=a.id and sv.user_id=$1) saved from audios a join users u on u.id=a.owner`;
 
 function av(a) {
@@ -170,6 +170,7 @@ function av(a) {
     long: Number(a.body_len || 0) > String(a.descr || '').length, in_rand: a.in_rand !== false, in_hups: a.in_hups === true,
     files, comments: a.comments || 0, saved: a.saved === true,
     bgm: a.bgm === true, bgm_idx: a.bgm_idx || 0, text: a.btext ?? null,
+    media: Array.isArray(a.media) ? a.media : [],
   };
 }
 /** Untuk penulis sendiri: sertakan daftar akun tujuan pada post berpilihan "akun tertentu". */
@@ -943,6 +944,20 @@ async function recount(postId) {
   await q('update audios set comments=(select count(*) from comments where post_id=$1 and not pending) where id=$1', [postId]);
 }
 
+/** Daftar URL media (hanya URL yang disimpan): http/https, ≤ 2048 huruf, tanpa duplikat, maks 100 sebagai batas anti-penyalahgunaan. */
+function okMedia(v) {
+  if (v === undefined || v === null) return [];
+  if (!Array.isArray(v)) throw new ApiErr('bad_request');
+  const out = [];
+  for (const x of v) {
+    const s = String(x ?? '').trim();
+    if (!s || s.length > 2048 || !/^https?:\/\/[^\s]+$/i.test(s)) throw new ApiErr('bad_request');
+    if (!out.includes(s)) out.push(s);
+  }
+  if (out.length > 100) throw new ApiErr('too_long', 413);
+  return out;
+}
+
 route('POST', /^\/posts$/, async (c) => {
   const u = c.need();
   await hit(`post:${u.id}`, 40, 3600);
@@ -950,7 +965,8 @@ route('POST', /^\/posts$/, async (c) => {
   if (text.length > MAX_POST_TEXT) throw new ApiErr('too_long', 413);
   const n = b.audios === undefined ? 0 : parseInt(b.audios, 10); // 0 = hanya teks, 1 = satu audio (biasa atau backsound)
   if (n !== 0 && n !== 1) throw new ApiErr('need_audio');
-  if (n === 0 && !text) throw new ApiErr('empty');
+  const media = okMedia(b.media);
+  if (n === 0 && !text && !media.length) throw new ApiErr('empty');
   const bgm = n === 1 && b.bgm === true, bgmIdx = 0, inRand = true, inHups = true; // satu post tampil di Acak dan di Hups
   const rnd = parseAud(b.rand, false, true) ?? 'public';
   await ownLabels(u.id, rnd);
@@ -966,8 +982,8 @@ route('POST', /^\/posts$/, async (c) => {
   let id;
   try {
     id = await tx(async (t) => {
-      const r = await t.query(`insert into audios(owner, descr, secs, rand, pprof, created, body, body_key, body_len, in_rand, in_hups, n_audio, pending, bgm, mentions, bgm_idx) values ($1,$2,0,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) returning id`,
-        [u.id, cutPreview(text), rnd, b.pprof !== false, now(), body, key, text.length, inRand, inHups, n, n > 0, bgm, mentions.join(','), bgmIdx]);
+      const r = await t.query(`insert into audios(owner, descr, secs, rand, pprof, created, body, body_key, body_len, in_rand, in_hups, n_audio, pending, bgm, mentions, bgm_idx, media) values ($1,$2,0,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb) returning id`,
+        [u.id, cutPreview(text), rnd, b.pprof !== false, now(), body, key, text.length, inRand, inHups, n, n > 0, bgm, mentions.join(','), bgmIdx, JSON.stringify(media)]);
       for (const x of to) await t.query('insert into audio_to(audio_id, user_id) values ($1,$2)', [r.rows[0].id, x]);
       return Number(r.rows[0].id);
     });

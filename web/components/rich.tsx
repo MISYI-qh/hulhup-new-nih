@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { firstUrl, kindOfUrl, linkRe, linkUri, proxied, trimLink, mediaUrl, quoteRef, mediaRef, embedOf, socialHost, postCode } from '@/lib/links';
 import { A } from '@/lib/store';
 import { FileBar, fileKey } from './post';
+import { VPlayer } from './vplayer';
 
 export function Avatar({ url, name, size }: { url?: string | null; name: string; size: number }) {
   const [bad, setBad] = useState(false);
@@ -164,7 +165,7 @@ function VideoEmbed({ url, poster, tall, orig }: { url: string; poster?: string;
   const note = store.t('ext_note').replace('{h}', host(orig ?? url));
   if (bad) return <a className="embed" style={{ display: 'grid', placeItems: 'center', height: 120, marginRight: 8, background: '#000', color: '#fff' }} href={orig ?? url} target="_blank" rel="noopener noreferrer"><Icon n="open_in_new_rounded" size={34} /></a>;
   return <div className="embed" style={{ marginRight: 8, background: '#000', position: 'relative' }} onClick={(e) => e.stopPropagation()}>
-    {on ? <video src={url} poster={poster} controls autoPlay loop playsInline onError={() => setBad(true)} style={{ maxHeight: 460, width: '100%' }} /> : <div style={{ aspectRatio: tall ? '4/5' : '16/9', maxHeight: 460, display: 'grid', placeItems: 'center', position: 'relative', ...(poster ? { background: `#000 url("${poster}") center/cover no-repeat` } : {}) }}>
+    {on ? <VPlayer url={url} poster={poster} onBad={() => setBad(true)} /> : <div style={{ aspectRatio: tall ? '4/5' : '16/9', maxHeight: 460, display: 'grid', placeItems: 'center', position: 'relative', ...(poster ? { background: `#000 url("${poster}") center/cover no-repeat` } : {}) }}>
       <button className="tap" aria-label="Putar" onClick={() => { store.stop(); setOn(true); }} style={{ width: 58, height: 58, borderRadius: '50%', background: 'rgba(255,255,255,.24)', display: 'grid', placeItems: 'center', color: '#fff' }}><Icon n="play_arrow_rounded" size={38} /></button>
       <div style={{ position: 'absolute', left: 14, right: 14, bottom: 10, textAlign: 'center', color: 'rgba(255,255,255,.6)', fontSize: 11.5 }}>{note}</div></div>}
   </div>;
@@ -175,5 +176,13 @@ function AudioEmbed({ url, host: h }: { url: string; host: string }) {
   let name = h; try { name = decodeURIComponent(new URL(url).pathname.split('/').filter(Boolean).pop() || h); } catch {}
   return <div style={{ paddingRight: 8 }}><FileBar keyId={key} url={url} secs={0} />
     <div style={{ padding: '4px 0 0 6px', color: 'var(--sub)', fontSize: 11.5 }}>{name} · {store.t('ext_note').replace('{h}', h)}</div></div>;
+}
+/** Deretan media dari URL: digeser ke samping seperti Threads, tiap item tampil langsung. */
+export function MediaStrip({ items }: { items: string[] }) {
+  if (!items?.length) return null;
+  const one = items.length === 1;
+  return <div className="mstrip" onClick={(e) => e.stopPropagation()}>
+    {items.map((u, i) => <div key={u + i} className="mi" style={one ? { width: '100%' } : undefined}><LinkEmbed url={u} /></div>)}
+  </div>;
 }
 export { firstUrl, quoteRef };

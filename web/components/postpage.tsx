@@ -4,9 +4,37 @@ import { Icon, HIcon } from './Icon';
 import { NeedLogin, Screen, useNav } from './shell';
 import { Empty, Field, IconBtn, Loader, PBtn, Toggle, confirmDlg, sheet, toast } from './ui';
 import { Pick, askLabel, reportSheet, uploadAud, audSplit, withLabels } from './aud';
-import { Avatar, LinkEmbed, QuoteCard, MentionBar, MentionText, firstUrl, quoteRef } from './rich';
+import { Avatar, LinkEmbed, MediaStrip, QuoteCard, MentionBar, MentionText, firstUrl, quoteRef } from './rich';
 import { ActBtn, AudioBars, BgmBar, FileBar, OwnerRow, PostActions, Wave, commentLink, mmss, postMenu, shareUrl } from './post';
 import { A, ApiErr, Api, store, useStore } from '@/lib/store';
+import { kindOfUrl } from '@/lib/links';
+
+// ---------- kolom media (hanya URL yang disimpan) ----------
+function MediaEditor({ items, set }: { items: string[]; set: (v: string[]) => void }) {
+  const s = useStore(); const [open, setOpen] = useState(false), [v, setV] = useState('');
+  const host = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return u; } };
+  const label = (u: string) => { const k = kindOfUrl(u); return k === 'image' ? ['open_in_new_rounded', 'Foto'] : k === 'video' ? ['play_arrow_rounded', 'Video'] : k === 'audio' ? ['music_note_rounded', 'Audio'] : ['open_in_new_rounded', 'Link']; };
+  const move = (i: number, d: number) => { const j = i + d; if (j < 0 || j >= items.length) return; const n = items.slice(); [n[i], n[j]] = [n[j], n[i]]; set(n); };
+  const commit = () => {
+    const t = v.trim(); if (!t) { setOpen(false); return; }
+    if (!/^https?:\/\/[^\s]+$/i.test(t) || t.length > 2048) { toast(s.t('media_bad'), { bad: true }); return; }
+    if (!items.includes(t)) set([...items, t]); setV(''); setOpen(false);
+  };
+  return <div style={{ margin: '12px 0 4px' }}>
+    <div className="med" aria-label={s.t('media_title')}>
+      {items.map((u, i) => { const [ic, nm] = label(u); return <div className="mt" key={u}>
+        <div className="k"><Icon n={ic} size={16} /><span>{nm}</span></div>
+        <div className="u">{host(u)}</div>
+        <div className="a"><button className="tap" aria-label="Geser ke kiri" disabled={i === 0} onClick={() => move(i, -1)}><Icon n="chevron_left_rounded" size={18} /></button>
+          <button className="tap" aria-label="Hapus" onClick={() => set(items.filter((_, k) => k !== i))}><Icon n="close_rounded" size={18} /></button>
+          <button className="tap" aria-label="Geser ke kanan" disabled={i === items.length - 1} onClick={() => move(i, 1)}><Icon n="chevron_right_rounded" size={18} /></button></div></div>; })}
+      <button className="tap add" onClick={() => setOpen(true)}><Icon n="add_rounded" size={22} /><span>{s.t('media_add')}</span></button>
+    </div>
+    {open ? <div className="row2" style={{ gap: 8, marginTop: 8 }}>
+      <div className="sheetfield" style={{ flex: 1 }}><input autoFocus value={v} placeholder={s.t('media_url_ph')} inputMode="url" autoCapitalize="none" autoCorrect="off" onChange={(e) => setV(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') commit(); }} /></div>
+      <PBtn onClick={commit}>{s.t('media_add')}</PBtn></div> : null}
+  </div>;
+}
 
 // ---------- komentar ----------
 function CommentTile({ c, depth, postId, postOwner, scope, onReply, onLike, onDelete, onPin }: { c: any; depth: number; postId: number; postOwner: string; scope: unknown; onReply: () => void; onLike: () => void; onDelete: () => void; onPin: () => void }) {
@@ -94,6 +122,7 @@ export function PostScreen({ id, comment, seed }: { id: number; comment?: number
       <OwnerRow a={p} />
       {text ? <div style={{ paddingTop: 14, userSelect: 'text' }}><MentionText text={text} hideQuote style={{ fontSize: 17, lineHeight: 1.55 }} /></div> : null}
       {q ? <QuoteCard id={q.id} /> : url ? <LinkEmbed url={url} /> : null}
+      <MediaStrip items={p.media} />
       {p.files.length ? <div style={{ paddingTop: 6 }}>{p.bgm ? <BgmBar a={p} /> : <AudioBars a={p} scope={scope.current} />}</div> : null}
       <div style={{ height: 10 }} /><PostActions a={p} onComments={() => ta.current?.focus()} />
       <hr style={{ border: 0, borderTop: '1px solid var(--hair)', margin: '12px 0' }} />
@@ -170,7 +199,7 @@ function AccountPick({ init, close }: { init: Record<string, any>; close: (v?: R
 // ---------- tulis post ----------
 export function ComposeScreen() {
   const s = useStore(); const n = useNav();
-  const [text, setText] = useState(''), [clip, setClip] = useState<Clip | null>(null), [playing, setPlaying] = useState(false), [pprof, setPprof] = useState(true), [busy, setBusy] = useState(false), [bgm, setBgm] = useState(false);
+  const [text, setText] = useState(''), [clip, setClip] = useState<Clip | null>(null), [playing, setPlaying] = useState(false), [pprof, setPprof] = useState(true), [busy, setBusy] = useState(false), [bgm, setBgm] = useState(false), [media, setMedia] = useState<string[]>([]);
   const [rand, setRand] = useState('public'), [picked, setPicked] = useState<Record<string, any>>({}); const au = useRef<HTMLAudioElement | null>(null);
   useEffect(() => () => { au.current?.pause(); }, []);
   const lock = useRef(false);
@@ -186,11 +215,11 @@ export function ComposeScreen() {
   };
   const submit = async () => {
     if (lock.current) return; const t = text.trim();
-    if (!clip && !t) { toast(s.t('e_empty'), { bad: true }); return; }
+    if (!clip && !t && !media.length) { toast(s.t('e_empty'), { bad: true }); return; }
     if (audSplit(rand).includes('accounts') && !Object.keys(picked).length) { toast(s.t('e_need_accounts'), { bad: true }); return; }
     lock.current = true; setBusy(true); let id: number | null = null;
     try {
-      const j = await Api.req('POST', '/posts', { text: t, audios: clip ? 1 : 0, ...(clip ? { bgm } : {}), pprof, rand: audSplit(rand), to: Object.keys(picked) });
+      const j = await Api.req('POST', '/posts', { text: t, audios: clip ? 1 : 0, ...(clip ? { bgm } : {}), media, pprof, rand: audSplit(rand), to: Object.keys(picked) });
       id = Number(j.id);
       if (clip) await Api.send(`/posts/${id}/audio?secs=${clip.secs}`, clip.blob, 'application/octet-stream');
       toast(s.t('posted')); n.back();
@@ -208,8 +237,10 @@ export function ComposeScreen() {
     {clip ? <div className="row2" style={{ paddingTop: 14, gap: 12 }}><div style={{ flex: 1 }}><div style={{ fontWeight: 600, fontSize: 16 }}>{s.t('bgm_label')}</div><div style={{ color: 'var(--sub)', fontSize: 12.5 }}>{s.t('bgm_note')}</div></div><Toggle v={bgm} on={setBgm} /></div> : null}
     <div style={{ height: 14 }} />
     <div className="sheetfield"><textarea rows={4} value={text} placeholder={s.t('write_hups')} onChange={(e) => setText(e.target.value)} /></div>
+    <MediaEditor items={media} set={setMedia} />
     <div style={{ height: 6 }} /><MentionBar value={text} onPick={setText} />
     <div style={{ color: 'var(--sub)', fontSize: 12.5, margin: '0 0 14px 6px' }}>{s.t('tag_hint')}</div>
+    <div className="row2" style={{ alignItems: 'flex-start', gap: 10, background: 'var(--soft)', borderRadius: 18, padding: '12px 14px', margin: '0 0 16px', color: 'var(--sub)', fontSize: 13, lineHeight: 1.45 }}><Icon n="info_outline_rounded" size={18} color="var(--sub)" style={{ flex: 'none', marginTop: 1 }} /><span>{s.t('media_hint')}</span></div>
     <div className="row2" style={{ paddingBottom: 14, gap: 12 }}><div style={{ flex: 1, fontWeight: 600, fontSize: 16 }}>{s.t('pprof')}</div><Toggle v={pprof} on={setPprof} /></div>
     <Pick label={s.t('who_see')} value={rand} opts={withLabels(uploadAud)} on={async (v) => { setRand(v); if (audSplit(v).includes('accounts') && !Object.keys(picked).length) { const r = await sheet<Record<string, any>>((close) => <AccountPick init={picked} close={close as any} />); if (r) { setPicked(r); if (!Object.keys(r).length) { const l = audSplit(v).filter((x) => x !== 'accounts'); setRand(l.length ? l.join(',') : 'public'); } } } }} />
     {hasAcc ? <button className="tap srow" style={{ marginTop: 10, marginBottom: 0, fontSize: 15 }} onClick={pickAcc}><Icon n="person_search_outlined" size={20} /><span style={{ flex: 1 }}>{s.t('pick_acc_n').replace('{n}', `${Object.keys(picked).length}`)}</span><Icon n="edit_outlined" size={18} color="var(--sub)" /></button> : null}

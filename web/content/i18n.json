@@ -1418,5 +1418,25 @@
 "quote_na": [
 "Post tidak tersedia",
 "Post unavailable"
+],
+"media_hint": [
+"Foto, video, atau musik belum bisa diunggah, hanya audio maksimal 15 detik. Tapi gampang: tempel saja link-nya di tulisan (Instagram, YouTube, TikTok, Spotify, SoundCloud, atau link langsung .jpg, .mp4, .mp3). Otomatis tampil dan bisa diputar langsung di dalam post, tanpa link.",
+"Photos, videos, and music can't be uploaded yet; only audio up to 15 seconds. It's easy though: just paste the link in your text (Instagram, YouTube, TikTok, Spotify, SoundCloud, or a direct .jpg, .mp4, .mp3 link). It shows up and plays right inside the post, no link shown."
+],
+"media_title": [
+"Media dari link",
+"Media from links"
+],
+"media_add": [
+"Tambah",
+"Add"
+],
+"media_url_ph": [
+"Tempel link foto, video, atau audio",
+"Paste a photo, video, or audio link"
+],
+"media_bad": [
+"Link harus diawali http:// atau https://",
+"Link must start with http:// or https://"
 ]
 }
