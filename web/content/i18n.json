@@ -1586,5 +1586,13 @@
 "ph_login": [
 "Masuk dulu untuk memakai Phipop",
 "Sign in to use Phipop"
+],
+"logout_q": [
+"Keluar dari akun?",
+"Sign out?"
+],
+"logout_q_body": [
+"Kamu harus masuk lagi untuk memakai akunmu di perangkat ini.",
+"You will need to sign in again to use your account on this device."
 ]
 }

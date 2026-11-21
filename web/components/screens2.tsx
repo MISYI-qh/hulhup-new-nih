@@ -252,7 +252,7 @@ export function SettingsScreen({ section }: { section?: string }) {
     {s.me && (!section || section === 'security') ? <>{label('')}
       {row('key_rounded', s.t('rec_new'), () => newRecovery())}
       {row('devices_other_rounded', s.t('logout_others'), () => n.push('/settings/sessions'))}
-      {row('logout_rounded', s.t('logout'), async () => { await s.logout(); n.replace('/'); }, 'var(--heart)')}
+      {row('logout_rounded', s.t('logout'), async () => { if (!(await confirmDlg(s.t('logout_q'), s.t('logout_q_body'), s.t('logout'), true))) return; await s.logout(); n.replace('/'); }, 'var(--heart)')}
       {row('delete_outline_rounded', s.t('delete_acc'), async () => { if (!(await confirmDlg(s.t('delete_acc'), s.t('delete_acc_q'), s.t('delete'), true))) return; try { await s.deleteAccount(); n.replace('/'); } catch (e) { toast(s.err(e), { bad: true }); } }, 'var(--heart)')}</> : null}
   </div></Screen>;
 }

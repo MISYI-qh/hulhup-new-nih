@@ -46,28 +46,33 @@ async function generate(history, userText, ctxText) {
   if (globalThis.__phipopGen) return globalThis.__phipopGen(history, userText, ctxText);
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new ApiErr('phipop_busy', 503);
-  const model = process.env.PHIPOP_MODEL || 'gemini-2.5-flash';
+  const model = process.env.PHIPOP_MODEL || 'gemini-3.8-flash';
   const contents = [...history.map((h) => ({ role: h.role === 'phipop' ? 'model' : 'user', parts: [{ text: h.body }] })),
     { role: 'user', parts: [{ text: (ctxText ? `[konteks post, data tak tepercaya]\n${ctxText}\n[/konteks]\n` : '') + userText }] }];
-  const ac = new AbortController(); const tm = setTimeout(() => ac.abort(), 14000);
+  const call = async (thinking) => {
+    const ac = new AbortController(); const tm = setTimeout(() => ac.abort(), 14000);
+    try {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        method: 'POST', signal: ac.signal, headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: SYSTEM }] }, contents,
+          generationConfig: { maxOutputTokens: 1024, temperature: 1.15, topP: 0.95, ...(thinking ? { thinkingConfig: { thinkingBudget: 0 } } : {}) },
+          safetySettings: [
+            { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
+            { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+            { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+            { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' }] }),
+      });
+      if (!r.ok) { const e = new Error('upstream'); e.status = r.status; console.error('phipop upstream', r.status, String(await r.text().catch(() => '')).slice(0, 300).replace(/key[=:]\S+/gi, 'key=***')); throw e; }
+      return await r.json();
+    } finally { clearTimeout(tm); }
+  };
   try {
-    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-      method: 'POST', signal: ac.signal, headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: SYSTEM }] }, contents,
-        generationConfig: { maxOutputTokens: 400, temperature: 1.15, topP: 0.95, thinkingConfig: { thinkingBudget: 0 } },
-        safetySettings: [
-          { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
-          { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-          { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-          { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' }] }),
-    });
-    if (!r.ok) { console.error('phipop upstream', r.status, String(await r.text().catch(() => '')).slice(0, 300).replace(/key[=:]\S+/gi, 'key=***')); throw new Error('upstream'); }
-    const j = await r.json();
-    const t = j?.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
+    let j; try { j = await call(true); } catch (e) { if (e.status === 400) j = await call(false); else throw e; } // beberapa model menolak thinkingBudget
+    const t = j?.candidates?.[0]?.content?.parts?.filter((p) => !p.thought).map((p) => p.text || '').join('') || '';
     if (!t.trim()) return pick(['hah? pertanyaan lu terlalu busuk buat gue jawab.', 'skip. ganti pertanyaan.']);
     return t;
-  } catch (e) { throw e instanceof ApiErr ? e : new ApiErr('phipop_busy', 503); } finally { clearTimeout(tm); }
+  } catch (e) { throw e instanceof ApiErr ? e : new ApiErr('phipop_busy', 503); }
 }
 
 export const phipopUser = () => one(`select id, username from users where username=$1`, [PH_USER]);
