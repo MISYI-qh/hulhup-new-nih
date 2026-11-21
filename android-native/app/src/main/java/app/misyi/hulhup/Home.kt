@@ -208,7 +208,7 @@ val kBuild get() = BuildConfig.BUILD
         if (s.me == null) PBtn(s.t("login"), { close(); go("/login") }, icon = Icons.Rounded.Login)
         else PBtn(s.t("logout"), { close(); sc.launch { s.logout() } }, icon = Icons.Rounded.Logout, ghost = true, fgc = Heart)
         Spacer(Modifier.height(14.dp))
-        HText(if (kBuild > 0) "Misyi · v2.0.0 ($kBuild)" else "Misyi · v2.0.0", 12f, FontWeight.Bold, sub(), ls = 1.2f, align = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+        HText("Misyi · v2.0.0", 12f, FontWeight.Bold, sub(), ls = 1.2f, align = TextAlign.Center, modifier = Modifier.fillMaxWidth())
     }
 }
 

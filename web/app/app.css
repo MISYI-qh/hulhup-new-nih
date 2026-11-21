@@ -189,3 +189,7 @@ button{-webkit-tap-highlight-color:transparent}
 .embed.frame iframe{display:block;max-height:none;object-fit:initial}
 .frame-open{position:absolute;right:8px;top:8px;z-index:2;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:rgba(0,0,0,.45);color:#fff;opacity:0;transition:opacity .2s}
 .embed.frame:hover .frame-open{opacity:1}
+
+/* Foto profil: tanpa garis fokus/ungu di pinggirnya */
+button:has(.avatar),button:has(.avatar):focus,button:has(.avatar):focus-visible,.avatar:focus,.avatar:focus-visible{outline:none!important;box-shadow:none!important}
+.avatar{outline:0;box-shadow:none}

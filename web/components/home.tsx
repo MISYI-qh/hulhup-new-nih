@@ -82,7 +82,7 @@ function SideMenu({ open, close }: { open: boolean; close: () => void }) {
       <div style={{ padding: '0 10px' }}>
         {!s.me ? <PBtn icon="login_rounded" onClick={() => { close(); n.push('/login'); }}>{s.t('login')}</PBtn>
           : <PBtn ghost icon="logout_rounded" fg="var(--heart)" onClick={async () => { close(); await s.logout(); }}>{s.t('logout')}</PBtn>}
-        <div style={{ textAlign: 'center', color: 'var(--sub)', fontWeight: 700, letterSpacing: 1.2, fontSize: 12, margin: '14px 0' }}>Misyi · v1.3.0</div>
+        <div style={{ textAlign: 'center', color: 'var(--sub)', fontWeight: 700, letterSpacing: 1.2, fontSize: 12, margin: '14px 0' }}>Misyi · v2.0.0</div>
       </div>
     </nav></div>;
 }

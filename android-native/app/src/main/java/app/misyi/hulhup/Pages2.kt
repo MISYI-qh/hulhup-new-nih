@@ -414,7 +414,7 @@ fun sidecar(b: ByteArray): ByteArray {
             Spacer(Modifier.height(8.dp))
             In(0) { Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Tap(onTap = { avatarMenu() }) {
-                    Box(Modifier.shadow(16.dp, CircleShape).background(bgOf(), CircleShape).padding(5.dp)) {
+                    Box {
                         Box(Modifier.size(104.dp).clip(CircleShape)) {
                             Avatar(me.avatar, me.name, 104.dp)
                             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .26f)), contentAlignment = Alignment.Center) {
