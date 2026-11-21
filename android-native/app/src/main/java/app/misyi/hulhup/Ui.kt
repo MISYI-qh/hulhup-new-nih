@@ -356,12 +356,12 @@ class AnimMarkCtl { var play: ((Int?) -> Unit)? = null }
     if (onTap == null) w() else Tap(scale = .96f, onTap = onTap) { Box(Modifier.padding(vertical = 8.dp, horizontal = 6.dp)) { w() } }
 }
 
-@Composable fun TopBar(lead: (@Composable () -> Unit)? = null, center: (@Composable () -> Unit)? = null, title: String? = null, back: Boolean = false, actions: @Composable RowScope.() -> Unit = {}, nActions: Int = 1) {
-    val w = (48 * max(1, nActions)).dp
+@Composable fun TopBar(lead: (@Composable () -> Unit)? = null, center: (@Composable () -> Unit)? = null, title: String? = null, back: Boolean = false, actions: @Composable RowScope.() -> Unit = {}, nActions: Int = 1, leadDp: Int? = null, actDp: Int? = null) {
+    val w = (48 * max(1, nActions)).dp; val wl = leadDp?.dp ?: w; val wa = actDp?.dp ?: w
     Row(Modifier.fillMaxWidth().statusBarsPadding().height(60.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.width(w), contentAlignment = Alignment.CenterStart) { if (back) IconBtn(Icons.Rounded.ArrowBackIosNew) { Nav.back() } else lead?.invoke() }
+        Box(Modifier.width(wl), contentAlignment = Alignment.CenterStart) { if (back) IconBtn(Icons.Rounded.ArrowBackIosNew) { Nav.back() } else lead?.invoke() }
         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { if (center != null) center() else HText(title ?: "", 18f, FontWeight.ExtraBold) }
-        Row(Modifier.width(w), horizontalArrangement = Arrangement.End, content = actions)
+        Row(Modifier.width(wa), horizontalArrangement = Arrangement.End, content = actions)
     }
 }
 

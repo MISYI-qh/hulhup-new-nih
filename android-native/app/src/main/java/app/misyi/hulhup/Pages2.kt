@@ -617,6 +617,7 @@ private fun Modifier.androidx_focus(f: androidx.compose.ui.focus.FocusRequester)
     }
     fun open(n: JSONObject) {
         val k = n.optString("type"); val post = n.optInt("post")
+        if (k == "phipop_code") { go("/phipop?code=" + java.net.URLEncoder.encode(n.str("extra"), "UTF-8")); return }
         if ((k == "comment" || k == "reply" || k == "mention" || k == "like") && post != 0) go("/p/${PostCode.enc(post.toLong())}") else go("/@${n.optString("username")}")
     }
     @Composable fun body(n: JSONObject, i: Int) {

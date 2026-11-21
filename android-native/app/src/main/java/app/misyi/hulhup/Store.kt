@@ -243,6 +243,7 @@ object Store {
     fun notifText(type: String, extra: String): String = when (type) {
         "like" -> t("n_like"); "comment" -> t("n_comment"); "reply" -> t("n_reply"); "mention" -> t("n_mention")
         "rel_req" -> t("n_rel_req").replace("{r}", relName(extra)); "rel_ok" -> t("n_rel_ok").replace("{r}", relName(extra))
+        "phipop_code" -> t("n_phipop_code").replace("{extra}", extra)
         else -> t("n_follow")
     }
 

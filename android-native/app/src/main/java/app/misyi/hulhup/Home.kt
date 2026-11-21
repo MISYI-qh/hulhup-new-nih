@@ -88,7 +88,8 @@ val kBuild get() = BuildConfig.BUILD
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
-            TopBar(lead = { IconBtn(Icons.Rounded.Menu) { menu = true } }, center = { HBrand() }, nActions = 2, actions = {
+            TopBar(lead = { IconBtn(Icons.Rounded.Menu) { menu = true } }, center = { HBrand() }, nActions = 2, leadDp = 48, actDp = 136, actions = {
+                PhipopBtn()
                 IconBtn(Icons.Rounded.Search) { if (s.needNet()) go("/search") }
                 IconBtn(Icons.Outlined.PersonOutline, dot = s.unread > 0) { go(if (s.me == null) "/me" else "/@${s.me!!.username}") }
             })
