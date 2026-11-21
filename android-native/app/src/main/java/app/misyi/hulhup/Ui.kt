@@ -184,9 +184,13 @@ fun toast(m: String, bad: Boolean = false) { Overlay.toasts.add(ToastMsg(System.
                 Spacer(Modifier.height(10.dp))
                 HText(q.body, 15f, color = sub(), lh = 1.5f)
                 Spacer(Modifier.height(22.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    PBtn(Store.t("cancel"), { q.result.complete(false) }, ghost = true, modifier = Modifier.weight(1f))
-                    PBtn(q.yes, { q.result.complete(true) }, color = if (q.danger) Heart else null, modifier = Modifier.weight(1f))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Tap(Modifier.weight(1f), onTap = { q.result.complete(false) }) {
+                        Box(Modifier.fillMaxWidth().height(52.dp).background(ink().copy(alpha = .08f), RoundedCornerShape(26.dp)), contentAlignment = Alignment.Center) { HText(Store.t("cancel"), 15f, FontWeight.ExtraBold, ink(), align = TextAlign.Center) }
+                    }
+                    Tap(Modifier.weight(1f), onTap = { q.result.complete(true) }) {
+                        Box(Modifier.fillMaxWidth().height(52.dp).background(if (q.danger) Heart else ink(), RoundedCornerShape(26.dp)), contentAlignment = Alignment.Center) { HText(q.yes, 15f, FontWeight.ExtraBold, if (q.danger || !isDark()) Color.White else Color(0xFF111111), align = TextAlign.Center, maxLines = 1) }
+                    }
                 }
             }
         }

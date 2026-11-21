@@ -237,6 +237,7 @@ private fun fmtCode(s: String): String = s.uppercase().filter { it.isLetterOrDig
                             try { val j = Api.req("POST", "/phipop/admin/send", JSONObject().put("request_id", id)); codes[id] = j.optString("code").ifEmpty { "✓" } } catch (e: Exception) { toast(s.err(e), true) }
                         } }) }
                         Box(Modifier.weight(1f)) { PBtn(s.t("pa_reject"), { sc.launch {
+                            if (!confirm(s.t("pa_reject"), s.t("pa_reject_q").replace("{u}", r.optString("username")), s.t("pa_reject"), danger = true)) return@launch
                             try { Api.req("POST", "/phipop/admin/reject", JSONObject().put("request_id", id)); load() } catch (e: Exception) { toast(s.err(e), true) }
                         } }, ghost = true) }
                     }
@@ -264,7 +265,7 @@ private fun fmtCode(s: String): String = s.uppercase().filter { it.isLetterOrDig
                         val l = if (a.optBoolean("exempt")) s.t("pa_unl") else if (a.isNull("lim")) "—" else "${a.optInt("lim")}"
                         HText("$l · ${a.optInt("used")} ${s.t("pa_used")}", 12.5f, color = sub())
                     }
-                    Tap(onTap = { sc.launch { try { Api.req("POST", "/phipop/admin/grant", JSONObject().put("username", u).put("revoke", true)); load() } catch (e: Exception) { toast(s.err(e), true) } } }) { HText(s.t("pa_revoke"), 13f, FontWeight.ExtraBold, Heart, Modifier.padding(12.dp)) }
+                    Tap(onTap = { sc.launch { if (!confirm(s.t("pa_revoke"), s.t("pa_revoke_q").replace("{u}", u), s.t("pa_revoke"), danger = true)) return@launch; try { Api.req("POST", "/phipop/admin/grant", JSONObject().put("username", u).put("revoke", true)); load() } catch (e: Exception) { toast(s.err(e), true) } } }) { HText(s.t("pa_revoke"), 13f, FontWeight.ExtraBold, Heart, Modifier.padding(12.dp)) }
                 }
             }
         }

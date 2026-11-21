@@ -484,7 +484,7 @@ fun sidecar(b: ByteArray): ByteArray {
                 label("")
                 row(Icons.Rounded.Key, s.t("rec_new")) { sc.launch { newRecovery() } }
                 row(Icons.Rounded.DevicesOther, s.t("logout_others")) { go("/settings/sessions") }
-                row(Icons.Rounded.Logout, s.t("logout"), Heart) { sc.launch { s.logout(); Nav.reset(Screen("/") { HomePage(0) }) } }
+                row(Icons.Rounded.Logout, s.t("logout"), Heart) { sc.launch { if (confirm(s.t("logout_q"), s.t("logout_b"), s.t("logout"), danger = true)) { s.logout(); Nav.reset(Screen("/") { HomePage(0) }) } } }
                 row(Icons.Outlined.DeleteOutline, s.t("delete_acc"), Heart) {
                     sc.launch {
                         if (!confirm(s.t("delete_acc"), s.t("delete_acc_q"), s.t("delete"), danger = true)) return@launch
@@ -542,7 +542,7 @@ fun sidecar(b: ByteArray): ByteArray {
                             }) { HText(s.t("sess_out"), 14f, FontWeight.ExtraBold, Heart, Modifier.padding(10.dp)) }
                         }
                     }
-                    if (list.size > 1) Box(Modifier.padding(top = 8.dp)) { PBtn(s.t("sess_all"), { sc.launch { try { Api.req("POST", "/me/logout-others"); toast(s.t("logout_others_done")); load() } catch (e: Exception) { toast(s.err(e), true) } } }, ghost = true, icon = Icons.Rounded.DevicesOther) }
+                    if (list.size > 1) Box(Modifier.padding(top = 8.dp)) { PBtn(s.t("sess_all"), { sc.launch { if (!confirm(s.t("sess_all"), s.t("sess_all_q"), s.t("sess_out"), danger = true)) return@launch; try { Api.req("POST", "/me/logout-others"); toast(s.t("logout_others_done")); load() } catch (e: Exception) { toast(s.err(e), true) } } }, ghost = true, icon = Icons.Rounded.DevicesOther) }
                     else Box(Modifier.fillMaxWidth().padding(top = 18.dp), contentAlignment = Alignment.Center) { HText(s.t("sess_empty"), 14f, color = sub()) }
                 }
             }
