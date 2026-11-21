@@ -67,6 +67,18 @@ export function socialHost(url: string): boolean {
   return /^(?:[\w-]+\.)*(instagram\.com|tiktok\.com|facebook\.com|fb\.watch|threads\.net|threads\.com|x\.com|twitter\.com)$/i.test(u.hostname);
 }
 /** Tautan pertama di teks yang berupa media (foto/video/audio langsung atau sematan situs): posisinya disembunyikan karena medianya tampil langsung. */
+/** Semua tautan media/sosial di teks (urutan muncul): dipakai untuk deretan media dan untuk menyembunyikan URL-nya. */
+export function mediaRefs(text: string, images = true): { at: number; len: number; url: string }[] {
+  const out: { at: number; len: number; url: string }[] = [];
+  for (const m of text.matchAll(linkRe())) {
+    const raw = trimLink(m[0]); if (!raw || raw.startsWith('@')) continue;
+    const uri = linkUri(raw); if (!uri) continue;
+    const url = uri.toString(), k = kindOfUrl(url);
+    if (k === 'image' && !images) continue;
+    if (k !== 'page' || embedOf(url) || socialHost(url)) out.push({ at: m.index!, len: raw.length, url });
+  }
+  return out;
+}
 export function mediaRef(text: string, images = true): { at: number; len: number } | null {
   for (const m of text.matchAll(linkRe())) {
     const raw = trimLink(m[0]); if (!raw || raw.startsWith('@')) continue;

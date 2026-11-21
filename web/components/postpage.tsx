@@ -4,7 +4,7 @@ import { Icon, HIcon } from './Icon';
 import { NeedLogin, Screen, useNav } from './shell';
 import { Empty, Field, IconBtn, Loader, PBtn, Toggle, confirmDlg, sheet, toast } from './ui';
 import { Pick, askLabel, reportSheet, uploadAud, audSplit, withLabels } from './aud';
-import { Avatar, LinkEmbed, MediaStrip, QuoteCard, MentionBar, MentionText, firstUrl, quoteRef } from './rich';
+import { Avatar, LinkEmbed, PostMedia, QuoteCard, MentionBar, MentionText, firstUrl, quoteRef } from './rich';
 import { ActBtn, AudioBars, BgmBar, FileBar, OwnerRow, PostActions, Wave, commentLink, mmss, postMenu, shareUrl } from './post';
 import { A, ApiErr, Api, store, useStore } from '@/lib/store';
 import { kindOfUrl } from '@/lib/links';
@@ -121,8 +121,7 @@ export function PostScreen({ id, comment, seed }: { id: number; comment?: number
     <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', overscrollBehavior: 'contain', minHeight: 0 }}>{loading && !p ? <Loader k="post" /> : err && !p ? <Empty icon="lock_outline_rounded" text={err} /> : p ? <div style={{ padding: '4px 18px 24px' }}>
       <OwnerRow a={p} />
       {text ? <div style={{ paddingTop: 14, userSelect: 'text' }}><MentionText text={text} hideQuote style={{ fontSize: 17, lineHeight: 1.55 }} /></div> : null}
-      {q ? <QuoteCard id={q.id} /> : url ? <LinkEmbed url={url} /> : null}
-      <MediaStrip items={p.media} />
+      <PostMedia text={text} media={p.media} />
       {p.files.length ? <div style={{ paddingTop: 6 }}>{p.bgm ? <BgmBar a={p} /> : <AudioBars a={p} scope={scope.current} />}</div> : null}
       <div style={{ height: 10 }} /><PostActions a={p} onComments={() => ta.current?.focus()} />
       <hr style={{ border: 0, borderTop: '1px solid var(--hair)', margin: '12px 0' }} />

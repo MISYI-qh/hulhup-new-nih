@@ -1,11 +1,12 @@
 'use client';
+import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Icon, HIcon } from './Icon';
 import { Api, store, useStore } from '@/lib/store';
 import { toast, PBtn } from './ui';
 import { useRouter } from 'next/navigation';
-import { firstUrl, kindOfUrl, linkRe, linkUri, proxied, trimLink, mediaUrl, quoteRef, mediaRef, embedOf, socialHost, postCode } from '@/lib/links';
+import { firstUrl, kindOfUrl, linkRe, linkUri, proxied, trimLink, mediaUrl, quoteRef, mediaRef, mediaRefs, embedOf, socialHost, postCode } from '@/lib/links';
 import { A } from '@/lib/store';
 import { FileBar, fileKey } from './post';
 import { VPlayer } from './vplayer';
@@ -30,13 +31,13 @@ export function openLink(raw: string, push: (p: string) => void) {
 
 /** Teks dengan @nama dan tautan yang bisa diketuk. */
 export function MentionText({ text, className, style, clamp, hideQuote }: { text: string; className?: string; style?: React.CSSProperties; clamp?: number; hideQuote?: boolean }) {
-  const out: React.ReactNode[] = []; let last = 0, k = 0; const q = hideQuote ? (quoteRef(text) ?? mediaRef(text, !!store.me)) : null;
+  const out: React.ReactNode[] = []; let last = 0, k = 0; const qr = hideQuote ? quoteRef(text) : null; const hid = hideQuote ? (qr ? [qr] : mediaRefs(text, !!store.me)) : []; const hat = new Set(hid.map((x) => x.at)); const q = hid.length ? hid[0] : null;
   const re = new RegExp(`${linkRe().source}|@([a-z0-9_]{3,20})`, 'gi');
   for (const m of text.matchAll(re)) {
     const raw = m[0], tag = m[2] != null, shown = tag ? raw : trimLink(raw);
     if (!shown) continue;
     const at = m.index!;
-    if (q && !tag && at === q.at) { if (at > last) out.push(text.slice(last, at).replace(/\s+$/, '')); last = at + shown.length; continue; }
+    if (hat.size && !tag && hat.has(at)) { if (at > last) out.push(text.slice(last, at).replace(/\s+$/, '')); last = at + shown.length; continue; }
     if (at > last) out.push(text.slice(last, at));
     out.push(tag
       ? <Link key={k++} href={`/@${m[2].toLowerCase()}`} className="mention" onClick={(e) => e.stopPropagation()}>{shown}</Link>
@@ -155,19 +156,25 @@ function PageCard({ url, p }: { url: string; p: any }) {
     </div></a>;
 }
 function ImageEmbed({ src, orig }: { src: string; orig: string }) {
-  const [bad, setBad] = useState(false);
+  const [bad, setBad] = useState(false), [full, setFull] = useState(false);
   if (bad) return <div className="embed" style={{ padding: 14, marginRight: 8, display: 'flex', gap: 10, color: 'var(--sub)' }}><Icon n="broken_image_outlined" />{host(orig || src)}</div>;
-  return <a className="tap embed im" style={{ display: 'block', marginRight: 8 }} href={src} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}><img src={src} alt="" loading="lazy" decoding="async" onError={() => setBad(true)} /></a>;
+  return <>
+    <button className="tap embed im nat" style={{ display: 'block', marginRight: 8, padding: 0, width: '100%' }} aria-label="Perbesar" onClick={(e) => { e.stopPropagation(); setFull(true); }}><img src={src} alt="" loading="lazy" decoding="async" onError={() => setBad(true)} /></button>
+    {full ? <Lightbox src={src} onClose={() => setFull(false)} /> : null}
+  </>;
+}
+function Lightbox({ src, onClose }: { src: string; onClose: () => void }) {
+  useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); }; window.addEventListener('keydown', k); const o = document.body.style.overflow; document.body.style.overflow = 'hidden'; return () => { window.removeEventListener('keydown', k); document.body.style.overflow = o; }; }, []);
+  return createPortal(<div className="lbx" onClick={(e) => { e.stopPropagation(); onClose(); }}><img src={src} alt="" onClick={(e) => e.stopPropagation()} /><button className="lbx-x tap" aria-label="Tutup" onClick={(e) => { e.stopPropagation(); onClose(); }}><Icon n="close_rounded" size={24} /></button></div>, document.body);
 }
 /** Video dari URL: tidak diunduh sampai diketuk (hemat kuota), lalu langsung diputar di tempat. */
-function VideoEmbed({ url, poster, tall, orig }: { url: string; poster?: string; tall?: boolean; orig?: string }) {
+function VideoEmbed({ url, poster, orig }: { url: string; poster?: string; tall?: boolean; orig?: string }) {
   const [on, setOn] = useState(false), [bad, setBad] = useState(false);
-  const note = store.t('ext_note').replace('{h}', host(orig ?? url));
-  if (bad) return <a className="embed" style={{ display: 'grid', placeItems: 'center', height: 120, marginRight: 8, background: '#000', color: '#fff' }} href={orig ?? url} target="_blank" rel="noopener noreferrer"><Icon n="open_in_new_rounded" size={34} /></a>;
-  return <div className="embed" style={{ marginRight: 8, background: '#000', position: 'relative' }} onClick={(e) => e.stopPropagation()}>
-    {on ? <VPlayer url={url} poster={poster} onBad={() => setBad(true)} /> : <div style={{ aspectRatio: tall ? '4/5' : '16/9', maxHeight: 460, display: 'grid', placeItems: 'center', position: 'relative', ...(poster ? { background: `#000 url("${poster}") center/cover no-repeat` } : {}) }}>
-      <button className="tap" aria-label="Putar" onClick={() => { store.stop(); setOn(true); }} style={{ width: 58, height: 58, borderRadius: '50%', background: 'rgba(255,255,255,.24)', display: 'grid', placeItems: 'center', color: '#fff' }}><Icon n="play_arrow_rounded" size={38} /></button>
-      <div style={{ position: 'absolute', left: 14, right: 14, bottom: 10, textAlign: 'center', color: 'rgba(255,255,255,.6)', fontSize: 11.5 }}>{note}</div></div>}
+  if (bad) return <a className="embed" style={{ display: 'grid', placeItems: 'center', height: 120, marginRight: 8, background: 'var(--soft)', color: 'var(--ink)' }} href={orig ?? url} target="_blank" rel="noopener noreferrer"><Icon n="open_in_new_rounded" size={34} /></a>;
+  return <div className="embed vemb" style={{ marginRight: 8 }} onClick={(e) => e.stopPropagation()}>
+    {on ? <VPlayer url={url} poster={poster} onBad={() => setBad(true)} /> : <div className={'vpre' + (poster ? '' : ' np')}>
+      {poster ? <img src={poster} alt="" loading="lazy" decoding="async" onError={() => setBad(true)} /> : null}
+      <button className="vp-big tap" aria-label="Putar" onClick={() => { store.stop(); setOn(true); }}><Icon n="play_arrow_rounded" size={40} /></button></div>}
   </div>;
 }
 function hashCode(s: string) { let h = 0; for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0; return h; }
@@ -178,11 +185,20 @@ function AudioEmbed({ url, host: h }: { url: string; host: string }) {
     <div style={{ padding: '4px 0 0 6px', color: 'var(--sub)', fontSize: 11.5 }}>{name} · {store.t('ext_note').replace('{h}', h)}</div></div>;
 }
 /** Deretan media dari URL: digeser ke samping seperti Threads, tiap item tampil langsung. */
+export function PostMedia({ text, media }: { text: string; media?: string[] }) {
+  const s = useStore(); const q = quoteRef(text);
+  const list: string[] = [...(media ?? [])];
+  if (!q) for (const r of mediaRefs(text, !!s.me)) if (!list.includes(r.url)) list.push(r.url);
+  if (!q) { // tautan halaman biasa (kartu) menyusul di belakang media
+    for (const m of text.matchAll(linkRe())) { const raw = trimLink(m[0]); if (!raw || raw.startsWith('@')) continue; const u = linkUri(raw)?.toString(); if (u && !list.includes(u)) list.push(u); }
+  }
+  return <>{q ? <QuoteCard id={q.id} /> : null}<MediaStrip items={list} /></>;
+}
 export function MediaStrip({ items }: { items: string[] }) {
   if (!items?.length) return null;
   const one = items.length === 1;
   return <div className="mstrip" onClick={(e) => e.stopPropagation()}>
-    {items.map((u, i) => <div key={u + i} className="mi" style={one ? { width: '100%' } : undefined}><LinkEmbed url={u} /></div>)}
+    {items.map((u, i) => <div key={u + i} className="msi" style={one ? { width: '100%' } : undefined}><LinkEmbed url={u} /></div>)}
   </div>;
 }
 export { firstUrl, quoteRef };

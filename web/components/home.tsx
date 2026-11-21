@@ -7,7 +7,7 @@ import { Brand, useNav } from './shell';
 import { IconBtn, PBtn, TopBar, sheet, toast } from './ui';
 import { audIcon, audSplit, audText, filterAud, multiSheet, withLabels, reportSheet } from './aud';
 import { HupsFeed } from './feed';
-import { LinkEmbed, MediaStrip, QuoteCard, MentionText, Avatar, Verified, firstUrl, quoteRef } from './rich';
+import { LinkEmbed, PostMedia, QuoteCard, MentionText, Avatar, Verified, firstUrl, quoteRef } from './rich';
 import { PostActions, toggleOfflinePost } from './post';
 import { postCode } from '@/lib/links';
 import { ProgBar, TimeText } from './post';
@@ -49,8 +49,7 @@ export function PopupBody({ a, close }: { a: A; close: () => void }) {
       : a.created > 0 ? <div className="hsub" style={{ marginBottom: 6 }}>{s.when(a.created)}</div> : null}
     {a.desc.trim() ? <div style={{ paddingTop: a.pprof ? 12 : 0, cursor: 'pointer' }} onClick={() => open(`/p/${postCode(a.id)}`)}>
       <MentionText text={a.desc.trim()} hideQuote clamp={6} style={{ fontSize: 15.5, lineHeight: 1.45 }} />{a.long ? <span className="more">…{s.t('read_more')}</span> : null}</div> : null}
-    {q ? <QuoteCard id={q.id} /> : url ? <LinkEmbed url={url} /> : null}
-    <MediaStrip items={a.media} />
+    <PostMedia text={a.desc} media={a.media} />
     <div style={{ height: a.pprof || a.desc.trim() ? 14 : 4 }} />
     {a.url ? <div className="row2" style={{ background: 'var(--soft)', borderRadius: 26, padding: '8px 6px 8px 8px' }}>
       <button className={`tap pbtn2${on ? ' on' : ''}`} style={{ width: 44, height: 44, borderRadius: on ? 13 : 22 }} aria-label={on ? 'Jeda' : 'Putar'} onClick={() => s.play(a).catch(() => toast(s.t('e_server'), { bad: true }))}><Icon n={on ? 'pause_rounded' : 'play_arrow_rounded'} size={26} /></button>
