@@ -5,7 +5,7 @@ import { Icon, HIcon } from './Icon';
 import { Api, store, useStore } from '@/lib/store';
 import { toast, PBtn } from './ui';
 import { useRouter } from 'next/navigation';
-import { firstUrl, kindOfUrl, linkRe, linkUri, proxied, trimLink, mediaUrl, quoteRef, mediaRef, embedOf, postCode } from '@/lib/links';
+import { firstUrl, kindOfUrl, linkRe, linkUri, proxied, trimLink, mediaUrl, quoteRef, mediaRef, embedOf, socialHost, postCode } from '@/lib/links';
 import { A } from '@/lib/store';
 import { FileBar, fileKey } from './post';
 
@@ -105,13 +105,14 @@ const host = (u: string) => { try { return new URL(u).hostname.replace(/^www\./,
 
 /** Tampilan otomatis untuk tautan di post: gambar, video, audio, atau kartu halaman, tanpa mengetuk tautannya. */
 export function LinkEmbed({ url }: { url: string }) {
-  const s = useStore(); const [p, setP] = useState<any | null>(null);
+  const s = useStore(); const [p, setP] = useState<any | null>(null); const [done, setDone] = useState(false);
   const k = kindOfUrl(url), fr = embedOf(url);
-  useEffect(() => { let on = true; if (!fr && (k === 'page' || k === 'image')) fetchPreview(url).then((x) => on && setP(x)); return () => { on = false; }; }, [url, k, s.me?.username]);
+  useEffect(() => { let on = true; if (!fr && (k === 'page' || k === 'image')) fetchPreview(url).then((x) => { if (on) { setP(x); setDone(true); } }); return () => { on = false; }; }, [url, k, s.me?.username]);
   if (fr) return <FrameEmbedView e={fr} url={url} />;
   if (k === 'video') return <VideoEmbed url={url} />;
   if (k === 'audio') return <AudioEmbed url={url} host={host(url)} />;
-  if (!p) return null;
+  if (!p) return done && socialHost(url) ? <OpenCard url={url} /> : null;
+  if (p.video) return <VideoEmbed url={`${p.video}`} poster={p.image ? proxied(`${p.image}`) : undefined} tall={socialHost(url)} orig={url} />;
   switch (`${p.kind}`) {
     case 'image': return <ImageEmbed src={proxied(`${p.src}`)} orig={`${p.url}`} />;
     case 'video': return <VideoEmbed url={`${p.url}`} />;
@@ -135,6 +136,12 @@ function FrameEmbedView({ e, url }: { e: import('@/lib/links').FrameEmbed; url: 
   </div>;
 }
 
+/** Cadangan bila pratinjau situs sosial tidak bisa diambil: kartu kecil yang membuka tautan aslinya. */
+function OpenCard({ url }: { url: string }) {
+  return <a className="tap embed" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 14, marginRight: 8, textDecoration: 'none', color: 'inherit' }} href={linkUri(url)?.toString()} target="_blank" rel="noopener noreferrer nofollow ugc" onClick={(e) => e.stopPropagation()}>
+    <Icon n="open_in_new_rounded" size={20} color="var(--sub)" /><span style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{host(url)}</span></a>;
+}
+
 function PageCard({ url, p }: { url: string; p: any }) {
   const img = proxied(`${p.image ?? ''}`), icon = proxied(`${p.icon ?? ''}`), site = `${p.site ?? ''}` || `${p.host ?? ''}`;
   const hide = (e: React.SyntheticEvent) => ((e.target as HTMLElement).style.display = 'none');
@@ -152,12 +159,12 @@ function ImageEmbed({ src, orig }: { src: string; orig: string }) {
   return <a className="tap embed im" style={{ display: 'block', marginRight: 8 }} href={src} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}><img src={src} alt="" loading="lazy" decoding="async" onError={() => setBad(true)} /></a>;
 }
 /** Video dari URL: tidak diunduh sampai diketuk (hemat kuota), lalu langsung diputar di tempat. */
-function VideoEmbed({ url }: { url: string }) {
+function VideoEmbed({ url, poster, tall, orig }: { url: string; poster?: string; tall?: boolean; orig?: string }) {
   const [on, setOn] = useState(false), [bad, setBad] = useState(false);
-  const note = store.t('ext_note').replace('{h}', host(url));
-  if (bad) return <a className="embed" style={{ display: 'grid', placeItems: 'center', height: 120, marginRight: 8, background: '#000', color: '#fff' }} href={url} target="_blank" rel="noopener noreferrer"><Icon n="open_in_new_rounded" size={34} /></a>;
+  const note = store.t('ext_note').replace('{h}', host(orig ?? url));
+  if (bad) return <a className="embed" style={{ display: 'grid', placeItems: 'center', height: 120, marginRight: 8, background: '#000', color: '#fff' }} href={orig ?? url} target="_blank" rel="noopener noreferrer"><Icon n="open_in_new_rounded" size={34} /></a>;
   return <div className="embed" style={{ marginRight: 8, background: '#000', position: 'relative' }} onClick={(e) => e.stopPropagation()}>
-    {on ? <video src={url} controls autoPlay loop playsInline onError={() => setBad(true)} style={{ maxHeight: 420 }} /> : <div style={{ aspectRatio: '16/9', display: 'grid', placeItems: 'center', position: 'relative' }}>
+    {on ? <video src={url} poster={poster} controls autoPlay loop playsInline onError={() => setBad(true)} style={{ maxHeight: 460, width: '100%' }} /> : <div style={{ aspectRatio: tall ? '4/5' : '16/9', maxHeight: 460, display: 'grid', placeItems: 'center', position: 'relative', ...(poster ? { background: `#000 url("${poster}") center/cover no-repeat` } : {}) }}>
       <button className="tap" aria-label="Putar" onClick={() => { store.stop(); setOn(true); }} style={{ width: 58, height: 58, borderRadius: '50%', background: 'rgba(255,255,255,.24)', display: 'grid', placeItems: 'center', color: '#fff' }}><Icon n="play_arrow_rounded" size={38} /></button>
       <div style={{ position: 'absolute', left: 14, right: 14, bottom: 10, textAlign: 'center', color: 'rgba(255,255,255,.6)', fontSize: 11.5 }}>{note}</div></div>}
   </div>;

@@ -215,7 +215,7 @@ val kBuild get() = BuildConfig.BUILD
 @Composable fun PopupBody(a: A, close: () -> Unit) {
     val s = Store; val sc = rememberCoroutineScope()
     @Suppress("UNUSED_EXPRESSION") s.rev
-    Column {
+    Column(Modifier.heightIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.8f).dp).verticalScroll(rememberScrollState())) {
         if (a.pprof) Tap(Modifier.fillMaxWidth(), onTap = { close(); go("/@${a.owner}") }) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Avatar(a.ownerAvatar, a.ownerName, 46.dp); Spacer(Modifier.width(12.dp))

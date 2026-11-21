@@ -126,9 +126,11 @@ private suspend fun fetchPreview(url: String): JSONObject? {
     embedOf(url)?.let { FrameEmbed(it, url); return }
     if (k == UrlKind.Video) { VideoEmbed(url); return }
     if (k == UrlKind.Audio) { AudioEmbed(url, host); return }
-    var p by remember(url) { mutableStateOf<JSONObject?>(null) }
-    LaunchedEffect(url) { p = fetchPreview(url) }
-    val pv = p ?: return
+    var p by remember(url) { mutableStateOf<JSONObject?>(null) }; var done by remember(url) { mutableStateOf(false) }
+    LaunchedEffect(url) { p = fetchPreview(url); done = true }
+    val pv = p
+    if (pv == null) { if (done && socialHost(url)) OpenCard(url, host); return }
+    if (pv.optString("video").isNotEmpty()) { VideoEmbed(pv.optString("video"), pv.optString("image").ifEmpty { null }, socialHost(url), url); return }
     when (pv.optString("kind")) {
         "image" -> ImageEmbed(proxied(pv.optString("src")), pv.optString("url"))
         "video" -> VideoEmbed(pv.optString("url"))
@@ -165,13 +167,14 @@ private suspend fun fetchPreview(url: String): JSONObject? {
 }
 
 /** Video dari URL: tidak diunduh sampai diketuk (hemat kuota), lalu langsung diputar di tempat. */
-@Composable private fun VideoEmbed(url: String) {
+@Composable private fun VideoEmbed(url: String, poster: String? = null, tall: Boolean = false, orig: String? = null) {
     var started by remember { mutableStateOf(false) }; var failed by remember { mutableStateOf(false) }
-    val host = (try { Uri.parse(url).host ?: "" } catch (_: Exception) { "" }).removePrefix("www.")
+    val host = (try { Uri.parse(orig ?: url).host ?: "" } catch (_: Exception) { "" }).removePrefix("www.")
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val player = remember(started) { if (started) ExoPlayer.Builder(ctx).build() else null }
     DisposableEffect(player) { onDispose { player?.release() } }
-    Box(Modifier.padding(top = 10.dp, end = 8.dp).fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(20.dp)).background(Color.Black), contentAlignment = Alignment.Center) {
+    Box(Modifier.padding(top = 10.dp, end = 8.dp).fillMaxWidth().aspectRatio(if (tall) 4f / 5f else 16f / 9f).clip(RoundedCornerShape(20.dp)).background(Color.Black), contentAlignment = Alignment.Center) {
+        if (poster != null && (player == null || failed)) Img(proxied(poster), Modifier.fillMaxSize(), ContentScale.Crop)
         if (player != null && !failed) {
             AndroidView(factory = { PlayerView(it).apply { this.player = player; useController = true } }, modifier = Modifier.fillMaxSize())
             LaunchedEffect(player) {
@@ -180,7 +183,7 @@ private suspend fun fetchPreview(url: String): JSONObject? {
             DisposableEffect(player) { val l = object : androidx.media3.common.Player.Listener { override fun onPlayerError(e: androidx.media3.common.PlaybackException) { failed = true } }; player.addListener(l); onDispose { player.removeListener(l) } }
         } else {
             if (!failed) HText(Store.t("ext_note").replace("{h}", host), 11.5f, color = Color.White.copy(alpha = .6f), align = TextAlign.Center, modifier = Modifier.align(Alignment.BottomCenter).padding(14.dp, 0.dp, 14.dp, 10.dp))
-            if (failed) Tap(onTap = { openLink(url) }) { Icon(Icons.Rounded.OpenInNew, null, Modifier.size(34.dp), tint = Color.White.copy(alpha = .7f)) }
+            if (failed) Tap(onTap = { openLink(orig ?: url) }) { Icon(Icons.Rounded.OpenInNew, null, Modifier.size(34.dp), tint = Color.White.copy(alpha = .7f)) }
             else Tap(onTap = { started = true }) { Box(Modifier.size(58.dp).background(Color.White.copy(alpha = .24f), CircleShape), contentAlignment = Alignment.Center) { Icon(Icons.Rounded.PlayArrow, null, Modifier.size(38.dp), tint = Color.White) } }
         }
     }
@@ -272,12 +275,6 @@ fun embedOf(url: String): FrameSpec? {
         if (seg.getOrNull(0) == "watch" && ok(v)) return FrameSpec("$yt$v?rel=0&playsinline=1", 16f / 9, null, "YouTube")
         if (seg.getOrNull(0) in listOf("shorts", "embed", "live") && ok(seg.getOrNull(1))) return FrameSpec("$yt${seg[1]}?rel=0&playsinline=1", if (seg[0] == "shorts") 9f / 16 else 16f / 9, null, "YouTube")
     }
-    if (h == "instagram.com") {
-        val kinds = listOf("p", "reel", "reels", "tv")
-        val i = if (seg.getOrNull(0) in kinds) 1 else if (seg.getOrNull(1) in listOf("p", "reel")) 2 else -1
-        if (i > 0 && ok(seg.getOrNull(i))) { val kd = seg[i - 1].let { if (it == "reels") "reel" else it }; return FrameSpec("https://www.instagram.com/$kd/${seg[i]}/embed/", null, 620, "Instagram") }
-    }
-    if (h == "tiktok.com") { val i = seg.indexOf("video"); val id = if (i >= 0) seg.getOrNull(i + 1) else null; if (id != null && Regex("^\\d{8,25}$").matches(id)) return FrameSpec("https://www.tiktok.com/embed/v2/$id", null, 740, "TikTok") }
     if (h == "vimeo.com" && Regex("^\\d{5,12}$").matches(seg.getOrNull(0) ?: "")) return FrameSpec("https://player.vimeo.com/video/${seg[0]}", 16f / 9, null, "Vimeo")
     if (h == "open.spotify.com") {
         val j = if (seg.getOrNull(0)?.startsWith("intl-") == true) 1 else 0; val t = seg.getOrNull(j); val id = seg.getOrNull(j + 1)
@@ -287,13 +284,18 @@ fun embedOf(url: String): FrameSpec? {
     return null
 }
 
+/** Situs sosial yang medianya diambil server (og:video / sematan resmi) dan tampil sebagai pemutar atau kartu. */
+fun socialHost(url: String): Boolean {
+    val h = (linkUri(url)?.host ?: "").lowercase()
+    return listOf("instagram.com", "tiktok.com", "facebook.com", "fb.watch", "threads.net", "x.com", "twitter.com").any { h == it || h.endsWith(".$it") }
+}
 /** Tautan media pertama di teks (foto/video/audio langsung atau sematan situs): disembunyikan karena medianya tampil langsung. */
 fun mediaRef(text: String, images: Boolean = true): QuoteRef? {
     for (m in linkRe.findAll(text)) {
         val raw = trimLink(m.value); if (raw.isEmpty() || raw.startsWith("@")) continue
         val u = linkUri(raw)?.toString() ?: continue
         val k = kindOfUrl(u); if (k == UrlKind.Image && !images) return null
-        return if (k != UrlKind.Page || embedOf(u) != null) QuoteRef(0, m.range.first, raw.length) else null
+        return if (k != UrlKind.Page || embedOf(u) != null || socialHost(u)) QuoteRef(0, m.range.first, raw.length) else null
     }
     return null
 }
@@ -327,5 +329,15 @@ fun hiddenRef(text: String): QuoteRef? = quoteRef(text) ?: mediaRef(text, Store.
                 loadDataWithBaseURL("https://hulhup.my.id", html, "text/html", "utf-8", null)
             }
         })
+    }
+}
+
+/** Cadangan bila pratinjau situs sosial tidak bisa diambil: kartu kecil yang membuka tautan aslinya. */
+@Composable private fun OpenCard(url: String, host: String) {
+    val shape = RoundedCornerShape(20.dp)
+    Tap(Modifier.padding(top = 10.dp, end = 8.dp), .99f, onTap = { openLink(url) }) {
+        Row(Modifier.fillMaxWidth().clip(shape).border(1.dp, ink().copy(alpha = .1f), shape).padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Rounded.OpenInNew, null, Modifier.size(20.dp), tint = sub()); Spacer(Modifier.width(10.dp)); HText(host, 14.5f, FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
     }
 }

@@ -53,12 +53,6 @@ export function embedOf(url: string): FrameEmbed | null {
     if (seg[0] === 'watch' && idOk(v ?? undefined)) return { src: `https://www.youtube-nocookie.com/embed/${v}?rel=0&playsinline=1`, ratio: '16/9', host: 'YouTube' };
     if ((seg[0] === 'shorts' || seg[0] === 'embed' || seg[0] === 'live') && idOk(seg[1])) return { src: `https://www.youtube-nocookie.com/embed/${seg[1]}?rel=0&playsinline=1`, ratio: seg[0] === 'shorts' ? '9/16' : '16/9', host: 'YouTube' };
   }
-  if (h === 'instagram.com') {
-    const i = seg[0] === 'p' || seg[0] === 'reel' || seg[0] === 'reels' || seg[0] === 'tv' ? 1 : seg[1] === 'p' || seg[1] === 'reel' ? 2 : -1;
-    const kind = i === 1 ? seg[0] : i === 2 ? seg[1] : ''; const id = i > 0 ? seg[i] : undefined;
-    if (idOk(id)) return { src: `https://www.instagram.com/${kind === 'reels' ? 'reel' : kind}/${id}/embed/`, h: 620, host: 'Instagram' };
-  }
-  if (h === 'tiktok.com') { const i = seg.indexOf('video'); const id = i >= 0 ? seg[i + 1] : undefined; if (id && /^\d{8,25}$/.test(id)) return { src: `https://www.tiktok.com/embed/v2/${id}`, h: 740, host: 'TikTok' }; }
   if (h === 'vimeo.com' && /^\d{5,12}$/.test(seg[0] ?? '')) return { src: `https://player.vimeo.com/video/${seg[0]}`, ratio: '16/9', host: 'Vimeo' };
   if (h === 'open.spotify.com') {
     const j = seg[0]?.startsWith('intl-') ? 1 : 0; const t = seg[j], id = seg[j + 1];
@@ -67,6 +61,11 @@ export function embedOf(url: string): FrameEmbed | null {
   if (h === 'soundcloud.com' && seg.length >= 2) return { src: `https://w.soundcloud.com/player/?url=${encodeURIComponent(u.origin + u.pathname)}&color=%236d4aff&visual=false`, h: 166, host: 'SoundCloud' };
   return null;
 }
+/** Situs sosial yang medianya diambil server (og:video / sematan resmi) dan tampil sebagai pemutar atau kartu. */
+export function socialHost(url: string): boolean {
+  const u = linkUri(url); if (!u) return false;
+  return /^(?:[\w-]+\.)*(instagram\.com|tiktok\.com|facebook\.com|fb\.watch|threads\.net|x\.com|twitter\.com)$/i.test(u.hostname);
+}
 /** Tautan pertama di teks yang berupa media (foto/video/audio langsung atau sematan situs): posisinya disembunyikan karena medianya tampil langsung. */
 export function mediaRef(text: string, images = true): { at: number; len: number } | null {
   for (const m of text.matchAll(linkRe())) {
@@ -74,7 +73,7 @@ export function mediaRef(text: string, images = true): { at: number; len: number
     const uri = linkUri(raw); if (!uri) continue;
     const url = uri.toString();
     const k = kindOfUrl(url); if (k === 'image' && !images) return null;
-    return k !== 'page' || embedOf(url) ? { at: m.index!, len: raw.length } : null;
+    return k !== 'page' || embedOf(url) || socialHost(url) ? { at: m.index!, len: raw.length } : null;
   }
   return null;
 }
