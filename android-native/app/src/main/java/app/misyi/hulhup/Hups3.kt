@@ -150,6 +150,7 @@ import org.json.JSONObject
                             OwnerRow(p)
                             if (text.isNotEmpty()) Box(Modifier.padding(top = 14.dp)) { MentionText(text, TextStyle(fontSize = 17.sp, lineHeight = (17 * 1.55).sp), selectable = true, hideQuote = true) }
                             val qr = quoteRef(text)
+                            if (p.media.isNotEmpty()) MediaStrip(p.media)
                             if (qr != null) QuoteCard(qr.id) else firstUrl(text)?.let { LinkEmbed(it) }
                             if (p.files.isNotEmpty()) Box(Modifier.padding(top = 6.dp)) { if (p.bgm) BgmBar(p) else AudioBars(p, owner) }
                             Spacer(Modifier.height(10.dp))
@@ -252,6 +253,7 @@ import org.json.JSONObject
     var bgm by remember { mutableStateOf(false) }
     var rand by remember { mutableStateOf("public") }
     var picked by remember { mutableStateOf<Map<String, JSONObject>>(emptyMap()) }
+    val media = remember { mutableStateListOf<String>() }
     DisposableEffect(Unit) { onDispose { Store.stop() } }
 
     suspend fun add() { val c = sheet<AudioClip> { done -> RecordSheet { done(it) } } ?: return; Store.stop(); clip = c; playing = false }
@@ -268,13 +270,14 @@ import org.json.JSONObject
     }
     suspend fun send() {
         val t = text.trim(); val c = clip
-        if (c == null && t.isEmpty()) { toast(s.t("e_empty"), true); return }
+        if (c == null && t.isEmpty() && media.isEmpty()) { toast(s.t("e_empty"), true); return }
         if (audSplit(rand).contains("accounts") && picked.isEmpty()) { toast(s.t("e_need_accounts"), true); return }
         busy = true
         var id: Int? = null
         try {
             val b = JSONObject().put("text", t).put("audios", if (c == null) 0 else 1).put("pprof", pprof).put("rand", JSONArray(audSplit(rand))).put("to", JSONArray(picked.keys.toList()))
             if (c != null) b.put("bgm", bgm)
+            if (media.isNotEmpty()) b.put("media", JSONArray(media.toList()))
             val j = Api.req("POST", "/posts", b); id = j.optInt("id")
             if (c != null) Api.multi("/posts/$id/audio", c.bytes, mapOf("secs" to "${c.secs}"))
             Nav.back(); toast(s.t("posted"))
@@ -303,6 +306,11 @@ import org.json.JSONObject
             Spacer(Modifier.height(6.dp))
             MentionBar(text) { text = it }
             HText(s.t("tag_hint"), 12.5f, color = sub(), modifier = Modifier.padding(start = 6.dp, bottom = 14.dp))
+            MediaEditor(media, !busy)
+            Row(Modifier.padding(bottom = 16.dp).fillMaxWidth().background(soft(), RoundedCornerShape(18.dp)).padding(14.dp, 12.dp), verticalAlignment = Alignment.Top) {
+                Icon(Icons.Outlined.Info, null, Modifier.padding(top = 1.dp).size(18.dp), tint = sub()); Spacer(Modifier.width(10.dp))
+                HText(s.t("media_hint"), 13f, color = sub(), lh = 19f)
+            }
             Row2(s.t("pprof"), pprof, { pprof = it })
             Spacer(Modifier.height(2.dp))
             Pick(s.t("who_see"), rand, withLabels(uploadAud)) { v -> rand = v; if (audSplit(v).contains("accounts") && picked.isEmpty()) sc.launch { pickAcc() } }

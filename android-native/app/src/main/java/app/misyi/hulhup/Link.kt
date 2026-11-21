@@ -9,7 +9,11 @@ import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -27,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
@@ -166,26 +171,131 @@ private suspend fun fetchPreview(url: String): JSONObject? {
     }
 }
 
-/** Video dari URL: tidak diunduh sampai diketuk (hemat kuota), lalu langsung diputar di tempat. */
+/** Video dari URL: tidak diunduh sampai diketuk (hemat kuota), lalu diputar di tempat dengan kontrol buatan sendiri (tanpa kontrol bawaan ExoPlayer). */
 @Composable private fun VideoEmbed(url: String, poster: String? = null, tall: Boolean = false, orig: String? = null) {
     var started by remember { mutableStateOf(false) }; var failed by remember { mutableStateOf(false) }
     val host = (try { Uri.parse(orig ?: url).host ?: "" } catch (_: Exception) { "" }).removePrefix("www.")
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val player = remember(started) { if (started) ExoPlayer.Builder(ctx).build() else null }
     DisposableEffect(player) { onDispose { player?.release() } }
-    Box(Modifier.padding(top = 10.dp, end = 8.dp).fillMaxWidth().aspectRatio(if (tall) 4f / 5f else 16f / 9f).clip(RoundedCornerShape(20.dp)).background(Color.Black), contentAlignment = Alignment.Center) {
+    var ratio by remember { mutableStateOf(if (tall) 4f / 5f else 16f / 9f) }
+    var playing by remember { mutableStateOf(false) }; var buffering by remember { mutableStateOf(true) }
+    var muted by remember { mutableStateOf(false) }; var speed by remember { mutableStateOf(1f) }
+    var pos by remember { mutableStateOf(0L) }; var dur by remember { mutableStateOf(0L) }
+    var show by remember { mutableStateOf(true) }; var tick by remember { mutableStateOf(0) }
+    fun fmt(ms: Long): String { val s = (ms / 1000).toInt().coerceAtLeast(0); return "%d:%02d".format(s / 60, s % 60) }
+    Box(Modifier.padding(top = 10.dp, end = 8.dp).fillMaxWidth().aspectRatio(ratio).clip(RoundedCornerShape(20.dp)).background(Color.Black), contentAlignment = Alignment.Center) {
         if (poster != null && (player == null || failed)) Img(proxied(poster), Modifier.fillMaxSize(), ContentScale.Crop)
         if (player != null && !failed) {
-            AndroidView(factory = { PlayerView(it).apply { this.player = player; useController = true } }, modifier = Modifier.fillMaxSize())
+            AndroidView(factory = { PlayerView(it).apply { this.player = player; useController = false; resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM; setShutterBackgroundColor(android.graphics.Color.TRANSPARENT) } }, modifier = Modifier.fillMaxSize())
             LaunchedEffect(player) {
                 try { Store.stop(); player.setMediaItem(MediaItem.fromUri(url)); player.repeatMode = androidx.media3.common.Player.REPEAT_MODE_ONE; player.prepare(); player.play() } catch (_: Exception) { failed = true }
             }
-            DisposableEffect(player) { val l = object : androidx.media3.common.Player.Listener { override fun onPlayerError(e: androidx.media3.common.PlaybackException) { failed = true } }; player.addListener(l); onDispose { player.removeListener(l) } }
+            LaunchedEffect(player) { while (true) { pos = player.currentPosition; dur = player.duration.coerceAtLeast(0L); kotlinx.coroutines.delay(250) } }
+            DisposableEffect(player) {
+                val l = object : androidx.media3.common.Player.Listener {
+                    override fun onPlayerError(e: androidx.media3.common.PlaybackException) { failed = true }
+                    override fun onIsPlayingChanged(p: Boolean) { playing = p }
+                    override fun onPlaybackStateChanged(st: Int) { buffering = st == androidx.media3.common.Player.STATE_BUFFERING }
+                    override fun onVideoSizeChanged(v: androidx.media3.common.VideoSize) { if (v.width > 0 && v.height > 0) ratio = (v.width * v.pixelWidthHeightRatio / v.height).coerceIn(9f / 16f, 16f / 9f) }
+                }
+                player.addListener(l); onDispose { player.removeListener(l) }
+            }
+            LaunchedEffect(show, playing, tick) { if (show && playing) { kotlinx.coroutines.delay(2600); show = false } }
+            // lapisan ketuk: tampil/sembunyikan kontrol
+            Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { show = !show; tick++ } })
+            if (buffering) androidx.compose.material3.CircularProgressIndicator(Modifier.size(34.dp), color = Color.White, strokeWidth = 2.5.dp)
+            androidx.compose.animation.AnimatedVisibility(show || !playing, enter = androidx.compose.animation.fadeIn(), exit = androidx.compose.animation.fadeOut()) {
+                Box(Modifier.fillMaxSize()) {
+                    Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .6f)))).padding(12.dp, 18.dp, 12.dp, 8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Tap(onTap = { tick++; if (playing) player.pause() else player.play() }) { Icon(if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, null, Modifier.padding(4.dp).size(26.dp), tint = Color.White) }
+                            HText(fmt(pos), 11.5f, FontWeight.SemiBold, Color.White, Modifier.padding(start = 4.dp))
+                            Box(Modifier.weight(1f).height(28.dp).padding(horizontal = 8.dp)
+                                .pointerInput(dur) { detectTapGestures { o -> if (dur > 0) { player.seekTo((dur * (o.x / size.width)).toLong()); tick++ } } }
+                                .pointerInput(dur) { detectHorizontalDragGestures(onDragStart = { tick++ }) { c, _ -> if (dur > 0) player.seekTo((dur * (c.position.x / size.width).coerceIn(0f, 1f)).toLong()) } }) {
+                                Box(Modifier.align(Alignment.Center).fillMaxWidth().height(3.dp).clip(CircleShape).background(Color.White.copy(alpha = .3f)))
+                                Box(Modifier.align(Alignment.CenterStart).fillMaxWidth(if (dur > 0) (pos.toFloat() / dur).coerceIn(0f, 1f) else 0f).height(3.dp).clip(CircleShape).background(Color.White))
+                            }
+                            HText(fmt(dur), 11.5f, FontWeight.SemiBold, Color.White.copy(alpha = .8f), Modifier.padding(end = 6.dp))
+                            Tap(onTap = { tick++; val n = when (speed) { 1f -> 1.5f; 1.5f -> 2f; 2f -> .75f; else -> 1f }; speed = n; player.setPlaybackSpeed(n) }) {
+                                Box(Modifier.padding(horizontal = 2.dp).clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = .2f)).padding(8.dp, 4.dp)) { HText((if (speed == 1f) "1" else if (speed == 2f) "2" else speed.toString()) + "×", 11.5f, FontWeight.ExtraBold, Color.White) }
+                            }
+                            Tap(onTap = { tick++; muted = !muted; player.volume = if (muted) 0f else 1f }) { Icon(if (muted) Icons.Rounded.VolumeOff else Icons.Rounded.VolumeUp, null, Modifier.padding(4.dp).size(22.dp), tint = Color.White) }
+                        }
+                    }
+                }
+            }
         } else {
             if (!failed) HText(Store.t("ext_note").replace("{h}", host), 11.5f, color = Color.White.copy(alpha = .6f), align = TextAlign.Center, modifier = Modifier.align(Alignment.BottomCenter).padding(14.dp, 0.dp, 14.dp, 10.dp))
             if (failed) Tap(onTap = { openLink(orig ?: url) }) { Icon(Icons.Rounded.OpenInNew, null, Modifier.size(34.dp), tint = Color.White.copy(alpha = .7f)) }
             else Tap(onTap = { started = true }) { Box(Modifier.size(58.dp).background(Color.White.copy(alpha = .24f), CircleShape), contentAlignment = Alignment.Center) { Icon(Icons.Rounded.PlayArrow, null, Modifier.size(38.dp), tint = Color.White) } }
         }
+    }
+}
+
+
+/** Lajur media yang digeser ke samping (seperti Threads): setiap item adalah URL media (video, foto, audio, sematan). Hanya URL yang disimpan. */
+@Composable fun MediaStrip(items: List<String>) {
+    if (items.isEmpty()) return
+    if (items.size == 1) { LinkEmbed(items[0]); return }
+    val w = (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * .78f).dp
+    androidx.compose.foundation.lazy.LazyRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        items(items.size) { i -> Box(Modifier.width(w)) { LinkEmbed(items[i]) } }
+    }
+}
+
+
+/** Editor media di layar tulis: ubin yang digeser ke samping, bisa ditambah, dihapus, dan diurutkan. */
+@Composable fun MediaEditor(media: androidx.compose.runtime.snapshots.SnapshotStateList<String>, enabled: Boolean = true) {
+    val s = Store
+    var adding by remember { mutableStateOf(false) }; var v by remember { mutableStateOf("") }
+    fun commit() {
+        val u = linkUri(trimLink(v.trim()))?.toString()
+        if (u == null) { toast(s.t("media_bad"), true); return }
+        if (media.contains(u)) { toast(s.t("media_dup"), true); return }
+        media.add(u); v = ""; adding = false
+    }
+    Column(Modifier.fillMaxWidth().padding(bottom = 14.dp)) {
+        HText(s.t("media_title"), 14f, FontWeight.Bold, modifier = Modifier.padding(start = 6.dp, bottom = 8.dp))
+        androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            items(media.size) { i ->
+                val u = media[i]; val k = kindOfUrl(u); val host = (linkUri(u)?.host ?: "").removePrefix("www.")
+                Box(Modifier.size(112.dp).clip(RoundedCornerShape(18.dp)).background(soft()).border(1.dp, ink().copy(alpha = .08f), RoundedCornerShape(18.dp))) {
+                    if (k == UrlKind.Image) Img(proxied(u), Modifier.fillMaxSize())
+                    else Column(Modifier.align(Alignment.Center).padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(when (k) { UrlKind.Video -> Icons.Rounded.Videocam; UrlKind.Audio -> Icons.Rounded.MusicNote; else -> Icons.Rounded.Link }, null, Modifier.size(26.dp), tint = ink())
+                        HText(host, 11f, FontWeight.SemiBold, sub(), Modifier.padding(top = 4.dp), maxLines = 2, align = TextAlign.Center, overflow = TextOverflow.Ellipsis)
+                    }
+                    Box(Modifier.align(Alignment.TopStart).padding(6.dp).size(22.dp).background(Color.Black.copy(alpha = .6f), CircleShape), contentAlignment = Alignment.Center) { HText("${i + 1}", 11f, FontWeight.ExtraBold, Color.White) }
+                    Tap(Modifier.align(Alignment.TopEnd), onTap = if (enabled) ({ media.removeAt(i) }) else null) {
+                        Box(Modifier.padding(6.dp).size(24.dp).background(Color.Black.copy(alpha = .6f), CircleShape), contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Close, null, Modifier.size(15.dp), tint = Color.White) }
+                    }
+                    Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (i > 0) Tap(onTap = { val t = media[i]; media[i] = media[i - 1]; media[i - 1] = t }) { Box(Modifier.size(26.dp).background(Color.Black.copy(alpha = .6f), CircleShape), contentAlignment = Alignment.Center) { Icon(Icons.Rounded.ChevronLeft, null, Modifier.size(18.dp), tint = Color.White) } }
+                        if (i < media.size - 1) Tap(onTap = { val t = media[i]; media[i] = media[i + 1]; media[i + 1] = t }) { Box(Modifier.size(26.dp).background(Color.Black.copy(alpha = .6f), CircleShape), contentAlignment = Alignment.Center) { Icon(Icons.Rounded.ChevronRight, null, Modifier.size(18.dp), tint = Color.White) } }
+                    }
+                }
+            }
+            item {
+                Tap(onTap = if (enabled) ({ adding = true }) else null) {
+                    Column(Modifier.size(112.dp).clip(RoundedCornerShape(18.dp)).border(1.5.dp, ink().copy(alpha = .18f), RoundedCornerShape(18.dp)), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Rounded.Add, null, Modifier.size(28.dp), tint = ink())
+                        HText(s.t("media_add"), 13f, FontWeight.Bold, modifier = Modifier.padding(top = 2.dp))
+                    }
+                }
+            }
+        }
+        if (adding) Row(Modifier.padding(top = 10.dp).fillMaxWidth().background(soft(), RoundedCornerShape(18.dp)).padding(16.dp, 4.dp, 6.dp, 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.weight(1f).padding(vertical = 12.dp)) {
+                if (v.isEmpty()) HText(s.t("media_url_ph"), 14.5f, color = sub(), maxLines = 1)
+                androidx.compose.foundation.text.BasicTextField(v, { v = it }, Modifier.fillMaxWidth(), singleLine = true, textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.5.sp, color = ink(), fontFamily = Outfit), cursorBrush = androidx.compose.ui.graphics.SolidColor(ink()),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Uri, imeAction = androidx.compose.ui.text.input.ImeAction.Done), keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { commit() }))
+            }
+            Tap(onTap = { commit() }) { Icon(Icons.Rounded.Check, null, Modifier.padding(10.dp).size(22.dp), tint = ink()) }
+            Tap(onTap = { adding = false; v = "" }) { Icon(Icons.Rounded.Close, null, Modifier.padding(10.dp).size(20.dp), tint = sub()) }
+        }
+        HText(s.t("media_sub"), 12.5f, color = sub(), modifier = Modifier.padding(start = 6.dp, top = 8.dp))
     }
 }
 
@@ -287,7 +397,7 @@ fun embedOf(url: String): FrameSpec? {
 /** Situs sosial yang medianya diambil server (og:video / sematan resmi) dan tampil sebagai pemutar atau kartu. */
 fun socialHost(url: String): Boolean {
     val h = (linkUri(url)?.host ?: "").lowercase()
-    return listOf("instagram.com", "tiktok.com", "facebook.com", "fb.watch", "threads.net", "x.com", "twitter.com").any { h == it || h.endsWith(".$it") }
+    return listOf("instagram.com", "tiktok.com", "facebook.com", "fb.watch", "threads.net", "threads.com", "x.com", "twitter.com").any { h == it || h.endsWith(".$it") }
 }
 /** Tautan media pertama di teks (foto/video/audio langsung atau sematan situs): disembunyikan karena medianya tampil langsung. */
 fun mediaRef(text: String, images: Boolean = true): QuoteRef? {

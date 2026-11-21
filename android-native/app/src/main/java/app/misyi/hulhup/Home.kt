@@ -233,6 +233,7 @@ val kBuild get() = BuildConfig.BUILD
             val t = buildAnnotatedString { append(dShown); if (a.long) withStyle(SpanStyle(color = acc(), fontWeight = FontWeight.Bold)) { append(" …  ${s.t("read_more")}") } }
             androidx.compose.material3.Text(t, Modifier.padding(top = if (a.pprof) 12.dp else 0.dp), fontSize = 15.sp, lineHeight = 21.sp, maxLines = 6, overflow = TextOverflow.Ellipsis, color = ink(), fontFamily = Outfit)
         }
+        if (a.media.isNotEmpty()) MediaStrip(a.media)
         if (qr != null) QuoteCard(qr.id) else firstUrl(d)?.let { LinkEmbed(it) }
         Spacer(Modifier.height(if (a.pprof || d.isNotEmpty()) 14.dp else 4.dp))
         if (a.url.isNotEmpty()) {

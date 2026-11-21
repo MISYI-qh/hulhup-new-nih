@@ -176,6 +176,7 @@ suspend fun postMenu(a: A, onDeleted: (() -> Unit)? = null) {
             // Di daftar Hups dan profil, teks post tampil penuh (pemotongan + Selengkapnya hanya di popup Acak).
             if (text.isNotEmpty()) Box(Modifier.padding(0.dp, 10.dp, 8.dp, 0.dp)) { MentionText(text, st, hideQuote = true) }
             val qr = quoteRef(text)
+            if (a.media.isNotEmpty()) MediaStrip(a.media)
             if (qr != null) QuoteCard(qr.id) else firstUrl(text)?.let { LinkEmbed(it) }
             if (a.files.isNotEmpty()) Box(Modifier.padding(end = 8.dp)) { if (a.bgm) BgmBar(a) else AudioBars(a, scope) }
             Spacer(Modifier.height(4.dp))
