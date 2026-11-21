@@ -242,3 +242,33 @@ button:has(.avatar),button:has(.avatar):focus,button:has(.avatar):focus-visible,
 .vpre.np{width:100%;aspect-ratio:16/9}
 .vp{container-type:inline-size}
 @container (max-width:320px){.vp-t.end{display:none}.vpc{gap:2px}.vp-sp{padding:0 6px;min-width:30px}}
+
+/* ===== Desktop: menu samping + kolom isi lebih lebar ===== */
+.rail{display:none}
+@media(min-width:900px){
+  body{padding-left:84px}
+  .rail{display:flex;flex-direction:column;position:fixed;left:0;top:0;bottom:0;width:84px;padding:18px 10px;z-index:30;background:var(--bg);border-right:1px solid var(--hair);align-items:center}
+  .rail-brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink);font-weight:800;font-size:21px;letter-spacing:-.4px;margin-bottom:18px;height:44px}
+  .rail-brand span,.rail .lb,.rail-ver{display:none}
+  .rail-items{display:flex;flex-direction:column;gap:4px;width:100%;align-items:center}
+  .rail-i{display:flex;align-items:center;gap:14px;height:52px;width:52px;justify-content:center;border-radius:26px;color:var(--sub);text-decoration:none;font-weight:700;font-size:16.5px;position:relative;transition:background .15s,color .15s}
+  .rail-i:hover{background:var(--soft);color:var(--ink)}
+  .rail-i.on{color:var(--ink);background:var(--soft)}
+  .rail-i .ic{position:relative;display:grid;place-items:center}
+  .rail-i .dot{position:absolute;top:-2px;right:-3px;width:9px;height:9px;border-radius:50%;background:var(--brand,#5b47f5);border:2px solid var(--bg);box-sizing:content-box}
+  .rail-new{margin-top:14px;width:52px;height:52px;border-radius:26px;background:var(--btn);color:var(--cream);display:flex;align-items:center;justify-content:center;gap:10px;text-decoration:none;font-weight:800;font-size:16px}
+  .rail-new:hover{opacity:.9}
+  .app{max-width:640px;border-left:1px solid var(--hair);border-right:1px solid var(--hair)}
+  .app .fab,.app button.fab{display:none!important}
+}
+@media(min-width:1180px){
+  body{padding-left:268px}
+  .rail{width:268px;align-items:stretch;padding:18px 16px}
+  .rail-brand span,.rail .lb,.rail-ver{display:inline}
+  .rail-brand{padding:0 8px}
+  .rail-items{align-items:stretch}
+  .rail-i{width:auto;justify-content:flex-start;padding:0 16px;border-radius:26px}
+  .rail-new{width:auto;margin-top:18px}
+  .rail-ver{display:block;margin-top:auto;text-align:center;color:var(--sub);font-weight:700;letter-spacing:1.2px;font-size:12px;padding:12px 0 2px}
+  .app{max-width:680px}
+}
