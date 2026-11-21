@@ -5,6 +5,8 @@ import { q, one, many, tx } from './db.js';
 import { ApiErr, now, sha, token, hashPw, checkPw, dayStr, okBirth, ageOf, imageMime, audioMime, readBody } from './util.js';
 import { storeFor, putAudio, getAudio, delAudio } from './blobs.js';
 import { randomInt, timingSafeEqual } from 'node:crypto';
+import * as PH from './phipop.js';
+import { OFFICIAL_IMG } from './official_assets.js';
 import { pushLater, pushDiag, pushReminders } from './push.js';
 import { deksImage, deksAudio, brief } from './deks/index.js';
 import { runSelfTest } from './deks/selftest.js';
@@ -684,8 +686,39 @@ route('GET', /^\/audios\/(\d+)\/file$/, async (c, m) => {
   return { binary: b, mime: f.mime, cache: 'private, max-age=86400' };
 });
 
+
+/** Akun resmi (phipop, hulhup, misyi): foto profil dipasang otomatis saat pertama diminta. misyi diambil dari situsnya. */
+async function officialAvatar(username) {
+  const u = await one(`select id from users where username=$1 and av_ver > 0`, [username]);
+  if (!u) return null;
+  let mime = null, data = null;
+  if (OFFICIAL_IMG[username]) { mime = OFFICIAL_IMG[username][0]; data = Buffer.from(OFFICIAL_IMG[username][1], 'base64'); }
+  else if (username === 'misyi') {
+    try {
+      const base = 'https://misyi.my.id/';
+      const html = await (await fetch(base, { signal: AbortSignal.timeout(6000), headers: { 'user-agent': 'Mozilla/5.0 (HulhupBot)' } })).text();
+      const tags = [...html.matchAll(/<link[^>]+>/gi)].map((x) => x[0]).filter((t) => /rel=["'][^"']*(apple-touch-icon|icon)/i.test(t));
+      tags.sort((a, b) => (/apple-touch/i.test(b) ? 1 : 0) - (/apple-touch/i.test(a) ? 1 : 0));
+      const og = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)/i)?.[1];
+      const cands = [...tags.map((t) => t.match(/href=["']([^"']+)/i)?.[1]), og, '/favicon.png', '/icons/Icon-512.png', '/favicon.ico'].filter(Boolean);
+      for (const href of cands) {
+        try {
+          const url = new URL(href, base); if (url.hostname !== 'misyi.my.id') continue;
+          const res = await fetch(url, { signal: AbortSignal.timeout(6000) }); if (!res.ok) continue;
+          const buf = Buffer.from(await res.arrayBuffer()); const mm = buf.length && buf.length < 1500000 ? imageMime(buf) : null;
+          if (mm) { mime = mm; data = buf; break; }
+        } catch {}
+      }
+    } catch {}
+  }
+  if (!data) return null;
+  await q(`insert into photos(user_id, kind, mime, data) values ($1,'avatar',$2,$3) on conflict (user_id, kind) do nothing`, [u.id, mime, data]);
+  return { mime, data };
+}
+
 route('GET', /^\/users\/([a-z0-9_]+)\/(avatar|cover)$/, async (c, m) => {
-  const r = await one(`select p.mime, p.data from photos p join users u on u.id=p.user_id where u.username=$1 and p.kind=$2 and u.status='active'`, [m[1], m[2]]);
+  let r = await one(`select p.mime, p.data from photos p join users u on u.id=p.user_id where u.username=$1 and p.kind=$2 and u.status='active'`, [m[1], m[2]]);
+  if (!r && m[2] === 'avatar') r = await officialAvatar(m[1]);
   if (!r) throw new ApiErr('not_found', 404);
   return { binary: r.data, mime: r.mime, cache: 'public, max-age=31536000, immutable' };
 });
@@ -989,6 +1022,7 @@ route('POST', /^\/posts$/, async (c) => {
     });
   } catch (e) { if (key) await delAudio('mongo', key); throw e; }
   if (n === 0) await mentionNotify(id, u.id);
+  if (PH_TAG.test(text)) await PH.later(phipopReply(u, id, null, text));
   return { ok: true, id };
 });
 
@@ -1142,6 +1176,7 @@ route('POST', /^\/posts\/(\d+)\/comments$/, async (c, m) => {
   } catch (e) { if (key) await delAudio('mongo', key); throw e; }
   await recount(post.id);
   await mentionNotify(post.id, u.id, mentionsOf(text), [parentOwner, Number(post.owner)].filter(Boolean), snip);
+  if (PH_TAG.test(text)) await PH.later(phipopReply(u, post.id, id, text));
   return { ok: true, id };
 });
 
@@ -1226,6 +1261,109 @@ route('POST', /^\/comments\/(\d+)\/like$/, async (c, m) => {
     return { liked, likes: (await t.query('select likes from comments where id=$1', [r.id])).rows[0].likes };
   });
 });
+
+
+// ---------- Phipop (AI) ----------
+const needAdmin = (c) => { const u = c.need(); if (u.role !== 'admin') throw new ApiErr('forbidden', 403); return u; };
+const phStatus = async (u) => ({ ...PH.statusOf(await PH.accessOf(u.id), await one(`select 1 x from phipop_requests where user_id=$1 and status='pending'`, [u.id])), admin: u.role === 'admin' });
+
+route('GET', /^\/phipop\/status$/, async (c) => ({ ok: true, ...(await phStatus(c.need())) }));
+
+route('POST', /^\/phipop\/request$/, async (c) => {
+  const u = c.need(); await hit(`phq:${u.id}`, 5, 3600);
+  const why = okText(c.body.why).slice(0, 600);
+  if (!why) throw new ApiErr('empty');
+  if (await PH.accessOf(u.id)) throw new ApiErr('phipop_has', 409);
+  if (await one(`select 1 x from phipop_requests where user_id=$1 and status='pending'`, [u.id])) throw new ApiErr('phipop_requested', 409);
+  await q('insert into phipop_requests(user_id, why, created) values ($1,$2,$3)', [u.id, why, now()]);
+  return { ok: true };
+});
+
+route('POST', /^\/phipop\/redeem$/, async (c) => {
+  const u = c.need(); await hit(`phr:${u.id}`, 10, 3600);
+  const code = String(c.body.code ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (code.length !== 12) throw new ApiErr('phipop_code_bad', 400);
+  const full = `${code.slice(0, 4)}-${code.slice(4, 8)}-${code.slice(8)}`;
+  await tx(async (t) => {
+    if ((await t.query('select 1 from phipop_access where user_id=$1', [u.id])).rows.length) throw new ApiErr('phipop_has', 409);
+    const r = await t.query('update phipop_codes set used_by=$1, used_at=$2 where code=$3 and to_user=$1 and used_by is null returning code', [u.id, now(), full]);
+    if (!r.rows.length) throw new ApiErr('phipop_code_bad', 400);
+    await t.query('insert into phipop_access(user_id, code, granted) values ($1,$2,$3)', [u.id, full, now()]);
+  });
+  return { ok: true, ...(await phStatus(u)) };
+});
+
+route('GET', /^\/phipop\/chat$/, async (c) => {
+  const u = c.need();
+  if (!(await PH.accessOf(u.id))) throw new ApiErr('phipop_locked', 403);
+  const rows = await many('select id, role, body, created from phipop_chat where user_id=$1 order by id desc limit 40', [u.id]);
+  return { items: rows.reverse().map((r) => ({ id: Number(r.id), role: r.role, text: r.body, created: Number(r.created) })), ...(await phStatus(u)) };
+});
+route('POST', /^\/phipop\/chat$/, async (c) => {
+  const u = c.need(); await hit(`phc:${u.id}`, 30, 600);
+  const txt = okText(c.body.text);
+  const reply = await PH.ask(u.id, txt, { chat: true, ctx: await PH.buildContext(txt.slice(0, PH.PH_MAX_IN)) });
+  return { ok: true, reply, ...(await phStatus(u)) };
+});
+route('DELETE', /^\/phipop\/chat$/, async (c) => { const u = c.need(); await q('delete from phipop_chat where user_id=$1', [u.id]); return { ok: true }; });
+
+// admin (hanya akun ber-role admin): tinjau permintaan, kirim kode lewat notifikasi, atur pengecualian batas
+route('GET', /^\/phipop\/admin$/, async (c) => {
+  needAdmin(c);
+  const reqs = await many(`select r.id, r.why, r.status, r.created, u.username, u.name from phipop_requests r join users u on u.id=r.user_id order by (r.status='pending') desc, r.created desc limit 100`);
+  const acc = await many(`select u.username, u.name, a.exempt, a.lim, a.used, a.win_start, a.code is not null has_code from phipop_access a join users u on u.id=a.user_id order by a.granted desc limit 200`);
+  return { requests: reqs.map((r) => ({ id: Number(r.id), username: r.username, name: r.name, why: r.why, status: r.status, created: Number(r.created) })),
+    access: acc.map((a) => ({ username: a.username, name: a.name, exempt: a.exempt, lim: a.lim, used: a.used, has_code: a.has_code })) };
+});
+route('POST', /^\/phipop\/admin\/send$/, async (c) => {
+  needAdmin(c);
+  const ph = await PH.phipopUser(); if (!ph) throw new ApiErr('not_found', 404);
+  let uname = String(c.body.username ?? '').toLowerCase();
+  const rid = Number(c.body.request_id) || null;
+  if (!uname && rid) uname = (await one('select u.username from phipop_requests r join users u on u.id=r.user_id where r.id=$1', [rid]))?.username ?? '';
+  const o = await one(`select id, username from users where username=$1 and status='active'`, [uname]);
+  if (!o) throw new ApiErr('not_found', 404);
+  if (await PH.accessOf(o.id)) throw new ApiErr('phipop_has', 409);
+  await q('delete from phipop_codes where to_user=$1 and used_by is null', [o.id]); // kode lama yang belum dipakai hangus
+  const code = await PH.newCode(o.id);
+  await tx(async (t) => {
+    await t.query(`insert into notifs(to_user, type, actor, extra, created) values ($1,'phipop_code',$2,$3,$4)`, [o.id, ph.id, code, now()]);
+    await t.query(`update phipop_requests set status='sent' where user_id=$1 and status='pending'`, [o.id]);
+  });
+  pushLater(Number(o.id), 'phipop_code', Number(ph.id), '');
+  return { ok: true, username: o.username, code };
+});
+route('POST', /^\/phipop\/admin\/reject$/, async (c) => { needAdmin(c); await q(`update phipop_requests set status='rejected' where id=$1 and status='pending'`, [Number(c.body.request_id) || 0]); return { ok: true }; });
+route('POST', /^\/phipop\/admin\/grant$/, async (c) => {
+  needAdmin(c);
+  const o = await one(`select id from users where username=$1 and status='active'`, [String(c.body.username ?? '').toLowerCase()]);
+  if (!o) throw new ApiErr('not_found', 404);
+  if (c.body.revoke === true) { await q('delete from phipop_access where user_id=$1', [o.id]); return { ok: true }; }
+  const lim = c.body.lim === null || c.body.lim === undefined || c.body.lim === '' ? null : Math.max(1, Math.min(10000, Number(c.body.lim) | 0));
+  await q(`insert into phipop_access(user_id, granted, exempt, lim) values ($1,$2,$3,$4) on conflict (user_id) do update set exempt=$3, lim=$4`, [o.id, now(), c.body.exempt === true, lim]);
+  return { ok: true };
+});
+
+/** Tag @phipop di post/komentar: jawab sebagai komentar (hanya bila pengirim punya akses). */
+const PH_TAG = /(^|[^a-z0-9_])@phipop(?![a-z0-9_])/i;
+async function phipopReply(u, postId, parentId, text) {
+  try {
+    const ph = await PH.phipopUser(); if (!ph || Number(u.id) === Number(ph.id)) return;
+    const post = await one(`select a.id, a.rand, a.body, a.body_key, a.descr, o.username ou from audios a join users o on o.id=a.owner where a.id=$1`, [postId]);
+    if (!post) return;
+    let reply;
+    const clean = String(text).replace(/@phipop(?![a-z0-9_])/ig, '').trim() || 'halo';
+    const ctx = await PH.buildContext(clean.slice(0, PH.PH_MAX_IN), { id: Number(post.id), owner: post.ou, priv: !String(post.rand || 'public').split(',').includes('public'), text: parentId ? await PH.postBody(post) : '' });
+    try { reply = await PH.ask(u.id, clean, { ctx });
+    }
+    catch (e) { if (e.code === 'phipop_limit') reply = 'jatah lu abis dulu. nunggu reset, sabar dikit napa.'; else return; }
+    await tx(async (t) => {
+      await t.query('insert into comments(post_id, owner, parent, body, body_len, pending, n_audio, created) values ($1,$2,$3,$4,$5,false,0,$6)', [postId, ph.id, parentId, reply, reply.length, now()]);
+      await notify(t, Number(u.id), parentId ? 'reply' : 'comment', Number(ph.id), Number(postId), reply.slice(0, 80));
+    });
+    await recount(postId);
+  } catch {}
+}
 
 /** Diagnostik internal hanya untuk pemegang CRON_SECRET. */
 function cronOk(req, url) {

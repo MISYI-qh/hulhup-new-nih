@@ -227,6 +227,7 @@ export class Store {
     switch (type) {
       case 'like': return this.t('n_like'); case 'comment': return this.t('n_comment'); case 'reply': return this.t('n_reply'); case 'mention': return this.t('n_mention');
       case 'rel_req': return this.t('n_rel_req').replace('{r}', this.relName(extra)); case 'rel_ok': return this.t('n_rel_ok').replace('{r}', this.relName(extra));
+      case 'phipop_code': return this.t('n_phipop_code').replace('{c}', extra);
       default: return this.t('n_follow');
     }
   }

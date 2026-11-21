@@ -126,12 +126,12 @@ export function LinkEmbed({ url }: { url: string }) {
 /** Pemutar sematan situs lain langsung tampil di dalam post (iframe resmi, dimuat malas saat mendekati layar). */
 function FrameEmbedView({ e, url }: { e: import('@/lib/links').FrameEmbed; url: string }) {
   const ref = useRef<HTMLDivElement>(null); const [seen, setSeen] = useState(false);
-  useEffect(() => {
-    const el = ref.current; if (!el || seen) return;
+  useEffect(() => { // dimuat saat mendekati layar; dilepas (berhenti memutar) saat sudah jauh keluar layar
+    const el = ref.current; if (!el) return;
     if (typeof IntersectionObserver === 'undefined') { setSeen(true); return; }
-    const io = new IntersectionObserver(([x]) => { if (x.isIntersecting) { io.disconnect(); setSeen(true); } }, { rootMargin: '400px 0px' });
+    const io = new IntersectionObserver(([x]) => setSeen(x.isIntersecting), { rootMargin: '0px 0px' });
     io.observe(el); return () => io.disconnect();
-  }, [seen]);
+  }, []);
   return <div ref={ref} className="embed frame" style={{ marginRight: 8, background: 'var(--soft)', position: 'relative', ...(e.ratio ? { aspectRatio: e.ratio, maxHeight: 560 } : { height: e.h }) }} onClick={(x) => x.stopPropagation()}>
     {seen ? <iframe src={e.src} title={e.host} loading="lazy" allow="autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" sandbox="allow-scripts allow-same-origin allow-presentation allow-popups allow-popups-to-escape-sandbox" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }} /> : null}
     <a href={url} target="_blank" rel="noopener noreferrer nofollow ugc" aria-label={e.host} className="frame-open" onClick={(x) => x.stopPropagation()}><Icon n="open_in_new_rounded" size={16} /></a>
@@ -181,7 +181,13 @@ function hashCode(s: string) { let h = 0; for (let i = 0; i < s.length; i++) h =
 function AudioEmbed({ url, host: h }: { url: string; host: string }) {
   const key = -(hashCode(url) & 0x3fffffff) - 1000;
   let name = h; try { name = decodeURIComponent(new URL(url).pathname.split('/').filter(Boolean).pop() || h); } catch {}
-  return <div style={{ paddingRight: 8 }}><FileBar keyId={key} url={url} secs={0} />
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => { // keluar dari layar -> hentikan audio ini
+    const el = ref.current; if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(([x]) => { if (!x.isIntersecting && store.playing === key) store.stop(); }, { threshold: 0 });
+    io.observe(el); return () => io.disconnect();
+  }, [key]);
+  return <div ref={ref} style={{ paddingRight: 8 }}><FileBar keyId={key} url={url} secs={0} />
     <div style={{ padding: '4px 0 0 6px', color: 'var(--sub)', fontSize: 11.5 }}>{name} · {store.t('ext_note').replace('{h}', h)}</div></div>;
 }
 /** Deretan media dari URL: digeser ke samping seperti Threads, tiap item tampil langsung. */

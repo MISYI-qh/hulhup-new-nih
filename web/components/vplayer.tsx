@@ -21,6 +21,12 @@ export function VPlayer({ url, poster, onBad, maxH = 460 }: { url: string; poste
     const go = el.requestFullscreen ?? el.webkitRequestFullscreen;
     if (go) go.call(el); else vv?.webkitEnterFullscreen?.();
   };
+  // keluar dari layar -> jeda (kecuali sedang layar penuh)
+  useEffect(() => {
+    const el = box.current; if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(([x]) => { if (!x.isIntersecting && !document.fullscreenElement && !(document as any).webkitFullscreenElement) v.current?.pause(); }, { threshold: 0.15 });
+    io.observe(el); return () => io.disconnect();
+  }, []);
   const shown = ui || !play || drag;
   return <div ref={box} className="vp" style={fs || !ratio ? undefined : { width: `min(100%, ${maxH * ratio}px)` }} onClick={(e) => { e.stopPropagation(); if ((e.target as HTMLElement).closest('.vpc')) return; shown && play ? toggle() : (poke(), play || toggle()); }} onMouseMove={poke}>
     <video ref={v} src={url} poster={poster} autoPlay loop playsInline controlsList="nodownload noplaybackrate noremoteplayback" disablePictureInPicture disableRemotePlayback onContextMenu={(e) => e.preventDefault()}

@@ -1438,5 +1438,153 @@
 "media_bad": [
 "Link harus diawali http:// atau https://",
 "Link must start with http:// or https://"
+],
+"n_phipop_code": [
+"mengirim kode akses Phipop-mu: {c}",
+"sent your Phipop access code: {c}"
+],
+"e_phipop_locked": [
+"Kamu belum punya akses Phipop",
+"You do not have Phipop access yet"
+],
+"e_phipop_limit": [
+"Jatah Phipop habis, tunggu reset",
+"Phipop quota used up, wait for the reset"
+],
+"e_phipop_busy": [
+"Phipop lagi ngelag, coba lagi",
+"Phipop is lagging, try again"
+],
+"e_phipop_code_bad": [
+"Kode salah atau bukan untuk akunmu",
+"Wrong code, or it is not for your account"
+],
+"e_phipop_has": [
+"Akunmu sudah punya akses Phipop",
+"Your account already has Phipop access"
+],
+"e_phipop_requested": [
+"Permintaanmu sudah terkirim, tunggu kodenya",
+"Your request is already sent, wait for the code"
+],
+"ph_title": [
+"Phipop",
+"Phipop"
+],
+"ph_intro": [
+"Phipop adalah AI Hulhup yang toxic, gaul, dan nggak punya filter basa-basi. Cuma bisa chat teks. Tag @phipop di post atau komentar juga dibalas. Aksesnya dibatasi dan perlu kode.",
+"Phipop is the Hulhup AI: toxic, slangy, zero small talk. Text chat only. Tag @phipop in a post or comment and it replies too. Access is limited and needs a code."
+],
+"ph_s1": [
+"Punya akun Hulhup",
+"Have a Hulhup account"
+],
+"ph_s2": [
+"Kirim permintaan dan ceritakan kamu mau pakai Phipop buat apa",
+"Send a request and tell us what you want Phipop for"
+],
+"ph_s3": [
+"Tunggu kode akses lewat notifikasi (1 kode untuk 1 akun)",
+"Wait for the access code in notifications (1 code per account)"
+],
+"ph_why": [
+"Kamu mau pakai Phipop buat apa?",
+"What do you want to use Phipop for?"
+],
+"ph_send_req": [
+"Kirim permintaan",
+"Send request"
+],
+"ph_req_sent": [
+"Permintaan terkirim. Tunggu kode di notifikasi.",
+"Request sent. Wait for the code in notifications."
+],
+"ph_have_code": [
+"Punya kode?",
+"Have a code?"
+],
+"ph_use_code": [
+"Pakai kode",
+"Use code"
+],
+"ph_msg": [
+"Ketik ke Phipop…",
+"Message Phipop…"
+],
+"ph_left": [
+"Sisa {n}/{m}",
+"{n}/{m} left"
+],
+"ph_reset": [
+"reset {t}",
+"resets in {t}"
+],
+"ph_unlimited": [
+"Tanpa batas",
+"Unlimited"
+],
+"ph_empty_chat": [
+"Sapa Phipop. Siapin mental.",
+"Say hi to Phipop. Brace yourself."
+],
+"ph_clear": [
+"Hapus riwayat",
+"Clear history"
+],
+"ph_typing": [
+"Phipop lagi ngetik…",
+"Phipop is typing…"
+],
+"ph_limit_note": [
+"Jatah habis. Reset {t} lagi.",
+"Quota used up. Resets in {t}."
+],
+"ph_manage": [
+"Kelola",
+"Manage"
+],
+"ph_admin_title": [
+"Kelola Phipop",
+"Manage Phipop"
+],
+"ph_send_code": [
+"Kirim kode",
+"Send code"
+],
+"ph_reject": [
+"Tolak",
+"Reject"
+],
+"ph_grant": [
+"Beri / atur akses",
+"Grant / set access"
+],
+"ph_unlim_sw": [
+"Tanpa batas",
+"Unlimited"
+],
+"ph_lim_ph": [
+"Batas khusus (kosong = 10)",
+"Custom limit (empty = 10)"
+],
+"ph_revoke": [
+"Cabut",
+"Revoke"
+],
+"ph_no_req": [
+"Belum ada permintaan",
+"No requests yet"
+],
+"ph_code_made": [
+"Kode terkirim ke {u}: {c}",
+"Code sent to {u}: {c}"
+],
+"ph_saved": [
+"Tersimpan",
+"Saved"
+],
+"ph_login": [
+"Masuk dulu untuk memakai Phipop",
+"Sign in to use Phipop"
 ]
 }

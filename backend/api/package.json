@@ -10,6 +10,7 @@
     "test": "node --test test/"
   },
   "dependencies": {
+    "@vercel/functions": "^3.11.3",
     "jpeg-js": "^0.4.4",
     "mongodb": "^6.10.0",
     "pg": "^8.13.0",

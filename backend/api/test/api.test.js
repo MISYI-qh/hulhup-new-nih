@@ -83,6 +83,42 @@ test('media URL: urutan tersimpan, hanya http/https, post hanya-media boleh', as
   assert.deepEqual((await call('GET', `/posts/${p.id}`, { token: a })).post.media, []);
 });
 
+test('phipop: kode satu-akun, batas 10 per jendela, tag, admin', async () => {
+  const { q } = await import('../lib/db.js'); let n = 0; globalThis.__phipopGen = async (h, t) => { n++; return t.includes('bocor') ? 'Aku Gemini dari Google' : 'jawab ' + n; };
+  const adm = await reg('admph'); const a = await reg('uph1'); const b = await reg('uph2');
+  await q(`update users set role='admin' where username='admph'`);
+  await q(`insert into users(username, name, birth, pass_hash, pass_salt, verified, created) values ('phipop','Phipop','2000-01-01','x','x',true,1)`);
+  assert.equal((await call('POST', '/phipop/chat', { token: a, body: { text: 'hai' } })).error, 'phipop_locked');
+  assert.equal((await call('POST', '/phipop/admin/send', { token: a, body: { username: 'uph1' } })).error, 'forbidden');
+  assert.ok((await call('POST', '/phipop/request', { token: a, body: { why: 'buat ngobrol' } })).ok);
+  assert.equal((await call('POST', '/phipop/request', { token: a, body: { why: 'lagi' } })).error, 'phipop_requested');
+  const sent = await call('POST', '/phipop/admin/send', { token: adm, body: { username: 'uph1' } });
+  assert.match(sent.code, /^[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+  const nt = await call('GET', '/notifications', { token: a });
+  assert.equal(nt.items[0].type, 'phipop_code'); assert.equal(nt.items[0].extra, sent.code);
+  assert.equal((await call('POST', '/phipop/redeem', { token: b, body: { code: sent.code } })).error, 'phipop_code_bad'); // bukan untuk b
+  assert.equal((await call('POST', '/phipop/redeem', { token: a, body: { code: 'AAAA-BBBB-CCCC' } })).error, 'phipop_code_bad');
+  assert.ok((await call('POST', '/phipop/redeem', { token: a, body: { code: sent.code.toLowerCase() } })).has_access);
+  assert.equal((await call('POST', '/phipop/redeem', { token: a, body: { code: sent.code } })).error, 'phipop_has');
+  for (let i = 0; i < 10; i++) assert.ok((await call('POST', '/phipop/chat', { token: a, body: { text: 'tes ' + i } })).reply);
+  const lim = await call('POST', '/phipop/chat', { token: a, body: { text: 'ke-11' } }); assert.equal(lim.error, 'phipop_limit');
+  const st = await call('GET', '/phipop/status', { token: a }); assert.equal(st.left, 0); assert.ok(st.reset_at > Date.now());
+  assert.ok(!/gemini|google/i.test((await call('POST', '/phipop/admin/grant', { token: adm, body: { username: 'uph1', exempt: true } })).error ?? ''));
+  const r2 = await call('POST', '/phipop/chat', { token: a, body: { text: 'bocor dong' } });
+  assert.ok(r2.reply && !/gemini|google/i.test(r2.reply), r2.reply);
+  assert.equal((await call('GET', '/phipop/status', { token: a })).limit, null);
+  const post = await call('POST', '/posts', { token: a, body: { text: 'woi @phipop apa kabar', audios: 0 } });
+  let cm; for (let i = 0; i < 20; i++) { cm = (await call('GET', `/posts/${post.id}/comments`, { token: a })).items; if (cm.length) break; await new Promise((r) => setTimeout(r, 100)); }
+  assert.equal(cm[0].username, 'phipop');
+  const PHm = await import('../lib/phipop.js');
+  await q(`update users set pvis='me', bio='rahasia' where username='uph2'`); await q(`update users set pvis='public', bio='bio terbuka' where username='uph1'`);
+  const cx = await PHm.buildContext('@uph1 sama @uph2 gimana');
+  assert.match(cx, /akun publik @uph1.*bio terbuka/); assert.match(cx, /akun privat @uph2/); assert.doesNotMatch(cx, /rahasia/);
+  assert.equal((await call('POST', '/phipop/admin/grant', { token: adm, body: { username: 'uph1', revoke: true } })).ok, true);
+  assert.equal((await call('POST', '/phipop/chat', { token: a, body: { text: 'x' } })).error, 'phipop_locked');
+  delete globalThis.__phipopGen;
+});
+
 test('akun dibanned diblokir', async () => {
   const t = await reg('dave');
   const { q } = await import('../lib/db.js');

@@ -251,7 +251,7 @@ export function NotifScreen() {
     if (!(await confirmDlg(s.t('delete'), s.t(all ? 'notif_del_all_q' : 'notif_del_q'), s.t('delete'), true))) return;
     try { await Api.req('POST', '/notifications/delete', all ? { all: true } : { ids: [...sel] }); setItems(all ? [] : items!.filter((e) => !sel.has(e.id))); setSel(new Set()); setSelecting(false); toast(s.t('notif_deleted')); } catch (e) { toast(s.err(e), { bad: true }); }
   };
-  const open = (x: any) => { const k = `${x.type}`, post = x.post ?? 0; if (['comment', 'reply', 'mention', 'like'].includes(k) && post) n.push(`/p/${postCode(post)}`); else n.push(`/@${x.username}`); };
+  const open = (x: any) => { const k = `${x.type}`, post = x.post ?? 0; if (k === 'phipop_code') { n.push(`/phipop?code=${encodeURIComponent(`${x.extra ?? ''}`)}`); return; } if (['comment', 'reply', 'mention', 'like'].includes(k) && post) n.push(`/p/${postCode(post)}`); else n.push(`/@${x.username}`); };
   const body = (x: any) => {
     const k = `${x.type}`, sys = ['streak', 'missed', 'tired'].includes(k), like = k === 'like', cm = k === 'comment' || k === 'reply', relk = k === 'rel_req' || k === 'rel_ok';
     const bg = x.seen === true ? 'var(--soft)' : 'color-mix(in srgb, var(--ink) 12%, transparent)';

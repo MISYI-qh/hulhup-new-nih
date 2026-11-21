@@ -124,7 +124,7 @@ export function HomeScreen({ mode0 = 0 }: { mode0?: 0 | 1 }) {
 
   return <div className="app" style={{ height: '100dvh' }}>
     <TopBar lead={<IconBtn n="menu_rounded" onClick={() => setMenu(true)} label="Menu" />} center={<Brand />}
-      actions={<><IconBtn n="search_rounded" label="Cari" onClick={() => { if (s.needNet()) n.push('/search'); }} /><IconBtn n="person_outline_rounded" label="Profil" dot={s.unread > 0} onClick={() => n.push(s.me ? `/@${s.me.username}` : '/me')} /></>} />
+      actions={<><button className="tap" aria-label="Phipop" onClick={() => n.push(s.me ? '/phipop' : '/login')} style={{ width: 48, height: 48, display: 'grid', placeItems: 'center' }}><img src="/phipop.png" alt="" width={30} height={30} style={{ width: 30, height: 30, borderRadius: '50%', background: '#fff' }} /></button><IconBtn n="search_rounded" label="Cari" onClick={() => { if (s.needNet()) n.push('/search'); }} /><IconBtn n="person_outline_rounded" label="Profil" dot={s.unread > 0} onClick={() => n.push(s.me ? `/@${s.me.username}` : '/me')} /></>} />
     <div style={{ flex: 1, minHeight: 0, overflow: mode === 1 ? 'auto' : 'hidden', position: 'relative', display: 'flex', flexDirection: 'column' }}>
       {mode === 0 ? <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
         <TapButton onTap={tap} />

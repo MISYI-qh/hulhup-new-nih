@@ -282,3 +282,37 @@ ALTER TABLE rels ADD COLUMN IF NOT EXISTS la BIGINT REFERENCES rel_labels(id) ON
 ALTER TABLE rels ADD COLUMN IF NOT EXISTS lb BIGINT REFERENCES rel_labels(id) ON DELETE SET NULL;
 ALTER TABLE rels DROP CONSTRAINT IF EXISTS rels_type_check;
 ALTER TABLE rels ADD CONSTRAINT rels_type_check CHECK (type IN ('friend','best','partner','family','custom'));
+
+-- Phipop (AI): akses hanya lewat kode satu-akun yang dikirim admin; batas masukan per jendela waktu.
+CREATE TABLE IF NOT EXISTS phipop_requests (
+  id      BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  why     TEXT NOT NULL CHECK (length(why) BETWEEN 1 AND 600),
+  status  TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','sent','rejected')),
+  created BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS phipop_requests_st ON phipop_requests(status, created);
+CREATE TABLE IF NOT EXISTS phipop_codes (
+  code     TEXT PRIMARY KEY,
+  to_user  BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  used_by  BIGINT UNIQUE REFERENCES users(id) ON DELETE SET NULL,
+  created  BIGINT NOT NULL,
+  used_at  BIGINT
+);
+CREATE TABLE IF NOT EXISTS phipop_access (
+  user_id   BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  code      TEXT UNIQUE,
+  granted   BIGINT NOT NULL,
+  exempt    BOOLEAN NOT NULL DEFAULT FALSE,
+  lim       INT,
+  win_start BIGINT NOT NULL DEFAULT 0,
+  used      INT NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS phipop_chat (
+  id      BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role    TEXT NOT NULL CHECK (role IN ('user','phipop')),
+  body    TEXT NOT NULL,
+  created BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS phipop_chat_u ON phipop_chat(user_id, id DESC);
