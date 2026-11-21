@@ -74,7 +74,7 @@ export function PostScreen({ id, comment, seed }: { id: number; comment?: number
   const bgm = (p: A) => { if (p.bgm && p.files.length) store.playBgm(p.id, p.files[Math.min(p.files.length - 1, Math.max(0, p.bgmIdx))].url, scope.current); };
   const load = async () => {
     try {
-      const j = await Api.req('GET', `/posts/${id}`); const p = new A(j.post); setA(p); setText(j.text ?? ''); store.countView(p); await comments(); setErr(null); bgm(p);
+      const j = await Api.req('GET', `/posts/${id}`); const p = new A(j.post); setA(p); setText(j.text || p.text || p.desc || ''); store.countView(p); await comments(); setErr(null); bgm(p);
       if (comment != null) { setTimeout(() => document.getElementById(`c${comment}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 250); setTimeout(() => setHl(null), 3000); }
     } catch (e) { setErr(e instanceof ApiErr && e.code === 'not_found' ? store.t('post_gone') : store.err(e)); }
     setLoading(false);
@@ -83,7 +83,7 @@ export function PostScreen({ id, comment, seed }: { id: number; comment?: number
   useEffect(() => {
     const t = setInterval(async () => {
       if (loading || sending || busy.current || document.visibilityState !== 'visible') return; busy.current = true;
-      try { const p = await Api.req('GET', `/posts/${id}`); const cm = await Api.req('GET', `/posts/${id}/comments`); if (!sending) { setA(new A(p.post)); setText((x) => p.text ?? x); setCmts((cm.items as any[]).map((c) => ({ ...c }))); } } catch {}
+      try { const p = await Api.req('GET', `/posts/${id}`); const cm = await Api.req('GET', `/posts/${id}/comments`); if (!sending) { { const np = new A(p.post); setA(np); setText((x) => p.text || np.text || np.desc || x); } setCmts((cm.items as any[]).map((c) => ({ ...c }))); } } catch {}
       busy.current = false;
     }, 5000); return () => clearInterval(t);
   }, [id, loading, sending]);
