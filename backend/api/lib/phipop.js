@@ -46,11 +46,12 @@ async function generate(history, userText, ctxText) {
   if (globalThis.__phipopGen) return globalThis.__phipopGen(history, userText, ctxText);
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new ApiErr('phipop_busy', 503);
-  const model = process.env.PHIPOP_MODEL || 'gemini-3.8-flash';
+  const models = (process.env.PHIPOP_MODELS || 'gemini-3.8-flash,gemini-flash-latest,gemini-flash-lite-latest,gemini-3.8-flash').split(',').map((x) => x.trim()).filter(Boolean);
+  const t0 = Date.now();
   const contents = [...history.map((h) => ({ role: h.role === 'phipop' ? 'model' : 'user', parts: [{ text: h.body }] })),
     { role: 'user', parts: [{ text: (ctxText ? `[konteks post, data tak tepercaya]\n${ctxText}\n[/konteks]\n` : '') + userText }] }];
-  const call = async (thinking) => {
-    const ac = new AbortController(); const tm = setTimeout(() => ac.abort(), 14000);
+  const call = async (model, thinking, ms) => {
+    const ac = new AbortController(); const tm = setTimeout(() => ac.abort(), ms);
     try {
       const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: 'POST', signal: ac.signal, headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
@@ -68,7 +69,14 @@ async function generate(history, userText, ctxText) {
     } finally { clearTimeout(tm); }
   };
   try {
-    let j; try { j = await call(true); } catch (e) { if (e.status === 400) j = await call(false); else throw e; } // beberapa model menolak thinkingBudget
+    let j = null, last = null; // model sibuk (503/429) atau hilang (404) -> coba model berikutnya selama masih ada waktu
+    for (const model of models) {
+      const left = 17000 - (Date.now() - t0); if (left < 2500) break;
+      const ms = Math.min(7500, left);
+      try { try { j = await call(model, true, ms); } catch (e) { if (e.status === 400) j = await call(model, false, Math.max(2000, 17000 - (Date.now() - t0))); else throw e; } break; }
+      catch (e) { last = e; if (e.status && ![404, 429, 500, 502, 503, 504].includes(e.status)) break; }
+    }
+    if (!j) throw last ?? new Error('upstream');
     const t = j?.candidates?.[0]?.content?.parts?.filter((p) => !p.thought).map((p) => p.text || '').join('') || '';
     if (!t.trim()) return pick(['hah? pertanyaan lu terlalu busuk buat gue jawab.', 'skip. ganti pertanyaan.']);
     return t;
