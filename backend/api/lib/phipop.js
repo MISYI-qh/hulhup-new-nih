@@ -57,7 +57,7 @@ async function generate(history, userText, ctxText) {
           { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
           { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' }] }),
     });
-    if (!r.ok) throw new Error('upstream');
+    if (!r.ok) { console.error('phipop upstream', r.status, String(await r.text().catch(() => '')).slice(0, 300).replace(/key[=:]\S+/gi, 'key=***')); throw new Error('upstream'); }
     const j = await r.json();
     const t = j?.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
     if (!t.trim()) return pick(['hah? pertanyaan lu terlalu busuk buat gue jawab.', 'skip. ganti pertanyaan.']);
