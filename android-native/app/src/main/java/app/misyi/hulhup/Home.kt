@@ -227,14 +227,14 @@ val kBuild get() = BuildConfig.BUILD
             }
         }
         if (!a.pprof && a.created > 0) HText(s.`when`(a.created), 13f, color = sub(), modifier = Modifier.padding(bottom = 6.dp))
-        val d = a.desc.trim(); val qr = quoteRef(d); val hr = hiddenRef(d)
-        val dShown = if (hr == null) d else (d.substring(0, hr.at).trimEnd() + d.substring(hr.at + hr.len).trimStart().let { if (it.isEmpty()) "" else "\n$it" }).trim()
+        val d = a.desc.trim(); val qr = quoteRef(d); val hr = hiddenRanges(d)
+        val dShown = hr.sortedByDescending { it.at }.fold(d) { acc, r -> acc.substring(0, r.at).trimEnd() + acc.substring(r.at + r.len).trimStart().let { if (it.isEmpty()) "" else "\n$it" } }.trim()
         if (dShown.isNotEmpty()) Tap(Modifier.fillMaxWidth(), .99f, onTap = { close(); openPost(a) }) {
             val t = buildAnnotatedString { append(dShown); if (a.long) withStyle(SpanStyle(color = acc(), fontWeight = FontWeight.Bold)) { append(" …  ${s.t("read_more")}") } }
             androidx.compose.material3.Text(t, Modifier.padding(top = if (a.pprof) 12.dp else 0.dp), fontSize = 15.sp, lineHeight = 21.sp, maxLines = 6, overflow = TextOverflow.Ellipsis, color = ink(), fontFamily = Outfit)
         }
-        if (a.media.isNotEmpty()) MediaStrip(a.media)
-        if (qr != null) QuoteCard(qr.id) else firstUrl(d)?.let { LinkEmbed(it) }
+        if (qr != null) QuoteCard(qr.id)
+        MediaStrip(postMedia(d, a.media))
         Spacer(Modifier.height(if (a.pprof || d.isNotEmpty()) 14.dp else 4.dp))
         if (a.url.isNotEmpty()) {
             val on = s.playing == a.id

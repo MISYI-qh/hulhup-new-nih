@@ -162,89 +162,166 @@ private suspend fun fetchPreview(url: String): JSONObject? {
     }
 }
 
+/** Gambar yang melaporkan rasio aslinya (lebar/tinggi) setelah termuat. */
+@Composable private fun ImgR(url: String, modifier: Modifier, fit: ContentScale = ContentScale.Crop, onRatio: (Float) -> Unit) {
+    val net = if (url.startsWith("/")) Api.base + url else url
+    coil.compose.AsyncImage(model = net, contentDescription = null, modifier = modifier, contentScale = fit, onSuccess = { st ->
+        val d = st.result.drawable; if (d.intrinsicWidth > 0 && d.intrinsicHeight > 0) onRatio(d.intrinsicWidth.toFloat() / d.intrinsicHeight)
+    })
+}
+
 @Composable private fun ImageEmbed(url: String, orig: String) {
     val host = try { Uri.parse(orig.ifEmpty { url }).host ?: "" } catch (_: Exception) { "" }
-    Tap(Modifier.padding(top = 10.dp, end = 8.dp), .99f, onTap = { Nav.go(Screen("image") { ImageViewer(url, host) }) }) {
-        Box(Modifier.fillMaxWidth().heightIn(max = 420.dp).clip(RoundedCornerShape(20.dp)).border(1.dp, ink().copy(alpha = .08f), RoundedCornerShape(20.dp))) {
-            Img(url, Modifier.fillMaxWidth(), ContentScale.FillWidth)
+    var ratio by remember(url) { mutableStateOf<Float?>(null) }
+    val r = (ratio ?: (4f / 3f)).coerceIn(.3f, 3f)
+    val maxH = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * .7f
+    BoxWithConstraints(Modifier.fillMaxWidth().padding(top = 10.dp, end = 8.dp)) {
+        val w = if (maxWidth < (maxH * r).dp) maxWidth else (maxH * r).dp
+        Tap(Modifier, .99f, onTap = { Nav.go(Screen("image") { ImageViewer(url, host) }) }) {
+            Box(Modifier.width(w).aspectRatio(r).clip(RoundedCornerShape(20.dp)).background(soft()).border(1.dp, ink().copy(alpha = .08f), RoundedCornerShape(20.dp))) {
+                ImgR(url, Modifier.fillMaxSize()) { ratio = it }
+            }
         }
     }
 }
 
-/** Video dari URL: tidak diunduh sampai diketuk (hemat kuota), lalu diputar di tempat dengan kontrol buatan sendiri (tanpa kontrol bawaan ExoPlayer). */
+/** Video dari URL: tidak diunduh sampai diketuk (hemat kuota), lalu diputar di tempat dengan kontrol buatan sendiri. Kotak mengikuti rasio asli video. */
 @Composable private fun VideoEmbed(url: String, poster: String? = null, tall: Boolean = false, orig: String? = null) {
     var started by remember { mutableStateOf(false) }; var failed by remember { mutableStateOf(false) }
     val host = (try { Uri.parse(orig ?: url).host ?: "" } catch (_: Exception) { "" }).removePrefix("www.")
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val player = remember(started) { if (started) ExoPlayer.Builder(ctx).build() else null }
     DisposableEffect(player) { onDispose { player?.release() } }
-    var ratio by remember { mutableStateOf(if (tall) 4f / 5f else 16f / 9f) }
+    var ratio by remember { mutableStateOf<Float?>(null) }
     var playing by remember { mutableStateOf(false) }; var buffering by remember { mutableStateOf(true) }
     var muted by remember { mutableStateOf(false) }; var speed by remember { mutableStateOf(1f) }
     var pos by remember { mutableStateOf(0L) }; var dur by remember { mutableStateOf(0L) }
     var show by remember { mutableStateOf(true) }; var tick by remember { mutableStateOf(0) }
+    var fs by remember { mutableStateOf(false) }
+    val r = (ratio ?: (16f / 9f)).coerceIn(.3f, 3f)
+    val maxH = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * .7f
     fun fmt(ms: Long): String { val s = (ms / 1000).toInt().coerceAtLeast(0); return "%d:%02d".format(s / 60, s % 60) }
-    Box(Modifier.padding(top = 10.dp, end = 8.dp).fillMaxWidth().aspectRatio(ratio).clip(RoundedCornerShape(20.dp)).background(Color.Black), contentAlignment = Alignment.Center) {
-        if (poster != null && (player == null || failed)) Img(proxied(poster), Modifier.fillMaxSize(), ContentScale.Crop)
-        if (player != null && !failed) {
-            AndroidView(factory = { PlayerView(it).apply { this.player = player; useController = false; resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM; setShutterBackgroundColor(android.graphics.Color.TRANSPARENT) } }, modifier = Modifier.fillMaxSize())
-            LaunchedEffect(player) {
-                try { Store.stop(); player.setMediaItem(MediaItem.fromUri(url)); player.repeatMode = androidx.media3.common.Player.REPEAT_MODE_ONE; player.prepare(); player.play() } catch (_: Exception) { failed = true }
-            }
-            LaunchedEffect(player) { while (true) { pos = player.currentPosition; dur = player.duration.coerceAtLeast(0L); kotlinx.coroutines.delay(250) } }
-            DisposableEffect(player) {
-                val l = object : androidx.media3.common.Player.Listener {
-                    override fun onPlayerError(e: androidx.media3.common.PlaybackException) { failed = true }
-                    override fun onIsPlayingChanged(p: Boolean) { playing = p }
-                    override fun onPlaybackStateChanged(st: Int) { buffering = st == androidx.media3.common.Player.STATE_BUFFERING }
-                    override fun onVideoSizeChanged(v: androidx.media3.common.VideoSize) { if (v.width > 0 && v.height > 0) ratio = (v.width * v.pixelWidthHeightRatio / v.height).coerceIn(9f / 16f, 16f / 9f) }
-                }
-                player.addListener(l); onDispose { player.removeListener(l) }
-            }
-            LaunchedEffect(show, playing, tick) { if (show && playing) { kotlinx.coroutines.delay(2600); show = false } }
-            // lapisan ketuk: tampil/sembunyikan kontrol
+
+    @Composable fun Ctl(p: ExoPlayer, full: Boolean) {
+        Box(Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { show = !show; tick++ } })
-            if (buffering) androidx.compose.material3.CircularProgressIndicator(Modifier.size(34.dp), color = Color.White, strokeWidth = 2.5.dp)
-            androidx.compose.animation.AnimatedVisibility(show || !playing, enter = androidx.compose.animation.fadeIn(), exit = androidx.compose.animation.fadeOut()) {
+            if (buffering) androidx.compose.material3.CircularProgressIndicator(Modifier.align(Alignment.Center).size(34.dp), color = Color.White, strokeWidth = 2.5.dp)
+            androidx.compose.animation.AnimatedVisibility(show || !playing, Modifier.fillMaxSize(), enter = androidx.compose.animation.fadeIn(), exit = androidx.compose.animation.fadeOut()) {
                 Box(Modifier.fillMaxSize()) {
-                    Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .6f)))).padding(12.dp, 18.dp, 12.dp, 8.dp)) {
+                    if (full) Tap(Modifier.align(Alignment.TopStart).statusBarsPadding(), onTap = { fs = false }) { Box(Modifier.padding(12.dp).size(36.dp).background(Color.Black.copy(alpha = .55f), CircleShape), contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Close, null, Modifier.size(20.dp), tint = Color.White) } }
+                    Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .6f)))).let { if (full) it.navigationBarsPadding() else it }.padding(12.dp, 18.dp, 8.dp, 8.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Tap(onTap = { tick++; if (playing) player.pause() else player.play() }) { Icon(if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, null, Modifier.padding(4.dp).size(26.dp), tint = Color.White) }
+                            Tap(onTap = { tick++; if (playing) p.pause() else p.play() }) { Icon(if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, null, Modifier.padding(4.dp).size(26.dp), tint = Color.White) }
                             HText(fmt(pos), 11.5f, FontWeight.SemiBold, Color.White, Modifier.padding(start = 4.dp))
                             Box(Modifier.weight(1f).height(28.dp).padding(horizontal = 8.dp)
-                                .pointerInput(dur) { detectTapGestures { o -> if (dur > 0) { player.seekTo((dur * (o.x / size.width)).toLong()); tick++ } } }
-                                .pointerInput(dur) { detectHorizontalDragGestures(onDragStart = { tick++ }) { c, _ -> if (dur > 0) player.seekTo((dur * (c.position.x / size.width).coerceIn(0f, 1f)).toLong()) } }) {
+                                .pointerInput(dur) { detectTapGestures { o -> if (dur > 0) { p.seekTo((dur * (o.x / size.width)).toLong()); tick++ } } }
+                                .pointerInput(dur) { detectHorizontalDragGestures(onDragStart = { tick++ }) { c, _ -> if (dur > 0) p.seekTo((dur * (c.position.x / size.width).coerceIn(0f, 1f)).toLong()) } }) {
                                 Box(Modifier.align(Alignment.Center).fillMaxWidth().height(3.dp).clip(CircleShape).background(Color.White.copy(alpha = .3f)))
                                 Box(Modifier.align(Alignment.CenterStart).fillMaxWidth(if (dur > 0) (pos.toFloat() / dur).coerceIn(0f, 1f) else 0f).height(3.dp).clip(CircleShape).background(Color.White))
                             }
                             HText(fmt(dur), 11.5f, FontWeight.SemiBold, Color.White.copy(alpha = .8f), Modifier.padding(end = 6.dp))
-                            Tap(onTap = { tick++; val n = when (speed) { 1f -> 1.5f; 1.5f -> 2f; 2f -> .75f; else -> 1f }; speed = n; player.setPlaybackSpeed(n) }) {
+                            Tap(onTap = { tick++; val n = when (speed) { 1f -> 1.5f; 1.5f -> 2f; 2f -> .75f; else -> 1f }; speed = n; p.setPlaybackSpeed(n) }) {
                                 Box(Modifier.padding(horizontal = 2.dp).clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = .2f)).padding(8.dp, 4.dp)) { HText((if (speed == 1f) "1" else if (speed == 2f) "2" else speed.toString()) + "×", 11.5f, FontWeight.ExtraBold, Color.White) }
                             }
-                            Tap(onTap = { tick++; muted = !muted; player.volume = if (muted) 0f else 1f }) { Icon(if (muted) Icons.Rounded.VolumeOff else Icons.Rounded.VolumeUp, null, Modifier.padding(4.dp).size(22.dp), tint = Color.White) }
+                            Tap(onTap = { tick++; muted = !muted; p.volume = if (muted) 0f else 1f }) { Icon(if (muted) Icons.Rounded.VolumeOff else Icons.Rounded.VolumeUp, null, Modifier.padding(4.dp).size(22.dp), tint = Color.White) }
+                            Tap(onTap = { tick++; fs = !fs }) { Icon(if (full) Icons.Rounded.FullscreenExit else Icons.Rounded.Fullscreen, null, Modifier.padding(4.dp).size(24.dp), tint = Color.White) }
                         }
                     }
                 }
             }
-        } else {
-            if (!failed) HText(Store.t("ext_note").replace("{h}", host), 11.5f, color = Color.White.copy(alpha = .6f), align = TextAlign.Center, modifier = Modifier.align(Alignment.BottomCenter).padding(14.dp, 0.dp, 14.dp, 10.dp))
-            if (failed) Tap(onTap = { openLink(orig ?: url) }) { Icon(Icons.Rounded.OpenInNew, null, Modifier.size(34.dp), tint = Color.White.copy(alpha = .7f)) }
-            else Tap(onTap = { started = true }) { Box(Modifier.size(58.dp).background(Color.White.copy(alpha = .24f), CircleShape), contentAlignment = Alignment.Center) { Icon(Icons.Rounded.PlayArrow, null, Modifier.size(38.dp), tint = Color.White) } }
+        }
+    }
+
+    BoxWithConstraints(Modifier.fillMaxWidth().padding(top = 10.dp, end = 8.dp)) {
+        val w = if (maxWidth < (maxH * r).dp) maxWidth else (maxH * r).dp
+        Box(Modifier.width(w).aspectRatio(r).clip(RoundedCornerShape(20.dp)).background(soft()), contentAlignment = Alignment.Center) {
+            if (poster != null && (player == null || failed)) ImgR(proxied(poster), Modifier.fillMaxSize()) { ratio = it }
+            if (player != null && !failed) {
+                AndroidView(factory = { PlayerView(it).apply { this.player = player; useController = false; resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM; setShutterBackgroundColor(android.graphics.Color.TRANSPARENT) } },
+                    modifier = Modifier.fillMaxSize(), update = { it.player = if (fs) null else player })
+                LaunchedEffect(player) {
+                    try { Store.stop(); player.setMediaItem(MediaItem.fromUri(url)); player.repeatMode = androidx.media3.common.Player.REPEAT_MODE_ONE; player.prepare(); player.play() } catch (_: Exception) { failed = true }
+                }
+                LaunchedEffect(player) { while (true) { pos = player.currentPosition; dur = player.duration.coerceAtLeast(0L); kotlinx.coroutines.delay(250) } }
+                DisposableEffect(player) {
+                    val l = object : androidx.media3.common.Player.Listener {
+                        override fun onPlayerError(e: androidx.media3.common.PlaybackException) { failed = true }
+                        override fun onIsPlayingChanged(p: Boolean) { playing = p }
+                        override fun onPlaybackStateChanged(st: Int) { buffering = st == androidx.media3.common.Player.STATE_BUFFERING }
+                        override fun onVideoSizeChanged(v: androidx.media3.common.VideoSize) { if (v.width > 0 && v.height > 0) ratio = v.width * v.pixelWidthHeightRatio / v.height }
+                    }
+                    player.addListener(l); onDispose { player.removeListener(l) }
+                }
+                LaunchedEffect(show, playing, tick) { if (show && playing) { kotlinx.coroutines.delay(2600); show = false } }
+                if (!fs) Ctl(player, false)
+            } else {
+                if (!failed) HText(Store.t("ext_note").replace("{h}", host), 11.5f, color = Color.White.copy(alpha = .75f), align = TextAlign.Center, modifier = Modifier.align(Alignment.BottomCenter).padding(14.dp, 0.dp, 14.dp, 10.dp))
+                if (failed) Tap(onTap = { openLink(orig ?: url) }) { Icon(Icons.Rounded.OpenInNew, null, Modifier.size(34.dp), tint = if (poster != null) Color.White else sub()) }
+                else Tap(onTap = { started = true }) { Box(Modifier.size(58.dp).background(Color.Black.copy(alpha = .45f), CircleShape), contentAlignment = Alignment.Center) { Icon(Icons.Rounded.PlayArrow, null, Modifier.size(38.dp), tint = Color.White) } }
+            }
+        }
+    }
+    if (fs && player != null) androidx.compose.ui.window.Dialog(onDismissRequest = { fs = false }, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+        Box(Modifier.fillMaxSize().background(Color.Black)) {
+            AndroidView(factory = { PlayerView(it).apply { this.player = player; useController = false; resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT; setShutterBackgroundColor(android.graphics.Color.TRANSPARENT) } }, modifier = Modifier.fillMaxSize())
+            Ctl(player, true)
         }
     }
 }
 
-
-/** Lajur media yang digeser ke samping (seperti Threads): setiap item adalah URL media (video, foto, audio, sematan). Hanya URL yang disimpan. */
+/** Lajur media yang digeser ke samping (seperti Threads): item tunggal selebar penuh, banyak item ±82%. Halaman biasa (kartu URL) ditaruh setelah media. */
 @Composable fun MediaStrip(items: List<String>) {
     if (items.isEmpty()) return
-    if (items.size == 1) { LinkEmbed(items[0]); return }
-    val w = (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * .78f).dp
-    androidx.compose.foundation.lazy.LazyRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-        items(items.size) { i -> Box(Modifier.width(w)) { LinkEmbed(items[i]) } }
+    var order by remember(items) { mutableStateOf(items) }
+    LaunchedEffect(items) {
+        if (items.size > 1) {
+            val media = ArrayList<String>(); val pages = ArrayList<String>()
+            for (u in items) {
+                if (kindOfUrl(u) != UrlKind.Page || embedOf(u) != null) { media.add(u); continue }
+                val p = fetchPreview(u)
+                val isM = p != null && (p.optString("video").isNotEmpty() || p.optString("kind") in listOf("image", "video", "audio"))
+                if (isM || (p == null && socialHost(u))) media.add(u) else pages.add(u)
+            }
+            order = media + pages
+        }
+    }
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        if (order.size == 1) LinkEmbed(order[0]) else {
+            val w = maxWidth * .82f
+            androidx.compose.foundation.lazy.LazyRow(Modifier.fillMaxWidth()) {
+                items(order, key = { it }) { u -> Box(Modifier.width(w)) { LinkEmbed(u) } }
+            }
+        }
     }
 }
 
+private fun isMediaUrl(u: String) = kindOfUrl(u) != UrlKind.Page || embedOf(u) != null || socialHost(u)
+
+/** Semua bagian teks yang disembunyikan: URL kutipan post Hulhup dan setiap URL media (tampil langsung di lajur). */
+fun hiddenRanges(text: String): List<QuoteRef> {
+    val out = ArrayList<QuoteRef>()
+    quoteRef(text)?.let { out.add(it) }
+    for (m in linkRe.findAll(text)) {
+        val raw = trimLink(m.value); if (raw.isEmpty() || raw.startsWith("@")) continue
+        val u = linkUri(raw)?.toString() ?: continue
+        if (kindOfUrl(u) == UrlKind.Image && Store.me == null) continue
+        if (isMediaUrl(u) && out.none { it.at == m.range.first }) out.add(QuoteRef(0, m.range.first, raw.length))
+    }
+    return out.sortedBy { it.at }
+}
+
+/** Urutan tampil: field media dulu, lalu semua URL di teks post (selain kutipan Hulhup), tanpa duplikat. */
+fun postMedia(text: String, media: List<String>): List<String> {
+    val q = quoteRef(text); val out = LinkedHashSet<String>(); out.addAll(media)
+    for (m in linkRe.findAll(text)) {
+        val raw = trimLink(m.value); if (raw.isEmpty() || raw.startsWith("@")) continue
+        if (q != null && m.range.first == q.at) continue
+        val u = linkUri(raw)?.toString() ?: continue
+        if (kindOfUrl(u) == UrlKind.Image && Store.me == null) continue
+        out.add(u)
+    }
+    return out.toList()
+}
 
 /** Editor media di layar tulis: ubin yang digeser ke samping, bisa ditambah, dihapus, dan diurutkan. */
 @Composable fun MediaEditor(media: androidx.compose.runtime.snapshots.SnapshotStateList<String>, enabled: Boolean = true) {

@@ -45,7 +45,8 @@ val mentionRe = Regex("${linkRe.pattern}|@([a-z0-9_]{3,20})", RegexOption.IGNORE
 @Composable fun MentionText(text: String, style: TextStyle, maxLines: Int = Int.MAX_VALUE, selectable: Boolean = false, hideQuote: Boolean = false) {
     val link = acc(); val sc = rememberCoroutineScope()
     val shownMap = remember(text) { mutableListOf<Triple<Int, Int, String>>() }
-    val q = remember(text, hideQuote) { if (hideQuote) hiddenRef(text) else null }
+    val q = remember(text, hideQuote) { if (hideQuote) hiddenRanges(text) else emptyList() }
+    val qs = remember(q) { q.map { it.at }.toSet() }
     val ann = remember(text, link, q) {
         shownMap.clear()
         buildAnnotatedString {
@@ -53,17 +54,17 @@ val mentionRe = Regex("${linkRe.pattern}|@([a-z0-9_]{3,20})", RegexOption.IGNORE
             for (m in mentionRe.findAll(text)) {
                 val raw = m.value; val isTag = m.groups[2] != null
                 val shown = if (isTag) raw else trimLink(raw); if (shown.isEmpty()) continue
-                if (q != null && !isTag && m.range.first == q.at) { if (m.range.first > last) append(text.substring(last, m.range.first).trimEnd()); last = m.range.first + shown.length; continue }
+                if (!isTag && m.range.first in qs) { if (m.range.first > last) append(text.substring(last, m.range.first).trimEnd()); last = m.range.first + shown.length; continue }
                 if (m.range.first > last) append(text.substring(last, m.range.first))
                 val st = length
                 withStyle(SpanStyle(color = link, fontWeight = if (isTag) FontWeight.ExtraBold else FontWeight.SemiBold, textDecoration = if (isTag) null else TextDecoration.Underline)) { append(shown) }
                 shownMap.add(Triple(st, length, if (isTag) "@" + m.groupValues[2] else shown))
                 last = m.range.first + shown.length
             }
-            if (last < text.length) append(if (q != null) text.substring(last).trimStart() else text.substring(last))
+            if (last < text.length) append(if (q.isNotEmpty()) text.substring(last).trimStart() else text.substring(last))
         }
     }
-    if (q != null && ann.text.isBlank()) return
+    if (q.isNotEmpty() && ann.text.isBlank()) return
     val st = style.copy(color = ink(), fontFamily = Outfit)
     val body: @Composable () -> Unit = {
         ClickableText(ann, style = st, maxLines = maxLines, overflow = if (maxLines == Int.MAX_VALUE) TextOverflow.Clip else TextOverflow.Ellipsis, onClick = { off ->
@@ -176,8 +177,8 @@ suspend fun postMenu(a: A, onDeleted: (() -> Unit)? = null) {
             // Di daftar Hups dan profil, teks post tampil penuh (pemotongan + Selengkapnya hanya di popup Acak).
             if (text.isNotEmpty()) Box(Modifier.padding(0.dp, 10.dp, 8.dp, 0.dp)) { MentionText(text, st, hideQuote = true) }
             val qr = quoteRef(text)
-            if (a.media.isNotEmpty()) MediaStrip(a.media)
-            if (qr != null) QuoteCard(qr.id) else firstUrl(text)?.let { LinkEmbed(it) }
+            if (qr != null) QuoteCard(qr.id)
+            MediaStrip(postMedia(text, a.media))
             if (a.files.isNotEmpty()) Box(Modifier.padding(end = 8.dp)) { if (a.bgm) BgmBar(a) else AudioBars(a, scope) }
             Spacer(Modifier.height(4.dp))
             PostActions(a)
