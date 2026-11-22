@@ -63,9 +63,9 @@ export const isBad = (t) => BAD.test(String(t || ''));
 const modelsList = () => (process.env.PHIPOP_MODELS || 'gemini-3.8-flash,gemini-flash-latest,gemini-flash-lite-latest,gemini-3.8-flash').split(',').map((x) => x.trim()).filter(Boolean);
 const SAFETY = [
   { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
-  { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_LOW_AND_ABOVE' },
-  { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_LOW_AND_ABOVE' },
-  { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' }];
+  { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
+  { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
+  { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' }];
 
 // kesehatan model: dilewati sementara bila sibuk/ditolak, supaya tidak buang waktu tiap permintaan
 const cool = new Map(); const thinkVar = new Map(); // model -> indeks varian pengaturan "berpikir" yang diterima
@@ -86,7 +86,7 @@ async function gcall(body0, deadline, perCall = 12000) {
       if (gc.thinkingConfig) THINK[vi](gc);
       const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: 'POST', signal: ac.signal, headers: { 'content-type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify({ ...body, generationConfig: gc }) });
-      if (!r.ok) { const e = new Error('upstream'); e.status = r.status; console.error('phipop upstream', model, 'v' + vi, r.status, String(await r.text().catch(() => '')).slice(0, 300).replace(/key[=:]\S+/gi, 'key=***')); throw e; }
+      if (!r.ok) { const e = new Error('upstream'); e.status = r.status; console.error('phipop upstream', model, 'v' + vi, r.status, String(await r.text().catch(() => '')).slice(0, 700).replace(/key[=:]\S+/gi, 'key=***')); throw e; }
       return await r.json();
     } finally { clearTimeout(tm); }
   };
