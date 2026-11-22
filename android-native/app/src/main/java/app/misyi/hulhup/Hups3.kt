@@ -55,6 +55,7 @@ import org.json.JSONObject
     val ls = rememberLazyListState()
     val me = remember { Nav.stack.lastOrNull() }
 
+    var cq by remember { mutableStateOf<String?>(null) }
     suspend fun loadComments() { val j = Api.req("GET", "/posts/$id/comments"); cmts.clear(); cmts.addAll((j.optJSONArray("items") ?: JSONArray()).objects()) }
     suspend fun reloadPost() { val p = Api.req("GET", "/posts/$id"); a = A(p.getJSONObject("post")) }
     suspend fun load() {
@@ -84,13 +85,14 @@ import org.json.JSONObject
     LaunchedEffect(hl, cmts.size) { if (hl != null && cmts.isNotEmpty()) { delay(350); delay(3000); hl = null } }
 
     suspend fun send() {
-        val t = input.text.trim(); if (t.isEmpty()) return
-        if (t == autoTag.trim()) return
+        val t0 = input.text.trim(); if (t0.isEmpty() && cq == null) return
+        if (t0 == autoTag.trim() && cq == null) return
+        val t = withQuote(t0, cq)
         sending = true
         var cid: Int? = null
         try {
             val j = Api.req("POST", "/posts/$id/comments", JSONObject().put("text", t).put("parent", replyTo?.optInt("id") ?: JSONObject.NULL))
-            cid = j.optInt("id"); input = TextFieldValue(""); replyTo = null; autoTag = ""
+            cid = j.optInt("id"); input = TextFieldValue(""); replyTo = null; autoTag = ""; cq = null
             loadComments(); reloadPost()
         } catch (e: Exception) {
             if (cid != null) { try { Api.req("DELETE", "/comments/$cid") } catch (_: Exception) {} }
@@ -148,7 +150,7 @@ import org.json.JSONObject
                     item {
                         Column {
                             OwnerRow(p)
-                            if (text.isNotEmpty()) Box(Modifier.padding(top = 14.dp)) { MentionText(text, TextStyle(fontSize = 17.sp, lineHeight = (17 * 1.55).sp), selectable = true, hideQuote = true) }
+                            if (text.isNotEmpty()) Box(Modifier.padding(top = 14.dp)) { MentionText(text, TextStyle(fontSize = 17.sp, lineHeight = (17 * 1.55).sp), selectable = true, hideQuote = true, ptag = p.ptag) }
                             val qr = quoteRef(text)
                             if (qr != null) QuoteCard(qr.id)
                             MediaStrip(postMedia(text, p.media))
@@ -179,10 +181,11 @@ import org.json.JSONObject
                 HText(s.t("replying").replace("{n}", replyTo!!.optString("name")), 13f, FontWeight.Bold, acc(), Modifier.weight(1f))
                 Tap(onTap = { val cur = input.text; if (cur.startsWith(autoTag)) input = TextFieldValue(cur.substring(autoTag.length)); autoTag = ""; replyTo = null }) { Icon(Icons.Rounded.Close, null, Modifier.padding(11.dp).size(26.dp), tint = sub()) }
             }
+            cq?.let { QuoteSlot(it) { cq = null } }
             Row(verticalAlignment = Alignment.Bottom) {
                 Box(Modifier.weight(1f).background(soft(), RoundedCornerShape(24.dp)).padding(horizontal = 16.dp, vertical = 12.dp)) {
                     if (input.text.isEmpty()) HText(s.t("comment_ph"), 15.5f, color = sub())
-                    BasicTextField(input, { input = it }, Modifier.fillMaxWidth().focusRequester(focus), textStyle = TextStyle(fontSize = 15.5.sp, color = ink(), fontFamily = Outfit), cursorBrush = SolidColor(ink()), minLines = 1, maxLines = 5, keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences))
+                    BasicTextField(input, { nv -> val ab = absorbQuote(nv.text) { cq = it }; input = if (ab == nv.text) nv else TextFieldValue(ab, TextRange(ab.length)) }, Modifier.fillMaxWidth().focusRequester(focus), textStyle = TextStyle(fontSize = 15.5.sp, color = ink(), fontFamily = Outfit), cursorBrush = SolidColor(ink()), minLines = 1, maxLines = 5, keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences))
                 }
                 Spacer(Modifier.width(8.dp))
                 Tap(onTap = if (sending) null else ({ sc.launch { send() } })) {
@@ -227,7 +230,12 @@ import org.json.JSONObject
                 HText(s.`when`(c.optLong("created")), 12f, color = sub(), maxLines = 1, modifier = Modifier.weight(1f, fill = false))
             }
             if (c.optBoolean("pinned")) Row(Modifier.padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Rounded.PushPin, null, Modifier.size(12.dp), tint = sub()); Spacer(Modifier.width(4.dp)); HText(s.t("pinned"), 11.5f, FontWeight.Bold, sub()) }
-            if (shown.isNotEmpty()) Box(Modifier.padding(top = 3.dp)) { MentionText(shown, TextStyle(fontSize = 15.sp, lineHeight = (15 * 1.45).sp), selectable = true) }
+            val ph = c.optString("ph"); val isPh = c.optString("username") == "phipop"
+            if (ph.startsWith("run:")) Box(Modifier.padding(top = 5.dp, bottom = 3.dp)) { PhipopRunFromPh(ph) }
+            else {
+                if (shown.isNotEmpty()) Box(Modifier.padding(top = 3.dp)) { MentionText(shown, TextStyle(fontSize = 15.sp, lineHeight = (15 * 1.45).sp), selectable = true, hideQuote = isPh, ptag = c.optBoolean("ptag")) }
+                if (isPh) { quoteRef(shown)?.let { QuoteCard(it.id) }; MediaStrip(postMedia(shown, emptyList())) }
+            }
             if (c.optBoolean("long") && full == null) Tap(onTap = if (loadingFull) null else ({ sc.launch { loadingFull = true; try { full = Api.req("GET", "/comments/${c.optInt("id")}/text").optString("text") } catch (e: Exception) { toast(s.err(e), true) }; loadingFull = false } })) {
                 HText(if (loadingFull) "…" else s.t("read_more"), 13.5f, FontWeight.Bold, acc(), Modifier.padding(top = 4.dp))
             }
@@ -243,7 +251,7 @@ import org.json.JSONObject
 }
 
 // ---------- tulis post ----------
-@Composable fun ComposePage() {
+@Composable fun ComposePage(quote0: String? = null) {
     val s = Store; val sc = rememberCoroutineScope()
     var text by remember { mutableStateOf("") }
     var clip by remember { mutableStateOf<AudioClip?>(null) }
@@ -254,6 +262,7 @@ import org.json.JSONObject
     var rand by remember { mutableStateOf("public") }
     var picked by remember { mutableStateOf<Map<String, JSONObject>>(emptyMap()) }
     val media = remember { mutableStateListOf<String>() }
+    var quote by remember { mutableStateOf(quote0) }
     DisposableEffect(Unit) { onDispose { Store.stop() } }
 
     suspend fun add() { val c = sheet<AudioClip> { done -> RecordSheet { done(it) } } ?: return; Store.stop(); clip = c; playing = false }
@@ -269,7 +278,7 @@ import org.json.JSONObject
         if (r.isEmpty()) { val l = audSplit(rand).toMutableList().also { it.remove("accounts") }; rand = if (l.isEmpty()) "public" else l.joinToString(",") }
     }
     suspend fun send() {
-        val t = text.trim(); val c = clip
+        val t = withQuote(text.trim(), quote); val c = clip
         if (c == null && t.isEmpty() && media.isEmpty()) { toast(s.t("e_empty"), true); return }
         if (audSplit(rand).contains("accounts") && picked.isEmpty()) { toast(s.t("e_need_accounts"), true); return }
         busy = true
@@ -301,8 +310,9 @@ import org.json.JSONObject
             Spacer(Modifier.height(14.dp))
             Box(Modifier.fillMaxWidth().background(soft(), RoundedCornerShape(22.dp)).padding(18.dp, 14.dp)) {
                 if (text.isEmpty()) HText(s.t("write_hups"), 16.5f, color = sub())
-                BasicTextField(text, { text = it }, Modifier.fillMaxWidth(), textStyle = TextStyle(fontSize = 16.5.sp, lineHeight = (16.5 * 1.5).sp, color = ink(), fontFamily = Outfit), cursorBrush = SolidColor(ink()), minLines = 4, maxLines = 12, keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences))
+                BasicTextField(text, { text = absorbQuote(it) { u -> quote = u } }, Modifier.fillMaxWidth(), textStyle = TextStyle(fontSize = 16.5.sp, lineHeight = (16.5 * 1.5).sp, color = ink(), fontFamily = Outfit), cursorBrush = SolidColor(ink()), minLines = 4, maxLines = 12, keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences))
             }
+            quote?.let { q -> QuoteSlot(q) { quote = null } }
             Spacer(Modifier.height(6.dp))
             MentionBar(text) { text = it }
             HText(s.t("tag_hint"), 12.5f, color = sub(), modifier = Modifier.padding(start = 6.dp, bottom = 14.dp))

@@ -33,13 +33,14 @@ class A(val j: JSONObject) {
     val bgmIdx = j.int("bgm_idx")
     val text: String? = j.strN("text")
     val to: List<String> = (j.optJSONArray("to") ?: JSONArray()).objects().map { it.optString("username") }
+    val ptag: Boolean = j.optBoolean("ptag")
     val media: List<String> = (j.optJSONArray("media") ?: JSONArray()).let { a -> (0 until a.length()).mapNotNull { a.optString(it).ifEmpty { null } } }
     val files: List<JSONObject> = j.optJSONArray("files")?.objects() ?: if (url.isEmpty()) emptyList() else listOf(JSONObject().put("url", url).put("secs", secs))
 
     fun toJson(): JSONObject = JSONObject().put("id", id).put("secs", secs).put("created", created).put("desc", desc).put("url", url).put("vis", vis)
         .put("rand", rand).put("owner", owner).put("owner_name", ownerName).put("owner_avatar", ownerAvatar).put("owner_verified", ownerVerified)
         .put("popup", popup).put("pprof", pprof).put("likes", likes).put("plays", plays).put("views", views).put("liked", liked).put("long", long)
-        .put("in_rand", inRand).put("in_hups", inHups).put("comments", comments).put("saved", saved).put("files", JSONArray(files)).put("media", JSONArray(media)).put("bgm", bgm)
+        .put("in_rand", inRand).put("in_hups", inHups).put("comments", comments).put("saved", saved).put("files", JSONArray(files)).put("media", JSONArray(media)).put("ptag", ptag).put("bgm", bgm)
         .put("ai", ai).put("ai_kind", aiKind).put("owner_avatar_ai", ownerAvatarAi).put("owner_avatar_ai_kind", ownerAvatarAiKind).put("text", text)
         .put("to", JSONArray(to.map { JSONObject().put("username", it) }))
 }

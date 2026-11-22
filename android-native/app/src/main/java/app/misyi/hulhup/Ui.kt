@@ -375,9 +375,13 @@ class AnimMarkCtl { var play: ((Int?) -> Unit)? = null }
     AsyncImage(model = net, contentDescription = null, modifier = modifier, contentScale = fit)
 }
 
+/** Foto resmi akun hulhup/misyi/phipop (PNG transparan): latarnya mengikuti tema. */
+fun officialAvatar(url: String?) = url != null && Regex("/users/(phipop|misyi|hulhup)/avatar").containsMatchIn(url)
+fun officialUser(u: String?) = u == "phipop" || u == "misyi" || u == "hulhup"
+
 @Composable fun Avatar(url: String?, name: String, size: Dp) {
     Box(Modifier.size(size).clip(CircleShape), contentAlignment = Alignment.Center) {
-        Box(Modifier.fillMaxSize().background(Color(0xFF2B2B2B)), contentAlignment = Alignment.Center) { HText(if (name.isEmpty()) "?" else name.take(1).uppercase(), size.value * .42f, FontWeight.ExtraBold, Cream) }
+        Box(Modifier.fillMaxSize().background(if (officialAvatar(url)) bgOf() else Color(0xFF2B2B2B)), contentAlignment = Alignment.Center) { HText(if (name.isEmpty()) "?" else name.take(1).uppercase(), size.value * .42f, FontWeight.ExtraBold, Cream) }
         if (url != null) Img(url, Modifier.fillMaxSize())
     }
 }

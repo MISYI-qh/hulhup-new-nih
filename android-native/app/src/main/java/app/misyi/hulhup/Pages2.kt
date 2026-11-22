@@ -121,7 +121,7 @@ private fun JSONObject.list(k: String) = optJSONArray(k)?.objects() ?: emptyList
                                 Column(Modifier.padding(horizontal = 24.dp)) { In(1) { Column {
                                     Row(verticalAlignment = Alignment.CenterVertically) { HText(u.name, 24f, FontWeight.ExtraBold, ls = -.5f, modifier = Modifier.weight(1f, false)); if (u.verified) Icon(Icons.Rounded.Verified, null, Modifier.padding(start = 6.dp).size(22.dp), tint = Blue) }
                                     Spacer(Modifier.height(2.dp)); HText(u.username, 15f, color = sub())
-                                    if (u.avatarAi) AiTag(s.t(if (u.avatarAiKind == "edited") "ai_photo_edit" else "ai_photo"))
+                                    if (u.avatarAi && !officialUser(u.username)) AiTag(s.t(if (u.avatarAiKind == "edited") "ai_photo_edit" else "ai_photo"))
                                     if (u.bio.isNotEmpty()) Box(Modifier.padding(top = 12.dp)) { MentionText(u.bio, androidx.compose.ui.text.TextStyle(fontSize = 15.sp, lineHeight = 21.75.sp, fontFamily = Outfit)) }
                                     Spacer(Modifier.height(16.dp))
                                     FlowRow(horizontalArrangement = Arrangement.spacedBy(22.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -141,7 +141,7 @@ private fun JSONObject.list(k: String) = optJSONArray(k)?.objects() ?: emptyList
                                         }, loading = busy, ghost = u.isFollowing, icon = if (u.isFollowing) Icons.Rounded.Check else Icons.Rounded.PersonAdd)
                                         Spacer(Modifier.height(10.dp))
                                         val st = rel.optString("status"); val ty = rel.optString("type")
-                                        when (st) {
+                                        if (uname == "phipop" && s.me?.username != "qih") Unit else when (st) {
                                             "none" -> PBtn(s.t("rel_add"), { relAdd() }, ghost = true, icon = Icons.Rounded.FavoriteBorder)
                                             "out" -> PBtn(s.t("rel_wait_cancel"), { relReq(s.t("rel_ended")) { Api.req("DELETE", "/relations/$uname") } }, ghost = true, icon = Icons.Rounded.HourglassEmpty)
                                             "in" -> Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -424,7 +424,7 @@ fun sidecar(b: ByteArray): ByteArray {
                     }
                 }
             } }
-            if (me.avatarAi) Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { AiTag(s.t(if (me.avatarAiKind == "edited") "ai_photo_edit" else "ai_photo")) }
+            if (me.avatarAi && !officialUser(me.username)) Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { AiTag(s.t(if (me.avatarAiKind == "edited") "ai_photo_edit" else "ai_photo")) }
             Spacer(Modifier.height(28.dp))
             Column(Modifier.padding(horizontal = 24.dp)) {
                 In(1) { Field(s.t("name"), name, { name = it }, max = 40) }; Spacer(Modifier.height(16.dp))

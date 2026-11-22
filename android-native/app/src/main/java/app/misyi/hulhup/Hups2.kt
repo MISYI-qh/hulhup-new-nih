@@ -33,7 +33,8 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.text.ClickableText
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.text.selection.SelectionContainer
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -42,7 +43,7 @@ import org.json.JSONObject
 val mentionRe = Regex("${linkRe.pattern}|@([a-z0-9_]{3,20})", RegexOption.IGNORE_CASE)
 
 /** Teks dengan tautan dan @nama yang bisa diketuk (membuka profil akun itu). */
-@Composable fun MentionText(text: String, style: TextStyle, maxLines: Int = Int.MAX_VALUE, selectable: Boolean = false, hideQuote: Boolean = false) {
+@Composable fun MentionText(text: String, style: TextStyle, maxLines: Int = Int.MAX_VALUE, selectable: Boolean = false, hideQuote: Boolean = false, ptag: Boolean = false) {
     val link = acc(); val sc = rememberCoroutineScope()
     val shownMap = remember(text) { mutableListOf<Triple<Int, Int, String>>() }
     val q = remember(text, hideQuote) { if (hideQuote) hiddenRanges(text) else emptyList() }
@@ -54,6 +55,7 @@ val mentionRe = Regex("${linkRe.pattern}|@([a-z0-9_]{3,20})", RegexOption.IGNORE
             for (m in mentionRe.findAll(text)) {
                 val raw = m.value; val isTag = m.groups[2] != null
                 val shown = if (isTag) raw else trimLink(raw); if (shown.isEmpty()) continue
+                if (isTag && ptag && m.groupValues[2].equals("phipop", true)) { if (m.range.first > last) append(text.substring(last, m.range.first)); appendInlineContent("phipop", "@phipop"); last = m.range.first + shown.length; continue }
                 if (!isTag && m.range.first in qs) { if (m.range.first > last) append(text.substring(last, m.range.first).trimEnd()); last = m.range.first + shown.length; continue }
                 if (m.range.first > last) append(text.substring(last, m.range.first))
                 val st = length
@@ -67,9 +69,14 @@ val mentionRe = Regex("${linkRe.pattern}|@([a-z0-9_]{3,20})", RegexOption.IGNORE
     if (q.isNotEmpty() && ann.text.isBlank()) return
     val st = style.copy(color = ink(), fontFamily = Outfit)
     val body: @Composable () -> Unit = {
-        ClickableText(ann, style = st, maxLines = maxLines, overflow = if (maxLines == Int.MAX_VALUE) TextOverflow.Clip else TextOverflow.Ellipsis, onClick = { off ->
-            shownMap.firstOrNull { off >= it.first && off < it.second }?.let { (_, _, v) -> if (v.startsWith("@")) go("/@${v.substring(1).lowercase()}") else sc.launch { openLink(v) } }
-        })
+        var lay by remember { mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null) }
+        val fsz = if (st.fontSize.isSp) st.fontSize.value else 15f
+        val inl = mapOf("phipop" to androidx.compose.foundation.text.InlineTextContent(androidx.compose.ui.text.Placeholder((fsz * 5.6f).sp, (fsz * 1.4f).sp, androidx.compose.ui.text.PlaceholderVerticalAlign.TextCenter)) { PhipopChip(fsz) })
+        androidx.compose.foundation.text.BasicText(ann, style = st, maxLines = maxLines, overflow = if (maxLines == Int.MAX_VALUE) TextOverflow.Clip else TextOverflow.Ellipsis, inlineContent = inl, onTextLayout = { lay = it },
+            modifier = Modifier.pointerInput(ann) { detectTapGestures { pos ->
+                val l = lay ?: return@detectTapGestures; val off = l.getOffsetForPosition(pos)
+                shownMap.firstOrNull { off >= it.first && off < it.second }?.let { (_, _, v) -> if (v.startsWith("@")) go("/@${v.substring(1).lowercase()}") else sc.launch { openLink(v) } }
+            } })
     }
     if (selectable) SelectionContainer { body() } else body()
 }
@@ -81,7 +88,7 @@ val mentionRe = Regex("${linkRe.pattern}|@([a-z0-9_]{3,20})", RegexOption.IGNORE
     LaunchedEffect(q) {
         if (q.isEmpty()) { users = emptyList(); return@LaunchedEffect }
         delay(280)
-        try { val j = Api.req("GET", "/search?q=${java.net.URLEncoder.encode(q, "UTF-8")}"); users = (j.optJSONArray("users") ?: org.json.JSONArray()).objects().take(6) } catch (_: Exception) {}
+        try { val j = Api.req("GET", "/search?m=1&q=${java.net.URLEncoder.encode(q, "UTF-8")}"); users = (j.optJSONArray("users") ?: org.json.JSONArray()).objects().take(6) } catch (_: Exception) {}
     }
     if (users.isEmpty()) return
     LazyRow(Modifier.height(46.dp)) {
@@ -148,12 +155,14 @@ suspend fun postMenu(a: A, onDeleted: (() -> Unit)? = null) {
         Column {
             PBtn(s.t("share"), { done("share") }, ghost = true, icon = Icons.Rounded.IosShare)
             Spacer(Modifier.height(10.dp))
+            if (s.me != null) { PBtn(s.t("quote"), { done("quote") }, ghost = true, icon = Icons.Rounded.FormatQuote); Spacer(Modifier.height(10.dp)) }
             if (mine) PBtn(s.t("delete"), { done("delete") }, ghost = true, icon = Icons.Rounded.DeleteOutline, fgc = Heart)
             else if (s.me != null) PBtn(s.t("report"), { done("report") }, ghost = true, icon = Icons.Outlined.Flag)
         }
     }
     when (r) {
         "share" -> sharePost(a)
+        "quote" -> go("/new?quote=" + java.net.URLEncoder.encode(postLink(a.id), "UTF-8"))
         "delete" -> {
             if (!confirm(s.t("delete"), s.t("delete_audio_q"), s.t("delete"), danger = true)) return
             try { Api.req("DELETE", "/audios/${a.id}"); onDeleted?.invoke() } catch (e: Exception) { toast(s.err(e), true) }
@@ -175,7 +184,7 @@ suspend fun postMenu(a: A, onDeleted: (() -> Unit)? = null) {
             OwnerRow(a, more = { sc.launch { postMenu(a, onDeleted) } })
             Box(Modifier.padding(top = 8.dp, end = 8.dp)) { AudChip(a.rand, a.to) }
             // Di daftar Hups dan profil, teks post tampil penuh (pemotongan + Selengkapnya hanya di popup Acak).
-            if (text.isNotEmpty()) Box(Modifier.padding(0.dp, 10.dp, 8.dp, 0.dp)) { MentionText(text, st, hideQuote = true) }
+            if (text.isNotEmpty()) Box(Modifier.padding(0.dp, 10.dp, 8.dp, 0.dp)) { MentionText(text, st, hideQuote = true, ptag = a.ptag) }
             val qr = quoteRef(text)
             if (qr != null) QuoteCard(qr.id)
             MediaStrip(postMedia(text, a.media))

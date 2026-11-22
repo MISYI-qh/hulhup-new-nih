@@ -21,7 +21,7 @@ object Api {
     val base: String = BuildConfig.API_URL
     var token: String? = null
     private lateinit var sp: SharedPreferences
-    private val client = OkHttpClient.Builder().connectTimeout(25, TimeUnit.SECONDS).readTimeout(60, TimeUnit.SECONDS).writeTimeout(60, TimeUnit.SECONDS).build()
+    private val client = OkHttpClient.Builder().connectTimeout(25, TimeUnit.SECONDS).readTimeout(90, TimeUnit.SECONDS).writeTimeout(60, TimeUnit.SECONDS).build()
     private val media = LinkedHashMap<String, ByteArray>()
 
     fun init(c: Context) { sp = c.getSharedPreferences("hulhup", Context.MODE_PRIVATE); token = sp.getString("token", null) }
