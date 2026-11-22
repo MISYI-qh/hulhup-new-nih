@@ -3,14 +3,31 @@
 
 const lower = (s) => Array.isArray(s) ? s.map(lower) : s && typeof s === 'object' ? Object.fromEntries(Object.entries(s).map(([k, v]) => [k, k === 'type' && typeof v === 'string' ? v.toLowerCase() : lower(v)])) : s;
 
+let cvModels = []; let cvAt = 0;
+// tanpa daftar model manual: tanya /models milik Clouvia lalu pilih yang cocok untuk ngobrol (di-cache 1 jam)
+async function discover() {
+  const cv = process.env.CLAUVIA_API_KEY; if (!cv || process.env.CLAUVIA_MODELS || Date.now() - cvAt < 3600000) return; cvAt = Date.now();
+  const base = (process.env.CLAUVIA_BASE_URL || 'https://router.clouvia.id/v1').replace(/\/+$/, '');
+  try {
+    const r = await fetch(base + '/models', { headers: { authorization: 'Bearer ' + cv }, signal: AbortSignal.timeout(6000) });
+    if (!r.ok) { console.error('phipop clouvia /models', r.status, String(await r.text().catch(() => '')).slice(0, 200)); return; }
+    const ids = ((await r.json())?.data || []).map((x) => x.id).filter(Boolean);
+    const want = [/gemini.*flash(?!.*(lite|image|tts))/i, /gpt-4o-mini|gpt-4\.1-mini|gpt-5.*mini/i, /claude.*(haiku|sonnet)/i, /deepseek.*(chat|v3)/i, /llama.*(70b|maverick)/i, /qwen/i];
+    const pick = []; for (const w of want) { const m = ids.find((i) => w.test(i) && !pick.includes(i)); if (m) pick.push(m); }
+    cvModels = pick.length ? pick.slice(0, 3) : ids.slice(0, 2);
+    console.error('phipop clouvia models', ids.length, '->', cvModels.join(','));
+  } catch (e) { console.error('phipop clouvia /models gagal', String(e.message || e).slice(0, 100)); }
+}
+
 export function providers() {
   const list = [];
   const or = process.env.OPENROUTER_API_KEY;
   if (or) for (const m of (process.env.PHIPOP_OR_MODELS || 'google/gemini-2.5-flash,openai/gpt-4o-mini').split(',').map((x) => x.trim()).filter(Boolean))
     list.push({ name: 'openrouter', url: 'https://openrouter.ai/api/v1/chat/completions', key: or, model: m, headers: { 'HTTP-Referer': 'https://hulhup.my.id', 'X-Title': 'Hulhup' } });
-  const cv = process.env.CLAUVIA_API_KEY, base = process.env.CLAUVIA_BASE_URL;
-  if (cv && base) for (const m of (process.env.CLAUVIA_MODELS || '').split(',').map((x) => x.trim()).filter(Boolean))
-    list.push({ name: 'clauvia', url: base.replace(/\/+$/, '') + '/chat/completions', key: cv, model: m, headers: {} });
+  const cv = process.env.CLAUVIA_API_KEY;
+  if (cv) { const base = (process.env.CLAUVIA_BASE_URL || 'https://router.clouvia.id/v1').replace(/\/+$/, '');
+    const ms = (process.env.CLAUVIA_MODELS || '').split(',').map((x) => x.trim()).filter(Boolean);
+    for (const m of ms.length ? ms : cvModels.length ? cvModels : ['']) if (m || !ms.length) list.push({ name: 'clouvia', url: base + '/chat/completions', key: cv, model: m, headers: {}, base }); }
   return list;
 }
 
@@ -53,7 +70,7 @@ export function fromOpenAI(j) {
 const cool = new Map();
 /** Coba tiap penyedia cadangan sampai batas waktu; lempar galat terakhir bila semua gagal. */
 export async function altcall(body, deadline, perCall = 20000) {
-  let last = null;
+  let last = null; await discover();
   for (const p of providers()) {
     const id = p.name + p.model; if ((cool.get(id) || 0) > Date.now()) continue;
     const left = deadline - Date.now(); if (left < 3000) break;
