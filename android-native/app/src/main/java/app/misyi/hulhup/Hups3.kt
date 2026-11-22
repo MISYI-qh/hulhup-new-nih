@@ -178,7 +178,11 @@ import org.json.JSONObject
         else Column(Modifier.fillMaxWidth().background(cardC()).imePadding().navigationBarsPadding().padding(12.dp, 8.dp, 12.dp, 10.dp)) {
             MentionBar(input.text) { input = TextFieldValue(it, TextRange(it.length)) }
             if (replyTo != null) Row(Modifier.padding(bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                HText(s.t("replying").replace("{n}", replyTo!!.optString("name")), 13f, FontWeight.Bold, acc(), Modifier.weight(1f))
+                Column(Modifier.weight(1f)) {
+                    HText(s.t("replying").replace("{n}", replyTo!!.optString("name")), 13f, FontWeight.Bold, acc())
+                    val snip = replyTo!!.optString("text").replace(Regex("\\s+"), " ").trim().take(120)
+                    if (snip.isNotEmpty()) HText(snip, 12.5f, color = sub(), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
                 Tap(onTap = { val cur = input.text; if (cur.startsWith(autoTag)) input = TextFieldValue(cur.substring(autoTag.length)); autoTag = ""; replyTo = null }) { Icon(Icons.Rounded.Close, null, Modifier.padding(11.dp).size(26.dp), tint = sub()) }
             }
             cq?.let { QuoteSlot(it) { cq = null } }

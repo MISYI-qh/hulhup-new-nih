@@ -430,7 +430,9 @@ private suspend fun fetchQuote(id: Int): A? {
         }
         return
     }
-    val text = (q.text ?: q.desc).trim()
+    val raw = (q.text ?: q.desc).trim()
+    val text = remember(raw) { hiddenRanges(raw).sortedByDescending { it.at }.fold(raw) { acc, r -> acc.substring(0, r.at).trimEnd() + acc.substring(r.at + r.len).trimStart().let { x -> if (x.isEmpty()) "" else "\n$x" } }.trim() }
+    val qMedia = remember(raw, q.media) { postMedia(raw, q.media).filter { quoteRef(it) == null } }
     Tap(Modifier.padding(top = 10.dp, end = 8.dp), .99f, onTap = { openPost(q) }) {
         Column(Modifier.fillMaxWidth().clip(shape).border(1.dp, ink().copy(alpha = .14f), shape).padding(14.dp, 12.dp, 14.dp, 10.dp)) {
             if (q.pprof) Row(verticalAlignment = Alignment.CenterVertically) {
@@ -440,6 +442,7 @@ private suspend fun fetchQuote(id: Int): A? {
                 HText("  ${q.owner} · ${s.`when`(q.created)}", 13f, color = sub(), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
             }
             if (text.isNotEmpty()) HText(text.trimEnd(), 15f, modifier = Modifier.padding(top = 8.dp), maxLines = 6, overflow = TextOverflow.Ellipsis, lh = 21f)
+            if (qMedia.isNotEmpty()) MediaStrip(qMedia)
             if (q.files.isNotEmpty() && !q.bgm) Box(Modifier.padding(top = 4.dp)) { FileBar(fileKey(q, 0), q.files[0].optString("url"), q.files[0].optInt("secs")) { Store.countPlay(q) } }
             Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(18.dp), verticalAlignment = Alignment.CenterVertically) {
                 Row(verticalAlignment = Alignment.CenterVertically) { HIcon(HK.sorot, size = 16.dp, color = sub()); Spacer(Modifier.width(5.dp)); HText("${q.likes}", 13f, FontWeight.SemiBold, sub()) }

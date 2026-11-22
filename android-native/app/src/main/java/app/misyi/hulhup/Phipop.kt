@@ -1,6 +1,7 @@
 package app.misyi.hulhup
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -144,6 +145,7 @@ private fun fmtCode(s: String): String = s.uppercase().filter { it.isLetterOrDig
 
 @Composable private fun ColumnScope.PhipopChat(cur: JSONObject, msgs: androidx.compose.runtime.snapshots.SnapshotStateList<JSONObject>, setSt: (JSONObject) -> Unit) {
     val s = Store; val sc = rememberCoroutineScope()
+    var replyTo by remember { mutableStateOf<JSONObject?>(null) }
     var text by remember { mutableStateOf("") }; var busy by remember { mutableStateOf(false) }; var loaded by remember { mutableStateOf(false) }
     val ls = rememberLazyListState()
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
@@ -162,12 +164,12 @@ private fun fmtCode(s: String): String = s.uppercase().filter { it.isLetterOrDig
     @Suppress("UNUSED_EXPRESSION") now
     fun send() {
         val t = text.trim(); if (t.isEmpty() || busy || out) return
-        busy = true; text = ""
+        busy = true; text = ""; val sentReply = replyTo; replyTo = null
         val mine = JSONObject().put("id", -System.nanoTime()).put("role", "user").put("text", t).put("created", System.currentTimeMillis()); msgs.add(mine)
         sc.launch {
             var rid = 0L
             try {
-                val j = Api.req("POST", "/phipop/chat", JSONObject().put("text", t).put("async", true))
+                val j = Api.req("POST", "/phipop/chat", JSONObject().put("text", t).put("async", true).apply { val rt = replyTo; if (rt != null && rt.optLong("id") > 0) put("reply_to", rt.optLong("id")) })
                 setSt(j); rid = j.optLong("id")
                 val its = j.optJSONArray("items")
                 val row = if (its != null && its.length() > 0) its.getJSONObject(its.length() - 1) else JSONObject().put("id", rid).put("role", "phipop").put("text", "").put("status", "run")
@@ -181,11 +183,11 @@ private fun fmtCode(s: String): String = s.uppercase().filter { it.isLetterOrDig
                     if (r.optString("status") != "run") { if (r.optString("status") == "err") toast(r.optString("text").ifEmpty { s.t("e_phipop_busy") }, true); break }
                 }
             } catch (e: ApiErr) {
-                if (rid == 0L) { msgs.remove(mine); text = t }
+                if (rid == 0L) { msgs.remove(mine); text = t; replyTo = sentReply }
                 else { val i = msgs.indexOfFirst { it.optLong("id") == rid }; if (i >= 0) msgs[i] = JSONObject().put("id", rid).put("role", "phipop").put("status", "err").put("text", s.err(e)) }
                 toast(s.err(e), true)
                 if (e.code == "phipop_limit" || e.code == "phipop_locked") { try { setSt(Api.req("GET", "/phipop/status")) } catch (_: Exception) {} }
-            } catch (e: Exception) { msgs.remove(mine); text = t; toast(s.err(e), true) }
+            } catch (e: Exception) { msgs.remove(mine); text = t; replyTo = sentReply; toast(s.err(e), true) }
             busy = false
         }
     }
@@ -197,8 +199,16 @@ private fun fmtCode(s: String): String = s.uppercase().filter { it.isLetterOrDig
             val links = (m.optJSONArray("links") ?: JSONArray()).let { ar -> (0 until ar.length()).map { ar.optString(it) }.filter { it.isNotEmpty() } }
             val raw = m.optString("text")
             val shownText = if (mineB) { val q = quoteRef(raw); if (q != null) textWithout(raw, listOf(raw.substring(q.at, q.at + q.len))) else raw } else textWithout(raw, links)
+            val rp = m.optJSONObject("reply")
             Column(Modifier.fillMaxWidth(), horizontalAlignment = if (mineB) Alignment.End else Alignment.Start) {
-                if (run || shownText.isNotEmpty()) Row(horizontalArrangement = if (mineB) Arrangement.End else Arrangement.Start, verticalAlignment = Alignment.Bottom) {
+                if (rp != null) Row(Modifier.widthIn(max = 290.dp).padding(bottom = 4.dp).height(androidx.compose.foundation.layout.IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.fillMaxHeight().width(3.dp).background(Brand, RoundedCornerShape(2.dp))); Spacer(Modifier.width(8.dp))
+                    Column {
+                        HText(if (rp.optString("role") == "user") s.t("phipop_you") else "Phipop", 12f, FontWeight.ExtraBold, sub())
+                        HText(rp.optString("text").replace(Regex("\\s+"), " ").trim().take(120), 12.5f, color = sub(), maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    }
+                }
+                if (run || shownText.isNotEmpty()) Row(Modifier.then(if (!run && m.optLong("id") > 0) Modifier.clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null) { replyTo = m } else Modifier), horizontalArrangement = if (mineB) Arrangement.End else Arrangement.Start, verticalAlignment = Alignment.Bottom) {
                     if (!mineB) { PhipopLogo(28.dp); Spacer(Modifier.width(8.dp)) }
                     Box(Modifier.widthIn(max = 290.dp).clip(RoundedCornerShape(20.dp, 20.dp, if (mineB) 6.dp else 20.dp, if (mineB) 20.dp else 6.dp)).background(if (mineB) ink() else soft()).padding(14.dp, 10.dp)) {
                         if (run) { val st = m.optJSONArray("steps"); val last = if (st != null && st.length() > 0) st.optJSONObject(st.length() - 1) else null; PhipopRunRow(last?.optString("k"), last?.optString("t")) }
@@ -217,6 +227,16 @@ private fun fmtCode(s: String): String = s.uppercase().filter { it.isLetterOrDig
             else if (resetAt > 0) s.t("phipop_left").replace("{l}", "$left").replace("{n}", "$limit").replace("{t}", leftTime(resetAt)) else s.t("phipop_left0").replace("{l}", "$left").replace("{n}", "$limit")
         if (out) HText(s.t("phipop_out").replace("{t}", if (resetAt > 0) leftTime(resetAt) else "…"), 13.5f, FontWeight.SemiBold, modifier = Modifier.padding(start = 6.dp, bottom = 8.dp))
         else HText(info, 12f, color = sub(), modifier = Modifier.padding(start = 6.dp, bottom = 6.dp))
+        replyTo?.let { rt ->
+            Row(Modifier.padding(bottom = 8.dp).fillMaxWidth().background(soft(), RoundedCornerShape(16.dp)).padding(12.dp, 8.dp, 4.dp, 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.width(3.dp).height(30.dp).background(Brand, RoundedCornerShape(2.dp))); Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    HText(s.t("phipop_replying").replace("{n}", if (rt.optString("role") == "user") s.t("phipop_you") else "Phipop"), 12.5f, FontWeight.ExtraBold)
+                    HText(rt.optString("text").replace(Regex("\\s+"), " ").trim().take(120), 12.5f, color = sub(), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                }
+                Tap(onTap = { replyTo = null }) { Icon(Icons.Rounded.Close, null, Modifier.padding(10.dp).size(20.dp), tint = sub()) }
+            }
+        }
         Row(verticalAlignment = Alignment.Bottom) {
             Box(Modifier.weight(1f).alpha(if (out) .45f else 1f)) { PField(text, { text = it.take(600) }, s.t("phipop_input_ph"), max = 5, enabled = !out) }
             Spacer(Modifier.width(10.dp))

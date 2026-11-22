@@ -253,6 +253,8 @@ object Strings {
         "pa_posting" to listOf("Phipop lagi nulis, tunggu sampai 1 menit…", "Phipop is writing, wait up to a minute…"),
         "pa_done" to listOf("Beres", "Done"),
         "pa_cancel_hint" to listOf("Isi teks buat posting persis, atau kosongkan biar Phipop yang nulis.", "Fill text to post it exactly, or leave empty to let Phipop write."),
+        "phipop_you" to listOf("Kamu", "You"),
+        "phipop_replying" to listOf("Membalas {n}", "Replying to {n}"),
         "write_hups" to listOf("Tulis sesuatu…", "Write something…"),
         "e_need_audio" to listOf("Tambahkan 1 audio untuk memposting", "Add 1 audio to post"),
         "e_no_comment_audio" to listOf("Komentar tidak boleh berisi audio", "Comments cannot contain audio"),
