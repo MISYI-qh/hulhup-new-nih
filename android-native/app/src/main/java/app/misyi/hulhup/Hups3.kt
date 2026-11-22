@@ -181,7 +181,7 @@ import org.json.JSONObject
                 Column(Modifier.weight(1f)) {
                     HText(s.t("replying").replace("{n}", replyTo!!.optString("name")), 13f, FontWeight.Bold, acc())
                     val snip = replyTo!!.optString("text").replace(Regex("\\s+"), " ").trim().take(120)
-                    if (snip.isNotEmpty()) HText(snip, 12.5f, color = sub(), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (snip.isNotEmpty()) HText(snip, 12.5f, color = sub(), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                 }
                 Tap(onTap = { val cur = input.text; if (cur.startsWith(autoTag)) input = TextFieldValue(cur.substring(autoTag.length)); autoTag = ""; replyTo = null }) { Icon(Icons.Rounded.Close, null, Modifier.padding(11.dp).size(26.dp), tint = sub()) }
             }
