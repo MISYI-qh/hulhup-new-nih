@@ -449,6 +449,15 @@ test('phipop v2: tools hanya publik, tag khusus, relationship, chat async, kelol
   let cm; for (let i = 0; i < 30; i++) { cm = (await call('GET', `/posts/${p1.id}/comments`, { token: a })).items; if (cm.length && !cm[0].ph) break; await new Promise((r) => setTimeout(r, 100)); }
   assert.equal(cm[0].username, 'phipop'); assert.equal(cm[0].ph, '');
   assert.equal((await call('GET', `/posts/${p2.id}/comments`, { token: b })).items.length, 0); // tanpa akses: tidak dijawab
+  // 10 komentar pertama di postingan Phipop dijawab otomatis: tanpa akses, tanpa tag
+  const own = await call('POST', '/phipop/admin/post', { token: adm, body: { text: 'post otomatis phipop' } });
+  const waitPh = async (n) => { let r; for (let i = 0; i < 40; i++) { r = (await call('GET', `/posts/${own.id}/comments`, { token: b })).items; if (r.filter((x) => x.username === 'phipop' && !x.ph).length >= n) break; await new Promise((z) => setTimeout(z, 100)); } return r; };
+  for (let i = 0; i < 11; i++) await call('POST', `/posts/${own.id}/comments`, { token: b, body: { text: 'komen ' + i } });
+  const rr2 = await waitPh(10); await new Promise((z) => setTimeout(z, 600));
+  const fin = (await call('GET', `/posts/${own.id}/comments`, { token: b })).items;
+  assert.equal(fin.filter((x) => x.username === 'phipop' && !x.ph).length, 10); // komentar ke-11 tidak dijawab
+  assert.equal(fin.filter((x) => x.username === 'phipop').length, 10);
+  await call('DELETE', `/phipop/admin/posts/${own.id}`, { token: adm });
   // tag di komentar
   const c1 = await call('POST', `/posts/${p1.id}/comments`, { token: a, body: { text: '@phipop lanjut' } });
   const c2 = await call('POST', `/posts/${p1.id}/comments`, { token: b, body: { text: '@phipop dong' } });

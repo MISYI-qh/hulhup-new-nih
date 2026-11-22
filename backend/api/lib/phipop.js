@@ -215,17 +215,18 @@ async function core(uid, input, { chat = false, ctx = '', allowId = 0, onStep, w
 
 /** Satu pertanyaan ke Phipop (tanpa riwayat tersimpan kecuali chat=true). Mengembalikan teks jawaban. */
 export async function ask(uid, text, opts = {}) { return (await askFull(uid, text, opts)).reply; }
-export async function askFull(uid, text, { chat = false, ctx = '', allowId = 0, onStep, who = '', where, priv = false } = {}) {
-  const a = await accessOf(uid);
-  if (!a) throw new ApiErr('phipop_locked', 403);
+export async function askFull(uid, text, { chat = false, ctx = '', allowId = 0, onStep, who = '', where, priv = false, free = false } = {}) {
+  // free: balasan otomatis di postingan Phipop sendiri (10 komentar pertama): tanpa akses, tanpa tag, tanpa memotong jatah
+  const a = free ? null : await accessOf(uid);
+  if (!free && !a) throw new ApiErr('phipop_locked', 403);
   const input = cleanInput(text);
   if (!input) throw new ApiErr('empty');
-  if (!(await consume(uid))) throw new ApiErr('phipop_limit', 429);
+  if (!free && !(await consume(uid))) throw new ApiErr('phipop_limit', 429);
   try {
     const r = await core(uid, input, { chat, ctx, allowId, onStep, who, where: where || (chat ? 'chat' : 'komentar'), priv });
     if (chat) await q('insert into phipop_chat(user_id, role, body, created, links, steps) values ($1,$2,$3,$4,$5::jsonb,$6::jsonb),($1,$7,$8,$9,$10::jsonb,$11::jsonb)', [uid, 'user', input, now(), '[]', '[]', 'phipop', r.reply, now() + 1, JSON.stringify(r.links), JSON.stringify(r.steps)]);
     return r;
-  } catch (e) { await refund(uid); throw e; }
+  } catch (e) { if (!free) await refund(uid); throw e; }
 }
 
 /** Chat berlatar belakang: simpan pesan pengguna dan baris jawaban "sedang jalan", lalu jalankan sambil progresnya bisa di-poll. */

@@ -1167,7 +1167,13 @@ route('POST', /^\/posts\/(\d+)\/comments$/, async (c, m) => {
   } catch (e) { if (key) await delAudio('mongo', key); throw e; }
   await recount(post.id);
   await mentionNotify(post.id, u.id, mentionsOf(text), [parentOwner, Number(post.owner)].filter(Boolean), snip);
-  if (PH_TAG.test(text) && await PH.accessOf(u.id)) { await q('update comments set ptag=true where id=$1', [id]); await PH.later(phipopReply(u, post.id, id, text)); }
+  const tagged = PH_TAG.test(text) && await PH.accessOf(u.id);
+  if (tagged) await q('update comments set ptag=true where id=$1', [id]);
+  // 10 komentar pertama di postingan Phipop dijawab otomatis: siapa pun, tanpa akses, tanpa tag
+  let auto = false;
+  const phu = await PH.phipopUser();
+  if (phu && Number(post.owner) === Number(phu.id) && u.username !== PH.PH_USER) auto = Number((await one(`select count(*)::int n from comments c join users cu on cu.id=c.owner where c.post_id=$1 and c.id<=$2 and cu.username<>$3 and not c.pending`, [post.id, id, PH.PH_USER])).n) <= 10;
+  if (auto || tagged) await PH.later(phipopReply(u, post.id, id, text, auto));
   return { ok: true, id };
 });
 
@@ -1409,7 +1415,7 @@ route('POST', /^\/phipop\/admin\/grant$/, async (c) => {
 
 /** Tag @phipop di post/komentar: jawab sebagai komentar (hanya bila pengirim punya akses). */
 const PH_TAG = /(^|[^a-z0-9_])@phipop(?![a-z0-9_])/i;
-async function phipopReply(u, postId, parentId, text) {
+async function phipopReply(u, postId, parentId, text, free = false) {
   let ph = null, cid = 0;
   try {
     ph = await PH.phipopUser(); if (!ph || Number(u.id) === Number(ph.id)) return;
@@ -1423,7 +1429,7 @@ async function phipopReply(u, postId, parentId, text) {
     const priv = !String(post.rand || 'public').split(',').includes('public');
     let reply, links = [];
     try {
-      const r = await PH.askFull(u.id, clean, { ctx, allowId: Number(postId), who: `@${u.username}`, where: 'komentar', priv, onStep: (st) => { q('update comments set ph_state=$2 where id=$1', [cid, label(st)]).catch(() => {}); } });
+      const r = await PH.askFull(u.id, clean, { ctx, allowId: Number(postId), who: `@${u.username}`, where: 'komentar', priv, free, onStep: (st) => { q('update comments set ph_state=$2 where id=$1', [cid, label(st)]).catch(() => {}); } });
       reply = r.reply; links = r.links;
     } catch (e) { if (e.code === 'phipop_limit') reply = 'jatah lu abis dulu. nunggu reset, sabar dikit napa.'; else throw e; }
     const web = links.filter((x) => !/hulhup\.my\.id\/p\//.test(x)), hul = links.find((x) => /hulhup\.my\.id\/p\//.test(x));
