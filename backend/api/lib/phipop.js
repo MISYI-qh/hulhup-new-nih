@@ -1,5 +1,6 @@
 // Phipop: AI Hulhup. Mesin di belakangnya dirahasiakan penuh; pengguna hanya melihat "Phipop".
 // Seluruh data (memori, pencarian, log) ada di database Hulhup sendiri; ke mesin hanya dikirim cuplikan yang dibutuhkan satu jawaban.
+import { altcall, providers } from './phalt.js';
 import { randomInt } from 'node:crypto';
 import { q, one, many } from './db.js';
 import { ApiErr, now } from './util.js';
@@ -92,7 +93,7 @@ async function gcall(body0, deadline, perCall = 12000) {
   };
   let last = null;
   const all = modelsList().filter((m, i, a) => a.indexOf(m) === i);
-  const order = [...all.filter(ready), ...all.filter((m) => !ready(m))];
+  const order = providers().length ? all.filter(ready) : [...all.filter(ready), ...all.filter((m) => !ready(m))];
   for (const model of order) {
     const left = deadline - Date.now(); if (left < 2500) break;
     try {
@@ -110,6 +111,7 @@ async function gcall(body0, deadline, perCall = 12000) {
       if (e.status && ![404, 429, 500, 502, 503, 504].includes(e.status)) break;
     }
   }
+  try { return await altcall(body, Math.max(deadline, Date.now() + 8000)); } catch (e2) { last = last || e2; }
   throw last ?? new Error('upstream');
 }
 const textOf = (j) => (j?.candidates?.[0]?.content?.parts || []).filter((p) => !p.thought && p.text).map((p) => p.text).join('');
