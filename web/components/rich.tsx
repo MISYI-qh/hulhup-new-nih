@@ -14,8 +14,9 @@ import { VPlayer } from './vplayer';
 export function Avatar({ url, name, size }: { url?: string | null; name: string; size: number }) {
   const [bad, setBad] = useState(false);
   const init = (name || '?').trim().charAt(0).toUpperCase() || '?';
-  return <span className="avatar" style={{ width: size, height: size, fontSize: size * .42 }}>
-    {url && !bad ? <img src={mediaUrl(url)} alt="" width={size} height={size} loading="lazy" decoding="async" onError={() => setBad(true)} /> : init}</span>;
+  const off = !!url && /\/users\/(phipop|misyi|hulhup)\/avatar/.test(url);
+  return <span className="avatar" style={{ width: size, height: size, fontSize: size * .42, ...(off ? { background: 'var(--bg)' } : {}) }}>
+    {url && !bad ? <img src={mediaUrl(url)} alt="" width={size} height={size} loading="lazy" decoding="async" style={off ? { objectFit: 'contain' } : undefined} onError={() => setBad(true)} /> : init}</span>;
 }
 export const Verified = ({ size = 15 }: { size?: number }) => <Icon n="verified_rounded" size={size} color="var(--blue)" style={{ marginLeft: 4 }} />;
 
@@ -30,7 +31,15 @@ export function openLink(raw: string, push: (p: string) => void) {
 }
 
 /** Teks dengan @nama dan tautan yang bisa diketuk. */
-export function MentionText({ text, className, style, clamp, hideQuote }: { text: string; className?: string; style?: React.CSSProperties; clamp?: number; hideQuote?: boolean }) {
+/** Tag khusus @phipop (ala Meta AI di Threads): hanya untuk akun yang punya akses. */
+export const PhTag = () => <Link href="/@phipop" className="phtag" onClick={(e) => e.stopPropagation()}><img src="/phipop.png" alt="" width={18} height={18} />Phipop</Link>;
+/** Baris "Phipop lagi mikir/nyari" (animasi). label = "run:<jenis>|<teks>". */
+export function PhRun({ label, size = 26 }: { label?: string; size?: number }) {
+  const m = /^run:([a-z]+)(?:\|(.*))?$/.exec(label ?? ''); const k = m?.[1] ?? 'mikir'; const t = m?.[2] || 'mikir…';
+  const ic = k === 'web' ? 'language_rounded' : k === 'page' ? 'link_rounded' : k === 'media' ? 'headphones_rounded' : null;
+  return <div className="phrun"><span className="phlogo" style={{ width: size, height: size }}><img src="/phipop.png" alt="" width={size} height={size} /></span>{ic ? <Icon n={ic} size={16} color="var(--sub)" /> : null}<span className="phl">{t}</span><i /><i /><i /></div>;
+}
+export function MentionText({ text, className, style, clamp, hideQuote, ptag }: { text: string; className?: string; style?: React.CSSProperties; clamp?: number; hideQuote?: boolean; ptag?: boolean }) {
   const out: React.ReactNode[] = []; let last = 0, k = 0; const qr = hideQuote ? quoteRef(text) : null; const hid = hideQuote ? (qr ? [qr] : mediaRefs(text, !!store.me)) : []; const hat = new Set(hid.map((x) => x.at)); const q = hid.length ? hid[0] : null;
   const re = new RegExp(`${linkRe().source}|@([a-z0-9_]{3,20})`, 'gi');
   for (const m of text.matchAll(re)) {
@@ -39,7 +48,8 @@ export function MentionText({ text, className, style, clamp, hideQuote }: { text
     const at = m.index!;
     if (hat.size && !tag && hat.has(at)) { if (at > last) out.push(text.slice(last, at).replace(/\s+$/, '')); last = at + shown.length; continue; }
     if (at > last) out.push(text.slice(last, at));
-    out.push(tag
+    out.push(tag && ptag && m[2].toLowerCase() === 'phipop' ? <PhTag key={k++} />
+      : tag
       ? <Link key={k++} href={`/@${m[2].toLowerCase()}`} className="mention" onClick={(e) => e.stopPropagation()}>{shown}</Link>
       : <a key={k++} className="hlink" href={linkUri(shown)?.toString() ?? '#'} target="_blank" rel="noopener noreferrer nofollow ugc" onClick={(e) => e.stopPropagation()}>{shown}</a>);
     last = at + shown.length;
@@ -57,7 +67,7 @@ export function MentionBar({ value, onPick }: { value: string; onPick: (v: strin
     if (nq === q.current) return; q.current = nq; clearTimeout(t.current);
     if (!nq) { setUsers([]); return; }
     const my = ++seq.current;
-    t.current = setTimeout(async () => { try { const j = await Api.req('GET', `/search?q=${encodeURIComponent(nq)}`); if (my === seq.current) setUsers((j.users as any[]).slice(0, 6)); } catch {} }, 280);
+    t.current = setTimeout(async () => { try { const j = await Api.req('GET', `/search?q=${encodeURIComponent(nq)}&m=1`); if (my === seq.current) setUsers((j.users as any[]).slice(0, 6)); } catch {} }, 280);
   }, [value]);
   useEffect(() => () => clearTimeout(t.current), []);
   if (!users.length) return null;
@@ -206,5 +216,16 @@ export function MediaStrip({ items }: { items: string[] }) {
   return <div className="mstrip" onClick={(e) => e.stopPropagation()}>
     {items.map((u, i) => <div key={u + i} className="msi" style={one ? { width: '100%' } : undefined}><LinkEmbed url={u} /></div>)}
   </div>;
+}
+/** Kartu kutipan di penulis (ala Threads): tautan post Hulhup keluar dari kolom teks dan jadi kartu dengan tombol hapus. */
+export function QuoteSlot({ url, onClear }: { url: string; onClear: () => void }) {
+  const q = quoteRef(url); if (!q) return null;
+  return <div className="qslot"><QuoteCard id={q.id} /><button className="tap" aria-label="Hapus kutipan" onClick={onClear}><Icon n="close_rounded" size={16} /></button></div>;
+}
+/** Pisahkan tautan post Hulhup pertama dari teks (kalau belum ada kutipan terpasang). */
+export function pullQuote(text: string): { text: string; quote: string | null } {
+  const q = quoteRef(text); if (!q) return { text, quote: null };
+  const url = text.slice(q.at, q.at + q.len);
+  return { text: (text.slice(0, q.at) + text.slice(q.at + q.len)).replace(/[ \t]+\n/g, '\n').replace(/^\s+/, '').replace(/ {2,}/g, ' '), quote: url };
 }
 export { firstUrl, quoteRef };

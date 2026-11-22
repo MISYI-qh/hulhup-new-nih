@@ -155,6 +155,7 @@ export function postMenu(a: A, onDeleted?: () => void) {
   const s = store, mine = s.me?.username === a.owner;
   return sheet((close) => <div className="stack" style={{ gap: 10 }}>
     <PBtn ghost icon="ios_share_rounded" onClick={() => { close(); sharePost(a); }}>{s.t('share')}</PBtn>
+    {s.me ? <PBtn ghost icon="format_quote_rounded" onClick={() => { close(); location.assign(`/new?quote=${encodeURIComponent(postLink(a.id))}`); }}>{s.t('quote_act')}</PBtn> : null}
     {mine ? <PBtn ghost icon="delete_outline_rounded" fg="var(--heart)" onClick={async () => {
       close();
       if (!(await confirmDlg(s.t('delete'), s.t('delete_audio_q'), s.t('delete'), true))) return;
@@ -182,7 +183,7 @@ export function PostCard({ a, scope, onDeleted }: { a: A; scope?: unknown; onDel
     itemScope itemType="https://schema.org/SocialMediaPosting">
     <OwnerRow a={a} more={() => postMenu(a, onDeleted)} />
     <div style={{ padding: '8px 8px 0 0' }}><AudChip rand={a.rand} to={a.to} /></div>
-    {text ? <div style={{ padding: '10px 8px 0 0' }}><MentionText text={text} hideQuote /></div> : null}
+    {text ? <div style={{ padding: '10px 8px 0 0' }}><MentionText text={text} hideQuote ptag={a.ptag} /></div> : null}
     <PostMedia text={text} media={a.media} />
     {a.files.length ? <div style={{ paddingRight: 8 }}>{a.bgm ? <BgmBar a={a} /> : <AudioBars a={a} scope={scope} />}</div> : null}
     <div style={{ height: 4 }} />

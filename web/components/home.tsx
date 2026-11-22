@@ -48,7 +48,7 @@ export function PopupBody({ a, close }: { a: A; close: () => void }) {
       <Icon n="chevron_right_rounded" color="var(--sub)" /></button>
       : a.created > 0 ? <div className="hsub" style={{ marginBottom: 6 }}>{s.when(a.created)}</div> : null}
     {a.desc.trim() ? <div style={{ paddingTop: a.pprof ? 12 : 0, cursor: 'pointer' }} onClick={() => open(`/p/${postCode(a.id)}`)}>
-      <MentionText text={a.desc.trim()} hideQuote clamp={6} style={{ fontSize: 15.5, lineHeight: 1.45 }} />{a.long ? <span className="more">…{s.t('read_more')}</span> : null}</div> : null}
+      <MentionText text={a.desc.trim()} hideQuote ptag={a.ptag} clamp={6} style={{ fontSize: 15.5, lineHeight: 1.45 }} />{a.long ? <span className="more">…{s.t('read_more')}</span> : null}</div> : null}
     <PostMedia text={a.desc} media={a.media} />
     <div style={{ height: a.pprof || a.desc.trim() ? 14 : 4 }} />
     {a.url ? <div className="row2" style={{ background: 'var(--soft)', borderRadius: 26, padding: '8px 6px 8px 8px' }}>
@@ -124,7 +124,7 @@ export function HomeScreen({ mode0 = 0 }: { mode0?: 0 | 1 }) {
 
   return <div className="app" style={{ height: '100dvh' }}>
     <TopBar lead={<IconBtn n="menu_rounded" onClick={() => setMenu(true)} label="Menu" />} center={<Brand />}
-      actions={<><button className="tap" aria-label="Phipop" onClick={() => n.push(s.me ? '/phipop' : '/login')} style={{ width: 48, height: 48, display: 'grid', placeItems: 'center' }}><img src="/phipop.png" alt="" width={30} height={30} style={{ width: 30, height: 30, borderRadius: '50%', background: '#fff' }} /></button><IconBtn n="search_rounded" label="Cari" onClick={() => { if (s.needNet()) n.push('/search'); }} /><IconBtn n="person_outline_rounded" label="Profil" dot={s.unread > 0} onClick={() => n.push(s.me ? `/@${s.me.username}` : '/me')} /></>} />
+      actions={<><button className="tap" aria-label="Phipop" onClick={() => n.push(s.me ? '/phipop' : '/login')} style={{ width: 48, height: 48, display: 'grid', placeItems: 'center' }}><img src="/phipop.png" alt="" width={30} height={30} style={{ width: 30, height: 30, borderRadius: '50%', background: 'var(--bg)' }} /></button><IconBtn n="search_rounded" label="Cari" onClick={() => { if (s.needNet()) n.push('/search'); }} /><IconBtn n="person_outline_rounded" label="Profil" dot={s.unread > 0} onClick={() => n.push(s.me ? `/@${s.me.username}` : '/me')} /></>} />
     <div style={{ flex: 1, minHeight: 0, overflow: mode === 1 ? 'auto' : 'hidden', position: 'relative', display: 'flex', flexDirection: 'column' }}>
       {mode === 0 ? <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
         <TapButton onTap={tap} />

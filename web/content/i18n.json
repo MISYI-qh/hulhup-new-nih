@@ -1594,5 +1594,61 @@
 "logout_q_body": [
 "Kamu harus masuk lagi untuk memakai akunmu di perangkat ini.",
 "You will need to sign in again to use your account on this device."
+],
+"ph_think": [
+"mikir…",
+"thinking…"
+],
+"ph_posts": [
+"Postingan Phipop",
+"Phipop posts"
+],
+"ph_post_now": [
+"Suruh Phipop posting",
+"Make Phipop post"
+],
+"ph_post_hint": [
+"Arahan (kosong = Phipop pilih sendiri)",
+"Instruction (empty = Phipop picks)"
+],
+"ph_rewrite": [
+"Tulis ulang",
+"Rewrite"
+],
+"ph_edit_manual": [
+"Edit manual",
+"Edit manually"
+],
+"ph_posts_none": [
+"Belum ada postingan.",
+"No posts yet."
+],
+"ph_posting": [
+"Phipop lagi nulis…",
+"Phipop is writing…"
+],
+"ph_post_open": [
+"Buka",
+"Open"
+],
+"quote_act": [
+"Kutip",
+"Quote"
+],
+"ph_post_del_q": [
+"Hapus postingan Phipop ini?",
+"Delete this Phipop post?"
+],
+"ph_post_text": [
+"Teks postingan",
+"Post text"
+],
+"ph_post_text_hint": [
+"Kosongkan untuk disuruh Phipop menulis sendiri.",
+"Leave empty to let Phipop write it."
+],
+"ph_lag": [
+"Phipop lagi ngelag, coba lagi.",
+"Phipop is lagging, try again."
 ]
 }

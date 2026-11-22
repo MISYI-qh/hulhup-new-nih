@@ -200,11 +200,24 @@ export async function viewMedia(ref, allowId = 0) {
   } catch (e) { return { info: { error: 'gagal mengambil media: ' + String(e.message || e).slice(0, 50) }, parts: [] }; }
 }
 
+/** Foto profil sebuah akun publik (atau milik penanya sendiri / akun resmi). */
+export async function viewAvatar(username, askerId = 0) {
+  const un = String(username || '').toLowerCase().replace(/^@/, '').replace(/[^a-z0-9_]/g, '').slice(0, 20);
+  const u = await one(`select id, username, pvis, status, av_ver from users where username=$1`, [un]);
+  if (!u || u.status !== 'active') return { info: { error: 'akun tidak ada' }, parts: [] };
+  const official = ['phipop', 'misyi', 'hulhup'].includes(u.username);
+  if (u.pvis !== 'public' && !official && Number(u.id) !== Number(askerId)) return { info: { error: 'akun privat: kamu tidak boleh melihat isinya' }, parts: [] };
+  const r = await one(`select mime, data from photos where user_id=$1 and kind='avatar'`, [u.id]);
+  if (!r || !(Number(u.av_ver) > 0)) return { info: { ok: true, catatan: `@${u.username} belum punya foto profil` }, parts: [] };
+  return { info: { ok: true, catatan: `foto profil @${u.username} dilampirkan, lihat` }, parts: [{ mimeType: r.mime || 'image/png', data: Buffer.from(r.data).toString('base64') }] };
+}
+
 export const TOOL_DECLS = [
   { name: 'search_hulhup', description: 'Cari post atau akun di Hulhup (hanya yang publik). Pakai kalau pengguna minta cari/lihat post, akun, atau topik di Hulhup, atau butuh contoh/bahan dari Hulhup. sort=top untuk yang paling banyak disorot minggu ini.',
     parameters: { type: 'OBJECT', properties: { q: { type: 'STRING', description: 'kata kunci (boleh kosong untuk terbaru/top)' }, kind: { type: 'STRING', enum: ['post', 'akun'] }, sort: { type: 'STRING', enum: ['baru', 'top'] } } } },
   { name: 'get_post', description: 'Baca satu post Hulhup lengkap beserta komentarnya. ref = id, kode 7 huruf, atau URL hulhup.my.id/p/...', parameters: { type: 'OBJECT', properties: { ref: { type: 'STRING' } }, required: ['ref'] } },
   { name: 'get_account', description: 'Lihat profil akun Hulhup publik dan post publik terbarunya.', parameters: { type: 'OBJECT', properties: { username: { type: 'STRING' } }, required: ['username'] } },
+  { name: 'view_avatar', description: 'Lihat foto profil (avatar) sebuah akun Hulhup: akun publik mana pun, penanya sendiri, atau kamu sendiri (username phipop).', parameters: { type: 'OBJECT', properties: { username: { type: 'STRING' } }, required: ['username'] } },
   { name: 'search_web', description: 'Cari informasi di internet lewat peramban Hulhup. Pakai untuk hal terbaru, fakta, berita, atau yang tidak kamu tahu pasti.', parameters: { type: 'OBJECT', properties: { q: { type: 'STRING' } }, required: ['q'] } },
   { name: 'open_url', description: 'Buka dan baca isi halaman web dari sebuah URL (artikel, situs).', parameters: { type: 'OBJECT', properties: { url: { type: 'STRING' } }, required: ['url'] } },
   { name: 'view_media', description: 'Lihat gambar atau dengarkan audio/video dari URL, atau dengarkan audio dari post Hulhup (ref post).', parameters: { type: 'OBJECT', properties: { url: { type: 'STRING', description: 'URL media/halaman, atau id/kode/URL post Hulhup' } }, required: ['url'] } },

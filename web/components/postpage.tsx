@@ -4,7 +4,7 @@ import { Icon, HIcon } from './Icon';
 import { NeedLogin, Screen, useNav } from './shell';
 import { Empty, Field, IconBtn, Loader, PBtn, Toggle, confirmDlg, sheet, toast } from './ui';
 import { Pick, askLabel, reportSheet, uploadAud, audSplit, withLabels } from './aud';
-import { Avatar, LinkEmbed, PostMedia, QuoteCard, MentionBar, MentionText, firstUrl, quoteRef } from './rich';
+import { Avatar, LinkEmbed, PostMedia, QuoteCard, MentionBar, MentionText, PhRun, QuoteSlot, pullQuote, firstUrl, quoteRef } from './rich';
 import { ActBtn, AudioBars, BgmBar, FileBar, OwnerRow, PostActions, Wave, commentLink, mmss, postMenu, shareUrl } from './post';
 import { A, ApiErr, Api, store, useStore } from '@/lib/store';
 import { kindOfUrl } from '@/lib/links';
@@ -54,7 +54,9 @@ function CommentTile({ c, depth, postId, postOwner, scope, onReply, onLike, onDe
         {isAuthor ? <span style={{ marginLeft: 6, padding: '2px 7px', borderRadius: 8, background: 'var(--ink)', color: 'var(--bg)', fontSize: 10.5, fontWeight: 800 }}>{s.t('author')}</span> : null}
         <span style={{ marginLeft: 8, color: 'var(--sub)', fontSize: 12 }}>{s.when(Number(c.created))}</span></div>
       {c.pinned ? <div className="row2" style={{ gap: 4, marginTop: 2, color: 'var(--sub)', fontSize: 11.5, fontWeight: 700 }}><Icon n="push_pin_rounded" size={12} />{s.t('pinned')}</div> : null}
-      {shown ? <div style={{ marginTop: 3 }}><MentionText text={shown} style={{ fontSize: 15, lineHeight: 1.45 }} /></div> : null}
+      {c.ph ? <PhRun label={`${c.ph}`} /> : null}
+      {!c.ph && shown ? <div style={{ marginTop: 3 }}><MentionText text={shown} ptag={c.ptag === true} hideQuote={c.username === 'phipop'} style={{ fontSize: 15, lineHeight: 1.45 }} /></div> : null}
+      {!c.ph && c.username === 'phipop' && shown ? <div style={{ marginTop: 6 }}><PostMedia text={shown} /></div> : null}
       {c.long === true && full == null ? <button className="tap" style={{ paddingTop: 4, color: 'var(--acc)', fontWeight: 700, fontSize: 13.5 }} onClick={lf ? undefined : loadFull}>{lf ? '…' : s.t('read_more')}</button> : null}
       {((c.audios as any[]) ?? []).map((x, i) => <FileBar key={i} keyId={-(1000000000 + c.id * 4 + i)} url={`${x.url}`} secs={Number(x.secs)} scope={scope} />)}
       <div className="row2" style={{ gap: 0 }}><ActBtn k="sorot" onClick={onLike} on={c.liked === true} count={Number(c.likes)} />
@@ -91,9 +93,11 @@ export function PostScreen({ id, comment, seed }: { id: number; comment?: number
 
   const refreshPost = async () => { const p = await Api.req('GET', `/posts/${id}`); setA(new A(p.post)); };
   const sendLock = useRef(false);
+  const [cq, setCq] = useState<string | null>(null);
+  const onInput = (v: string) => { if (!cq) { const r = pullQuote(v); if (r.quote) { setCq(r.quote); setInput(r.text); return; } } setInput(v); };
   const send = async () => {
-    const t = input.trim(); if (sendLock.current || !t || t === autoTag.current.trim()) return; sendLock.current = true; setSending(true); let cid: number | null = null;
-    try { const j = await Api.req('POST', `/posts/${id}/comments`, { text: t, parent: replyTo?.id }); cid = Number(j.id); setInput(''); setReplyTo(null); autoTag.current = ''; await comments(); await refreshPost(); }
+    const t0 = input.trim(); const t = (t0 + (cq ? `${t0 ? '\n' : ''}${cq}` : '')).trim(); if (sendLock.current || !t0 && !cq || t0 === autoTag.current.trim() && !cq) return; sendLock.current = true; setSending(true); let cid: number | null = null;
+    try { const j = await Api.req('POST', `/posts/${id}/comments`, { text: t, parent: replyTo?.id }); cid = Number(j.id); setInput(''); setCq(null); setReplyTo(null); autoTag.current = ''; await comments(); await refreshPost(); }
     catch (e) { if (cid != null) { try { await Api.req('DELETE', `/comments/${cid}`); } catch {} } toast(s.err(e), { bad: true }); }
     sendLock.current = false; setSending(false);
   };
@@ -120,7 +124,7 @@ export function PostScreen({ id, comment, seed }: { id: number; comment?: number
       <div style={{ display: 'flex' }}>{p ? <IconBtn n="more_horiz_rounded" label="Menu" onClick={() => postMenu(p, () => n.back())} /> : null}</div></div>
     <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', overscrollBehavior: 'contain', minHeight: 0 }}>{loading && !p ? <Loader k="post" /> : err && !p ? <Empty icon="lock_outline_rounded" text={err} /> : p ? <div style={{ padding: '4px 18px 24px' }}>
       <OwnerRow a={p} />
-      {text ? <div style={{ paddingTop: 14, userSelect: 'text' }}><MentionText text={text} hideQuote style={{ fontSize: 17, lineHeight: 1.55 }} /></div> : null}
+      {text ? <div style={{ paddingTop: 14, userSelect: 'text' }}><MentionText text={text} hideQuote ptag={p.ptag} style={{ fontSize: 17, lineHeight: 1.55 }} /></div> : null}
       <PostMedia text={text} media={p.media} />
       {p.files.length ? <div style={{ paddingTop: 6 }}>{p.bgm ? <BgmBar a={p} /> : <AudioBars a={p} scope={scope.current} />}</div> : null}
       <div style={{ height: 10 }} /><PostActions a={p} onComments={() => ta.current?.focus()} />
@@ -133,8 +137,9 @@ export function PostScreen({ id, comment, seed }: { id: number; comment?: number
       : <div className="cmtbar"><MentionBar value={input} onPick={setInput} />
         {replyTo ? <div className="row2" style={{ paddingBottom: 6 }}><div style={{ flex: 1, color: 'var(--acc)', fontWeight: 700, fontSize: 13 }}>{s.t('replying').replace('{n}', `${replyTo.name}`)}</div>
           <button className="tap" aria-label="Batal" onClick={() => { if (input.startsWith(autoTag.current)) setInput(input.slice(autoTag.current.length)); autoTag.current = ''; setReplyTo(null); }} style={{ color: 'var(--sub)' }}><Icon n="close_rounded" size={18} /></button></div> : null}
+        {cq ? <QuoteSlot url={cq} onClear={() => setCq(null)} /> : null}
         <div className="row2" style={{ alignItems: 'flex-end', gap: 8 }}>
-          <textarea ref={ta} rows={1} value={input} placeholder={s.t('comment_ph')} onChange={(e) => setInput(e.target.value)} />
+          <textarea ref={ta} rows={1} value={input} placeholder={s.t('comment_ph')} onChange={(e) => onInput(e.target.value)} />
           <button className="tap round" onClick={sending ? undefined : send} aria-label="Kirim">{sending ? <span className="spin" style={{ width: 20, height: 20 }} /> : <Icon n="arrow_upward_rounded" size={22} />}</button></div></div>}
   </div>;
 }
@@ -198,7 +203,9 @@ function AccountPick({ init, close }: { init: Record<string, any>; close: (v?: R
 // ---------- tulis post ----------
 export function ComposeScreen() {
   const s = useStore(); const n = useNav();
-  const [text, setText] = useState(''), [clip, setClip] = useState<Clip | null>(null), [playing, setPlaying] = useState(false), [pprof, setPprof] = useState(true), [busy, setBusy] = useState(false), [bgm, setBgm] = useState(false), [media, setMedia] = useState<string[]>([]);
+  const [text, setText] = useState(''), [clip, setClip] = useState<Clip | null>(null), [playing, setPlaying] = useState(false), [pprof, setPprof] = useState(true), [busy, setBusy] = useState(false), [bgm, setBgm] = useState(false), [media, setMedia] = useState<string[]>([]), [cq, setCq] = useState<string | null>(null);
+  useEffect(() => { try { const u = new URLSearchParams(location.search).get('quote'); if (u && quoteRef(u)) setCq(u); } catch {} }, []);
+  const onText = (v: string) => { if (!cq) { const r = pullQuote(v); if (r.quote) { setCq(r.quote); setText(r.text); return; } } setText(v); };
   const [rand, setRand] = useState('public'), [picked, setPicked] = useState<Record<string, any>>({}); const au = useRef<HTMLAudioElement | null>(null);
   useEffect(() => () => { au.current?.pause(); }, []);
   const lock = useRef(false);
@@ -213,7 +220,7 @@ export function ComposeScreen() {
     setPicked(r); if (!Object.keys(r).length) { const l = audSplit(rand).filter((x) => x !== 'accounts'); setRand(l.length ? l.join(',') : 'public'); }
   };
   const submit = async () => {
-    if (lock.current) return; const t = text.trim();
+    if (lock.current) return; const t = (text.trim() + (cq ? `${text.trim() ? '\n' : ''}${cq}` : '')).trim();
     if (!clip && !t && !media.length) { toast(s.t('e_empty'), { bad: true }); return; }
     if (audSplit(rand).includes('accounts') && !Object.keys(picked).length) { toast(s.t('e_need_accounts'), { bad: true }); return; }
     lock.current = true; setBusy(true); let id: number | null = null;
@@ -235,9 +242,10 @@ export function ComposeScreen() {
         <b style={{ fontSize: 13.5 }}>{mmss(clip.secs)}</b><IconBtn n="refresh_rounded" color="var(--sub)" onClick={add} /><IconBtn n="close_rounded" color="var(--sub)" onClick={() => { au.current?.pause(); setClip(null); setPlaying(false); setBgm(false); }} /></div>}
     {clip ? <div className="row2" style={{ paddingTop: 14, gap: 12 }}><div style={{ flex: 1 }}><div style={{ fontWeight: 600, fontSize: 16 }}>{s.t('bgm_label')}</div><div style={{ color: 'var(--sub)', fontSize: 12.5 }}>{s.t('bgm_note')}</div></div><Toggle v={bgm} on={setBgm} /></div> : null}
     <div style={{ height: 14 }} />
-    <div className="sheetfield"><textarea rows={4} value={text} placeholder={s.t('write_hups')} onChange={(e) => setText(e.target.value)} /></div>
+    <div className="sheetfield"><textarea rows={4} value={text} placeholder={s.t('write_hups')} onChange={(e) => onText(e.target.value)} /></div>
+    {cq ? <QuoteSlot url={cq} onClear={() => setCq(null)} /> : null}
     <MediaEditor items={media} set={setMedia} />
-    <div style={{ height: 6 }} /><MentionBar value={text} onPick={setText} />
+    <div style={{ height: 6 }} /><MentionBar value={text} onPick={onText} />
     <div style={{ color: 'var(--sub)', fontSize: 12.5, margin: '0 0 14px 6px' }}>{s.t('tag_hint')}</div>
     <div className="row2" style={{ alignItems: 'flex-start', gap: 10, background: 'var(--soft)', borderRadius: 18, padding: '12px 14px', margin: '0 0 16px', color: 'var(--sub)', fontSize: 13, lineHeight: 1.45 }}><Icon n="info_outline_rounded" size={18} color="var(--sub)" style={{ flex: 'none', marginTop: 1 }} /><span>{s.t('media_hint')}</span></div>
     <div className="row2" style={{ paddingBottom: 14, gap: 12 }}><div style={{ flex: 1, fontWeight: 600, fontSize: 16 }}>{s.t('pprof')}</div><Toggle v={pprof} on={setPprof} /></div>

@@ -22,7 +22,7 @@ export function DesktopRail() {
     <Link href="/" className="rail-brand" aria-label="Hulhup"><AnimMark width={38} auto slow /><span>Hulhup</span></Link>
     <div className="rail-items">
       {items.map((it) => <Link key={it.href + it.label} href={it.href} className={'rail-i' + (it.on ? ' on' : '')} aria-current={it.on ? 'page' : undefined}>
-        <span className="ic">{it.hk ? <HIcon k={it.hk} size={26} /> : it.img ? <img src={it.img} alt="" width={28} height={28} style={{ borderRadius: '50%', background: '#fff' }} /> : <Icon n={it.icon!} size={26} />}{it.dot ? <i className="dot" /> : null}</span><span className="lb">{it.label}</span></Link>)}
+        <span className="ic">{it.hk ? <HIcon k={it.hk} size={26} /> : it.img ? <img src={it.img} alt="" width={28} height={28} style={{ borderRadius: '50%', background: 'var(--bg)', objectFit: 'contain' }} /> : <Icon n={it.icon!} size={26} />}{it.dot ? <i className="dot" /> : null}</span><span className="lb">{it.label}</span></Link>)}
     </div>
     <Link href={s.me ? '/new' : '/login'} className="rail-new"><Icon n="add_rounded" size={24} /><span className="lb">{s.t('new_post')}</span></Link>
     <div className="rail-ver">Misyi · v2.0.0</div>
