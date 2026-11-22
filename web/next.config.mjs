@@ -16,8 +16,13 @@ const CSP = [
   "upgrade-insecure-requests",
 ].join('; ');
 
+// satu ID untuk tiap build: dipakai klien untuk tahu ada versi baru lalu menyegarkan diri
+process.env.HH_BUILD ||= process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || String(Date.now());
+
 /** @type {import('next').NextConfig} */
 export default {
+  generateBuildId: async () => process.env.HH_BUILD,
+  env: { NEXT_PUBLIC_BUILD: process.env.HH_BUILD },
   poweredByHeader: false,
   reactStrictMode: true,
   images: { unoptimized: true },

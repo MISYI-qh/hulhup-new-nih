@@ -3,6 +3,7 @@ import './app.css';
 import './intro.css';
 import { Boot } from '@/components/shell';
 import { DesktopRail } from '@/components/rail';
+import { Fresh } from '@/components/fresh';
 import { ORIGIN, API } from '@/lib/api';
 
 export const metadata: Metadata = {
@@ -35,6 +36,7 @@ export default function Root({ children }: { children: React.ReactNode }) {
             {['H', 'u', 'l', 'h', 'u', 'p'].map((c, i) => <span key={i} className={`iw-l iw-l${i}`}><span className="iw-word">{c}</span></span>)}
           </div></div>
         <Boot />
+        <Fresh />
         <DesktopRail />
         {children}
       </body>
