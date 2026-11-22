@@ -34,6 +34,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.text.selection.SelectionContainer
 import kotlinx.coroutines.delay
