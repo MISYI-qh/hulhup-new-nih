@@ -34,7 +34,8 @@ fun go(path: String) { Nav.go(pageFor(path) ?: Screen(path) { NotFoundPage() }) 
 fun pageFor(name: String): Screen? {
     val path = name.substringBefore('?').substringBefore('#')
     val seg = path.split('/').filter { it.isNotEmpty() }.map { java.net.URLDecoder.decode(it, "UTF-8") }
-    if (seg.isEmpty() || seg[0] == "acak") return Screen("/") { HomePage(0) }
+    if (seg.isEmpty()) return Screen("/") { HomePage() }
+    if (seg[0] == "acak") return Screen("/") { HomePage(0) }
     val s = Store
     if (seg[0].startsWith("@") && seg[0].length > 1) {
         val u = seg[0].substring(1).lowercase()

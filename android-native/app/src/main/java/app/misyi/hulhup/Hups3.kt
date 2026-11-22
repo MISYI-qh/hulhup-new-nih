@@ -60,7 +60,7 @@ import org.json.JSONObject
     suspend fun load() {
         try {
             val j = Api.req("GET", "/posts/$id")
-            a = A(j.getJSONObject("post")); text = j.strN("text") ?: ""; s.countView(a!!)
+            a = A(j.getJSONObject("post")); text = (j.strN("text") ?: "").ifBlank { a!!.text ?: a!!.desc }; s.countView(a!!)
             loadComments(); error = null
             a?.let { p -> if (p.bgm && p.files.isNotEmpty()) s.playBgm(p.id, bgmUrl(p), scope = owner) }
         } catch (e: Exception) { error = if (e is ApiErr && e.code == "not_found") s.t("post_gone") else s.err(e) }
@@ -75,7 +75,7 @@ import org.json.JSONObject
             try {
                 val p = Api.req("GET", "/posts/$id"); val cm = Api.req("GET", "/posts/$id/comments")
                 if (sending) continue
-                a = A(p.getJSONObject("post")); text = p.strN("text") ?: text
+                a = A(p.getJSONObject("post")); text = (p.strN("text") ?: "").ifBlank { a!!.text ?: a!!.desc }.ifBlank { text }
                 cmts.clear(); cmts.addAll((cm.optJSONArray("items") ?: JSONArray()).objects())
             } catch (_: Exception) {}
         }

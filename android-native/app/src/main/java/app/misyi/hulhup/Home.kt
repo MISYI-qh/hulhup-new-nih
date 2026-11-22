@@ -47,10 +47,10 @@ import kotlin.math.pow
 val kBuild get() = BuildConfig.BUILD
 
 /** Beranda: Acak (tombol besar) dan Hups (linimasa), dengan menu samping (padanan home.dart). */
-@Composable fun HomePage(mode0: Int = 0) {
+@Composable fun HomePage(mode0: Int? = null) {
     val s = Store; val sc = rememberCoroutineScope()
     var menu by remember { mutableStateOf(false) }; var busy by remember { mutableStateOf(false) }
-    var mode by remember { mutableIntStateOf(if (s.online) mode0 else 0) }
+    var mode by remember { mutableIntStateOf(if (s.online) (mode0 ?: s.homeMode) else 0) }
     @Suppress("UNUSED_EXPRESSION") s.rev
     LaunchedEffect(mode) { s.homeMode = mode }
     BackHandler(enabled = menu || mode != 0) { if (menu) menu = false else mode = 0 }

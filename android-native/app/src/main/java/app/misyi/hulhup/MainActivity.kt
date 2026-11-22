@@ -81,7 +81,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun initial(i: Intent?): Array<Screen> {
-        val home = Screen("/") { HomePage(0) }
+        val home = Screen("/") { HomePage() }
         val p = i?.data?.takeIf { it.host == "hulhup.my.id" || it.host == "www.hulhup.my.id" }?.encodedPath
         val t = if (p != null && p != "/") pageFor(p) else null
         return if (t == null) arrayOf(home) else arrayOf(home, t)
