@@ -135,7 +135,7 @@ export function PostScreen({ id, comment, seed }: { id: number; comment?: number
     </div> : null}</div>
     {!s.me ? <div style={{ padding: '8px 16px 14px' }}><PBtn icon="login_rounded" onClick={() => n.push('/login')}>{s.t('login_comment')}</PBtn></div>
       : <div className="cmtbar"><MentionBar value={input} onPick={setInput} />
-        {replyTo ? <div className="row2" style={{ paddingBottom: 6 }}><div style={{ flex: 1, color: 'var(--acc)', fontWeight: 700, fontSize: 13 }}>{s.t('replying').replace('{n}', `${replyTo.name}`)}</div>
+        {replyTo ? <div className="row2" style={{ paddingBottom: 6 }}><div className="rplsnip" style={{ flex: 1 }}><b>{s.t('replying').replace('{n}', `${replyTo.name}`)}</b><span>{String(replyTo.text ?? replyTo.body ?? '').replace(/\s+/g, ' ').slice(0, 120) || '…'}</span></div>
           <button className="tap" aria-label="Batal" onClick={() => { if (input.startsWith(autoTag.current)) setInput(input.slice(autoTag.current.length)); autoTag.current = ''; setReplyTo(null); }} style={{ color: 'var(--sub)' }}><Icon n="close_rounded" size={18} /></button></div> : null}
         {cq ? <QuoteSlot url={cq} onClear={() => setCq(null)} /> : null}
         <div className="row2" style={{ alignItems: 'flex-end', gap: 8 }}>

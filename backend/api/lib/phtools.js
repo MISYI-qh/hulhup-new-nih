@@ -187,16 +187,25 @@ export async function viewMedia(ref, allowId = 0) {
     return parts.length ? { info: { ok: true, catatan: `${parts.length} audio dari post dilampirkan, dengarkan` }, parts } : { info: { error: 'post ini tidak punya audio' }, parts: [] };
   }
   const u = safeUrl(s); if (!u) return { info: { error: 'url tidak valid' }, parts: [] };
+  if (/(^|\.)(youtube\.com|youtu\.be)$/i.test(u.hostname) && /watch|shorts|live|^\/[\w-]{11}$/.test(u.pathname + u.search)) {
+    return { info: { ok: true, catatan: 'video YouTube dilampirkan, tonton' }, parts: [{ mimeType: 'video/mp4', fileUri: u.toString() }] };
+  }
   try {
     let r = await fetchBin(u.toString(), 14 * 1024 * 1024);
-    if (r.html) { // halaman biasa: ambil gambar/video pratinjaunya
-      const pv = await preview(u.toString()); const alt = pv?.image || pv?.video; if (!alt) return { info: { error: 'tidak ada media di halaman itu' }, parts: [] };
-      r = await fetchBin(alt.startsWith('/') ? new URL(alt, 'https://hulhup.my.id').toString() : alt, 14 * 1024 * 1024);
-      if (r.html) return { info: { error: 'media tidak bisa diambil' }, parts: [] };
+    let note = '';
+    if (r.html) { // halaman biasa (mis. reel Instagram): coba videonya dulu, lalu gambar pratinjau
+      const pv = await preview(u.toString()); const cands = [pv?.video, pv?.image].filter(Boolean);
+      if (!cands.length) return { info: { error: 'tidak ada media yang bisa diambil dari halaman itu', caption: pv?.title || pv?.description || undefined }, parts: [] };
+      let got = null;
+      for (const c of cands) {
+        try { const x = await fetchBin(c.startsWith('/') ? new URL(c, 'https://hulhup.my.id').toString() : c, 14 * 1024 * 1024); if (!x.html && x.buf.length <= (MAXB[x.mime.split('/')[0]] || 0)) { got = x; break; } } catch {}
+      }
+      if (!got) return { info: { error: 'video/gambar di halaman itu tidak bisa diunduh (mungkin diproteksi situsnya)', caption: [pv?.title, pv?.description].filter(Boolean).join(' - ').slice(0, 400) || undefined, catatan: 'jujur bilang ke pengguna kamu cuma bisa baca keterangannya, bukan nonton videonya' }, parts: [] };
+      r = got; if (r.mime.startsWith('image/')) note = ' (hanya gambar pratinjau, video tidak bisa diunduh; bilang jujur)';
     }
     const kind = r.mime.split('/')[0];
     if (r.buf.length > MAXB[kind]) return { info: { error: 'media terlalu besar' }, parts: [] };
-    return { info: { ok: true, jenis: r.mime, catatan: 'media dilampirkan, lihat/dengarkan' }, parts: [{ mimeType: r.mime, data: r.buf.toString('base64') }] };
+    return { info: { ok: true, jenis: r.mime, catatan: 'media dilampirkan, lihat/dengarkan' + note }, parts: [{ mimeType: r.mime, data: r.buf.toString('base64') }] };
   } catch (e) { return { info: { error: 'gagal mengambil media: ' + String(e.message || e).slice(0, 50) }, parts: [] }; }
 }
 
@@ -220,5 +229,5 @@ export const TOOL_DECLS = [
   { name: 'view_avatar', description: 'Lihat foto profil (avatar) sebuah akun Hulhup: akun publik mana pun, penanya sendiri, atau kamu sendiri (username phipop).', parameters: { type: 'OBJECT', properties: { username: { type: 'STRING' } }, required: ['username'] } },
   { name: 'search_web', description: 'Cari informasi di internet lewat peramban Hulhup. Pakai untuk hal terbaru, fakta, berita, atau yang tidak kamu tahu pasti.', parameters: { type: 'OBJECT', properties: { q: { type: 'STRING' } }, required: ['q'] } },
   { name: 'open_url', description: 'Buka dan baca isi halaman web dari sebuah URL (artikel, situs).', parameters: { type: 'OBJECT', properties: { url: { type: 'STRING' } }, required: ['url'] } },
-  { name: 'view_media', description: 'Lihat gambar atau dengarkan audio/video dari URL, atau dengarkan audio dari post Hulhup (ref post).', parameters: { type: 'OBJECT', properties: { url: { type: 'STRING', description: 'URL media/halaman, atau id/kode/URL post Hulhup' } }, required: ['url'] } },
+  { name: 'view_media', description: 'Lihat gambar, tonton video (termasuk YouTube, reel/halaman yang punya video), atau dengarkan audio dari URL; atau dengarkan audio dari post Hulhup (ref post). Untuk video dalam post Hulhup, ambil URL-nya dari teks post lalu panggil ini.', parameters: { type: 'OBJECT', properties: { url: { type: 'STRING', description: 'URL media/halaman, atau id/kode/URL post Hulhup' } }, required: ['url'] } },
 ];

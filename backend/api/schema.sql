@@ -339,3 +339,5 @@ CREATE TABLE IF NOT EXISTS phipop_posts (
   created BIGINT NOT NULL,
   UNIQUE (day, slot)
 );
+
+ALTER TABLE phipop_chat ADD COLUMN IF NOT EXISTS reply_to BIGINT;

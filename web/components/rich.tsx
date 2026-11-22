@@ -100,7 +100,8 @@ export function QuoteCard({ id }: { id: number }) {
   return <div ref={ref} className="embed quote tap" role="link" tabIndex={0} onClick={go} onKeyDown={(e) => { if (e.key === 'Enter') go(e); }}>
     {a.pprof ? <div className="qh"><Avatar url={a.ownerAvatar} name={a.ownerName} size={26} />
       <b>{a.ownerName}</b>{a.ownerVerified ? <Verified size={14} /> : null}<span className="qs">{a.owner} · {s.when(a.created)}</span></div> : null}
-    {text ? <div className="qt">{text.replace(/\s+$/, '')}</div> : null}
+    {text ? <div className="qt"><MentionText text={text.replace(/\s+$/, '')} hideQuote ptag={a.ptag} /></div> : null}
+    {quoteRef(text) ? <MediaStrip items={a.media ?? []} /> : <div className="qm"><PostMedia text={text} media={a.media} /></div>}
     {a.files.length && !a.bgm ? <div style={{ padding: '4px 0 0' }}><FileBar keyId={fileKey(a, 0)} url={a.files[0].url} secs={a.files[0].secs ?? 0} onStart={() => store.countPlay(a)} /></div> : null}
     <div className="qf"><span><HIcon k="sorot" size={16} />{a.likes}</span><span><HIcon k="comment" size={16} />{a.comments}</span></div>
   </div>;

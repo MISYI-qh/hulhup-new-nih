@@ -9,7 +9,7 @@ import { Api, useStore } from '@/lib/store';
 
 type St = { has_access: boolean; requested: boolean; used: number; limit: number | null; left: number | null; reset_at: number; exempt: boolean; admin: boolean };
 type Step = { k: string; t: string };
-type Msg = { id: number; role: 'user' | 'phipop'; text: string; created: number; status?: string; steps?: Step[]; links?: string[] };
+type Msg = { id: number; role: 'user' | 'phipop'; text: string; created: number; status?: string; steps?: Step[]; links?: string[]; reply?: { id: number; role: 'user' | 'phipop'; text: string } };
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /** Kartu untuk satu tautan: post Hulhup jadi kutipan, lainnya pratinjau. */
 const PhLink = ({ url }: { url: string }) => { const q = quoteRef(url); return q ? <QuoteCard id={q.id} /> : <LinkEmbed url={url} />; };
@@ -21,7 +21,7 @@ const Logo = ({ size }: { size: number }) => <img src="/phipop.png" alt="Phipop"
 export function PhipopScreen() {
   const s = useStore(); const ready = useReady(); const n = useNav();
   const [st, setSt] = useState<St | null>(null); const [msgs, setMsgs] = useState<Msg[]>([]); const [busy, setBusy] = useState(false);
-  const [why, setWhy] = useState(''), [code, setCode] = useState(''), [text, setText] = useState('');
+  const [why, setWhy] = useState(''), [code, setCode] = useState(''), [text, setText] = useState(''); const [rp, setRp] = useState<Msg | null>(null);
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => { try { const c = new URLSearchParams(location.search).get('code'); if (c) setCode(c.toUpperCase()); } catch {} }, []);
   const alive = useRef(true); useEffect(() => () => { alive.current = false; }, []);
@@ -68,10 +68,10 @@ export function PhipopScreen() {
   const out = st.limit !== null && (st.left ?? 0) <= 0 && st.reset_at > Date.now();
   const send = () => act(async () => {
     const t = text.trim(); if (!t) return;
-    setText(''); setMsgs((m) => [...m, { id: -Date.now(), role: 'user', text: t, created: Date.now(), status: 'done' }]);
+    const cur = rp; setText(''); setRp(null); setMsgs((m) => [...m, { id: -Date.now(), role: 'user', text: t, created: Date.now(), status: 'done', ...(cur ? { reply: { id: cur.id, role: cur.role, text: cur.text.slice(0, 140) } } : {}) }]);
     let r: any;
-    try { r = await Api.req('POST', '/phipop/chat', { text: t, async: true }); }
-    catch (e) { setMsgs((m) => m.slice(0, -1)); setText(t); throw e; }
+    try { r = await Api.req('POST', '/phipop/chat', { text: t, async: true, ...(cur && cur.id > 0 ? { reply_to: cur.id } : {}) }); }
+    catch (e) { setMsgs((m) => m.slice(0, -1)); setText(t); setRp(cur); throw e; }
     setSt(r); setMsgs((m) => [...m, { id: r.id, role: 'phipop', text: '', created: Date.now(), status: 'run', steps: [], links: [] }]);
     await poll(r.id);
   });
@@ -86,20 +86,23 @@ export function PhipopScreen() {
         const q = m.text ? pullQuote(m.text) : { text: '', quote: null as string | null }; const body = q.quote ? q.text : m.text;
         return m.role === 'user'
           ? <div key={m.id} style={{ alignSelf: 'flex-end', maxWidth: '82%', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-            {body ? <div style={{ background: 'var(--btn)', color: 'var(--cream)', padding: '10px 14px', borderRadius: '20px 20px 6px 20px', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.4 }}>{body}</div> : null}
+            {m.reply ? <div className="rplsnip" style={{ background: 'var(--soft)', padding: '6px 10px', borderRadius: 12, maxWidth: '100%' }}><b>{m.reply.role === 'phipop' ? 'Phipop' : s.t('ph_you')}</b><span>{m.reply.text}</span></div> : null}
+            {body ? <div className="tap" onClick={() => m.id > 0 && setRp(m)} style={{ background: 'var(--btn)', color: 'var(--cream)', padding: '10px 14px', borderRadius: '20px 20px 6px 20px', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.4 }}>{body}</div> : null}
             {q.quote ? <div style={{ width: 'min(100%, 320px)' }}><PhLink url={q.quote} /></div> : null}</div>
           : <div key={m.id} className="row2" style={{ alignSelf: 'flex-start', maxWidth: '90%', gap: 8, alignItems: 'flex-end' }}><Logo size={30} />
             {m.status === 'run' ? <div style={{ background: 'var(--soft)', padding: '8px 14px', borderRadius: '20px 20px 20px 6px', minWidth: 0 }}><PhRun label={runLabel(m.steps)} size={20} /></div>
               : <div style={{ minWidth: 0 }}>
-                {body ? <div style={{ background: 'var(--soft)', padding: '10px 14px', borderRadius: '20px 20px 20px 6px', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.4 }}>{body}</div> : null}
+                {body ? <div className="tap" onClick={() => setRp(m)} style={{ background: 'var(--soft)', padding: '10px 14px', borderRadius: '20px 20px 20px 6px', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.4 }}>{body}</div> : null}
                 {(m.links?.length || q.quote) ? <div className="phlinks">{[...new Set([...(q.quote ? [q.quote] : []), ...(m.links ?? [])])].map((u) => <PhLink key={u} url={u} />)}</div> : null}</div>}</div>;
       })}
       <div ref={end} />
     </div>
     <div className="cmtbar">{out ? <div style={{ textAlign: 'center', color: 'var(--sub)', fontWeight: 700, padding: '10px 0' }}>{s.t('ph_limit_note').replace('{t}', leftT(st.reset_at - Date.now()))}</div>
-      : <div className="row2" style={{ gap: 8 }}>
+      : <>{rp ? <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 6 }}><div className="rplsnip" style={{ flex: 1 }}><b>{s.t('ph_reply_to').replace('{n}', rp.role === 'phipop' ? 'Phipop' : s.t('ph_you'))}</b><span>{rp.text}</span></div>
+          <button className="tap" aria-label="Batal" onClick={() => setRp(null)} style={{ color: 'var(--sub)' }}><Icon n="close_rounded" size={18} /></button></div> : null}
+      <div className="row2" style={{ gap: 8 }}>
         <div className="sheetfield" style={{ flex: 1, margin: 0 }}><input value={text} maxLength={600} placeholder={s.t('ph_msg')} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }} /></div>
-        <button className="tap" aria-label="Kirim" disabled={busy || !text.trim()} onClick={send} style={{ width: 46, height: 46, borderRadius: 23, background: 'var(--btn)', color: 'var(--cream)', display: 'grid', placeItems: 'center', flex: 'none' }}><Icon n="send_rounded" size={20} /></button></div>}</div>
+        <button className="tap" aria-label="Kirim" disabled={busy || !text.trim()} onClick={send} style={{ width: 46, height: 46, borderRadius: 23, background: 'var(--btn)', color: 'var(--cream)', display: 'grid', placeItems: 'center', flex: 'none' }}><Icon n="send_rounded" size={20} /></button></div></>}</div>
   </Screen>;
 }
 

@@ -1507,6 +1507,14 @@
 "Pakai kode",
 "Use code"
 ],
+"ph_reply_to": [
+"Membalas {n}",
+"Replying to {n}"
+],
+"ph_you": [
+"Kamu",
+"You"
+],
 "ph_msg": [
 "Ketik ke Phipop…",
 "Message Phipop…"

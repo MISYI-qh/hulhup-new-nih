@@ -1290,19 +1290,21 @@ route('POST', /^\/phipop\/redeem$/, async (c) => {
   return { ok: true, ...(await phStatus(u)) };
 });
 
-const chatRow = (r) => ({ id: Number(r.id), role: r.role, text: r.body, created: Number(r.created), status: r.status, steps: r.steps || [], links: r.links || [] });
+const chatRow = (r) => ({ id: Number(r.id), role: r.role, text: r.body, created: Number(r.created), status: r.status, steps: r.steps || [], links: r.links || [],
+  ...(r.rp_id ? { reply: { id: Number(r.rp_id), role: r.rp_role, text: String(r.rp_body || '').slice(0, 140) } } : {}) });
+const CHAT_SQL = 'select c.id, c.role, c.body, c.created, c.status, c.steps, c.links, p.id rp_id, p.role rp_role, p.body rp_body from phipop_chat c left join phipop_chat p on p.id=c.reply_to and p.user_id=c.user_id';
 route('GET', /^\/phipop\/chat$/, async (c) => {
   const u = c.need();
   if (!(await PH.accessOf(u.id))) throw new ApiErr('phipop_locked', 403);
   await PH.reapChat(u.id);
-  const rows = await many('select id, role, body, created, status, steps, links from phipop_chat where user_id=$1 order by id desc limit 40', [u.id]);
+  const rows = await many(CHAT_SQL + ' where c.user_id=$1 order by c.id desc limit 40', [u.id]);
   return { ok: true, items: rows.reverse().map(chatRow), ...(await phStatus(u)) };
 });
 /** Progres satu jawaban (di-poll saat Phipop sedang mencari). */
 route('GET', /^\/phipop\/chat\/(\d+)$/, async (c, m) => {
   const u = c.need();
   await PH.reapChat(u.id);
-  const r = await one('select id, role, body, created, status, steps, links from phipop_chat where id=$1 and user_id=$2', [m[1], u.id]);
+  const r = await one(CHAT_SQL + ' where c.id=$1 and c.user_id=$2', [m[1], u.id]);
   if (!r) throw new ApiErr('not_found', 404);
   return { ok: true, item: chatRow(r), ...(r.status !== 'run' ? await phStatus(u) : {}) };
 });
@@ -1311,8 +1313,10 @@ route('POST', /^\/phipop\/chat$/, async (c) => {
   const txt = okText(c.body.text);
   const ctx = await PH.buildContext(txt.slice(0, PH.PH_MAX_IN));
   if (c.body.async === true) { // klien baru: balik cepat, progres di-poll lewat GET /phipop/chat/:id
-    const j = await PH.chatStart(u.id, txt, ctx); await PH.later(j.job);
-    const rows = await many('select id, role, body, created, status, steps, links from phipop_chat where user_id=$1 order by id desc limit 2', [u.id]);
+    let replyTo = 0;
+    if (c.body.reply_to) { const rp = await one('select id from phipop_chat where id=$1 and user_id=$2', [Number(c.body.reply_to) || 0, u.id]); if (rp) replyTo = Number(rp.id); }
+    const j = await PH.chatStart(u.id, txt, ctx, replyTo); await PH.later(j.job);
+    const rows = await many(CHAT_SQL + ' where c.user_id=$1 order by c.id desc limit 2', [u.id]);
     return { ok: true, id: j.id, items: rows.reverse().map(chatRow), ...(await phStatus(u)) };
   }
   const r = await PH.askFull(u.id, txt, { chat: true, ctx });
