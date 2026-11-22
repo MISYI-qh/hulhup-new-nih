@@ -87,7 +87,7 @@ async function gcall(body0, deadline, perCall = 12000) {
       if (gc.thinkingConfig) THINK[vi](gc);
       const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: 'POST', signal: ac.signal, headers: { 'content-type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify({ ...body, generationConfig: gc }) });
-      if (!r.ok) { const e = new Error('upstream'); e.status = r.status; console.error('phipop upstream', model, 'v' + vi, r.status, String(await r.text().catch(() => '')).slice(0, 700).replace(/key[=:]\S+/gi, 'key=***')); throw e; }
+      if (!r.ok) { const e = new Error('upstream'); e.status = r.status; const tx = String(await r.text().catch(() => '')); e.daily = /per day|PerDay/i.test(tx); console.error('phipop upstream', model, 'v' + vi, r.status, tx.slice(0, 300).replace(/key[=:]\S+/gi, 'key=***')); throw e; }
       return await r.json();
     } finally { clearTimeout(tm); }
   };
@@ -105,7 +105,7 @@ async function gcall(body0, deadline, perCall = 12000) {
     } catch (e) {
       last = e;
       if (e.status === 400) { if (__media) throw e; chill(model, 10 * 60000); continue; }
-      if (e.status === 429) chill(model, 3 * 60000);
+      if (e.status === 429) chill(model, e.daily ? 60 * 60000 : 3 * 60000);
       else if (e.status === 503 || e.status === 500 || e.status === 502 || e.status === 504 || !e.status) chill(model, 40000);
       else if (e.status === 404) chill(model, 30 * 60000);
       if (e.status && ![404, 429, 500, 502, 503, 504].includes(e.status)) break;
