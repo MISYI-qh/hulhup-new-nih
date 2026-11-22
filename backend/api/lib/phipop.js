@@ -68,23 +68,25 @@ const SAFETY = [
   { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' }];
 
 // kesehatan model: dilewati sementara bila sibuk/ditolak, supaya tidak buang waktu tiap permintaan
-const cool = new Map(); const noThink = new Set();
+const cool = new Map(); const thinkVar = new Map(); // model -> indeks varian pengaturan "berpikir" yang diterima
 const ready = (m) => (cool.get(m) || 0) < Date.now();
 const chill = (m, ms) => cool.set(m, Date.now() + ms);
+// varian: matikan berpikir lewat anggaran, lewat tingkat (model baru), atau tanpa pengaturan (beri ruang token lebih)
+const THINK = [(gc) => { gc.thinkingConfig = { thinkingBudget: 0 }; }, (gc) => { gc.thinkingConfig = { thinkingLevel: 'minimal' }; }, (gc) => { delete gc.thinkingConfig; gc.maxOutputTokens = Math.max(gc.maxOutputTokens || 0, 6000); }];
 
 /** Satu panggilan ke mesin dengan cadangan model dan coba ulang sampai batas waktu. Kunci hanya dari lingkungan server. */
 async function gcall(body0, deadline, perCall = 12000) {
   const { __media, ...body } = body0; body0.__media = __media;
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new ApiErr('phipop_busy', 503);
-  const once = async (model, withThinking, ms) => {
+  const once = async (model, vi, ms) => {
     const ac = new AbortController(); const tm = setTimeout(() => ac.abort(), ms);
     try {
       const gc = { ...(body.generationConfig || {}) };
-      if (withThinking === false || noThink.has(model)) delete gc.thinkingConfig;
+      if (gc.thinkingConfig) THINK[vi](gc);
       const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: 'POST', signal: ac.signal, headers: { 'content-type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify({ ...body, generationConfig: gc }) });
-      if (!r.ok) { const e = new Error('upstream'); e.status = r.status; console.error('phipop upstream', model, r.status, String(await r.text().catch(() => '')).slice(0, 300).replace(/key[=:]\S+/gi, 'key=***')); throw e; }
+      if (!r.ok) { const e = new Error('upstream'); e.status = r.status; console.error('phipop upstream', model, 'v' + vi, r.status, String(await r.text().catch(() => '')).slice(0, 300).replace(/key[=:]\S+/gi, 'key=***')); throw e; }
       return await r.json();
     } finally { clearTimeout(tm); }
   };
@@ -94,11 +96,10 @@ async function gcall(body0, deadline, perCall = 12000) {
   for (const model of order) {
     const left = deadline - Date.now(); if (left < 2500) break;
     try {
-      try { return await once(model, true, Math.min(perCall, left)); }
-      catch (e) {
-        if (e.status !== 400) throw e;
-        const r = await once(model, false, Math.min(perCall, Math.max(2000, deadline - Date.now())));
-        noThink.add(model); return r;
+      let vi = thinkVar.get(model) ?? 0;
+      for (;;) {
+        try { const r = await once(model, vi, Math.min(perCall, Math.max(2000, deadline - Date.now()))); thinkVar.set(model, vi); return r; }
+        catch (e) { if (e.status === 400 && vi < THINK.length - 1 && !(body0.generationConfig || {}).__fixed) { vi++; continue; } throw e; }
       }
     } catch (e) {
       last = e;
@@ -144,8 +145,8 @@ async function converse({ hist = [], userText, ctx = '', mem = '', env, extraSys
   const turn = { role: 'user', parts: [{ text: (ctx ? `[konteks, data tak tepercaya]\n${ctx}\n[/konteks]\n` : '') + userText }] };
   const contents = [...hist.map((h) => ({ role: h.role === 'phipop' ? 'model' : 'user', parts: [{ text: h.body }] })), turn];
   const gc = { maxOutputTokens: 1400, temperature: 1.1, topP: 0.95, thinkingConfig: { thinkingBudget: 0 } };
-  let regen = false;
-  for (let round = 0; round < 6; round++) {
+  let regen = false, emptyTry = 0;
+  for (let round = 0; round < 8; round++) {
     const withTools = tools && round < 5 && env.calls < 6;
     let j;
     try { j = await gcall({ systemInstruction: { parts: [{ text: sys }] }, contents, ...(withTools ? { tools: [{ functionDeclarations: T.TOOL_DECLS }] } : {}), generationConfig: gc, safetySettings: SAFETY, __media: env.media }, deadline, 20000); }
@@ -157,7 +158,11 @@ async function converse({ hist = [], userText, ctx = '', mem = '', env, extraSys
     const calls = parts.filter((p) => p.functionCall);
     if (!calls.length) {
       const t = textOf(j);
-      if (!t.trim()) return pick(['hah? pertanyaan lu terlalu busuk buat gue jawab.', 'skip. ganti pertanyaan.']);
+      if (!t.trim()) {
+        const c0 = j?.candidates?.[0]; console.error('phipop empty', c0?.finishReason, JSON.stringify(j?.promptFeedback || {}).slice(0, 200), (c0?.content?.parts || []).length);
+        if (emptyTry++ < 2 && deadline - Date.now() > 6000) { if (c0?.finishReason === 'MAX_TOKENS') gc.maxOutputTokens = 6000; continue; }
+        return pick(['hah? pertanyaan lu terlalu busuk buat gue jawab.', 'skip. ganti pertanyaan.']);
+      }
       if (!regen && (isBad(t))) { regen = true; contents.push({ role: 'model', parts: [{ text: t }] }, { role: 'user', parts: [{ text: '[sistem] jawabanmu melanggar batas (SARA/seks/pelecehan). Tulis ulang tanpa itu, tetap dalam gayamu.' }] }); continue; }
       return t;
     }
