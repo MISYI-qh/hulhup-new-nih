@@ -28,6 +28,15 @@ export function providers() {
   if (cv) { const base = (process.env.CLAUVIA_BASE_URL || 'https://router.clouvia.id/v1').replace(/\/+$/, '');
     const ms = (process.env.CLAUVIA_MODELS || '').split(',').map((x) => x.trim()).filter(Boolean);
     for (const m of ms.length ? ms : cvModels.length ? cvModels : ['']) if (m || !ms.length) list.push({ name: 'clouvia', url: base + '/chat/completions', key: cv, model: m, headers: {}, base }); }
+  // penyedia lain bergaya OpenAI; model bisa diganti lewat PHIPOP_<NAMA>_MODELS
+  const EX = [
+    ['groq', 'GROQ_API_KEY', 'https://api.groq.com/openai/v1', 'llama-3.3-70b-versatile'],
+    ['mistral', 'MISTRAL_API_KEY', 'https://api.mistral.ai/v1', 'mistral-small-latest'],
+    ['together', 'TOGETHER_API_KEY', 'https://api.together.xyz/v1', 'meta-llama/Llama-3.3-70B-Instruct-Turbo'],
+    ['cohere', 'COHERE_API_KEY', 'https://api.cohere.com/compatibility/v1', 'command-a-03-2025'],
+    ['pollinations', 'POLLINATIONS_API_KEY', 'https://gen.pollinations.ai/v1', 'openai']];
+  for (const [name, env, base, def] of EX) { const k = process.env[env]; if (!k) continue;
+    for (const m of (process.env['PHIPOP_' + name.toUpperCase() + '_MODELS'] || def).split(',').map((x) => x.trim()).filter(Boolean)) list.push({ name, url: base + '/chat/completions', key: k, model: m, headers: {} }); }
   return list;
 }
 
@@ -77,7 +86,7 @@ export async function altcall(body, deadline, perCall = 20000) {
     const ac = new AbortController(); const tm = setTimeout(() => ac.abort(), Math.min(perCall, left));
     try {
       const r = await fetch(p.url, { method: 'POST', signal: ac.signal, headers: { 'content-type': 'application/json', authorization: 'Bearer ' + p.key, ...p.headers }, body: JSON.stringify(toOpenAI(body, p.model)) });
-      if (!r.ok) { const e = new Error('alt'); e.status = r.status; console.error('phipop alt', p.name, p.model, r.status, String(await r.text().catch(() => '')).slice(0, 300).replace(/(sk-|clv_)[\w-]+/g, '***')); throw e; }
+      if (!r.ok) { const e = new Error('alt'); e.status = r.status; console.error('phipop alt', p.name, p.model, r.status, String(await r.text().catch(() => '')).slice(0, 300).replace(/(sk-|sk_|clv_|gsk_|mstrl_|key_)[\w-]+/g, '***')); throw e; }
       const j = await r.json(); const out = fromOpenAI(j);
       if (!out.candidates[0].content.parts.length) { console.error('phipop alt empty', p.name, p.model); throw new Error('empty'); }
       return out;
