@@ -412,3 +412,72 @@ test('keamanan: SSRF alamat khusus, diagnostik internal, masukan aneh, tanpa keb
   // /img tanpa tanda tangan ditolak
   assert.equal((await call('GET', '/img?u=aHR0cDovLzEyNy4wLjAuMS8&s=abc')).error, 'not_found');
 });
+
+test('phipop v2: tools hanya publik, tag khusus, relationship, chat async, kelola post', async () => {
+  const { q } = await import('../lib/db.js'); let n = 0;
+  globalThis.__phipopGen = async (h, t) => { n++; return t.includes('kasar') ? 'lu ngentot' : 'jawab ' + n; };
+  const adm = await reg('admv2'); const a = await reg('uv2a'); const b = await reg('uv2b');
+  await q(`update users set role='admin' where username='admv2'`);
+  const ph = await q(`select id from users where username='phipop'`).then((r) => r.rows[0]);
+  const T = await import('../lib/phtools.js'); const PHm = await import('../lib/phipop.js');
+  // kode pendek bolak-balik
+  for (const id of [1, 77, 123456]) assert.equal(T.decCode(T.encCode(id)), id);
+  // relationship ke phipop: hanya qih
+  await q(`insert into users(username, name, birth, pass_hash, pass_salt, verified, created) values ('qih','Qih','2000-01-01','x','x',true,1) on conflict do nothing`);
+  const rr = await call('POST', '/relations', { token: a, body: { to: 'phipop', type: 'friend' } });
+  assert.equal(rr.error, 'forbidden');
+  // tools: hanya publik
+  await q(`update users set pvis='public' where username in ('uv2a','uv2b')`);
+  const pub = await call('POST', '/posts', { token: a, body: { text: 'kucing oren lucu banget', audios: 0 } });
+  const prv = await call('POST', '/posts', { token: a, body: { text: 'rahasia kucing belang', audios: 0, rand: ['friend'] } });
+  const sr = await T.searchHulhup({ q: 'kucing' });
+  assert.equal(sr.hasil.length, 1); assert.match(sr.hasil[0].teks, /oren/); assert.doesNotMatch(JSON.stringify(sr), /rahasia/);
+  assert.ok((await T.getPost(prv.id)).error); assert.ok((await T.getPost(T.postUrl(pub.id))).post);
+  assert.equal((await T.getPost(prv.id, prv.id)).post.id, prv.id); // di thread tempat di-tag
+  assert.equal((await T.getAccount('uv2a')).akun, '@uv2a');
+  // filter keluaran: seks tidak lolos
+  assert.doesNotMatch(PHm.sanitizeReply('lu ngentot'), /ngentot/); assert.doesNotMatch(PHm.sanitizeReply('dasar kafir'), /kafir/);
+  assert.equal(PHm.sanitizeReply('anjir goblok banget lu'), 'anjir goblok banget lu'); // kasar biasa boleh
+  // akses; ptag hanya untuk yang punya akses
+  await call('POST', '/phipop/request', { token: a, body: { why: 'tes' } });
+  const sent = await call('POST', '/phipop/admin/send', { token: adm, body: { username: 'uv2a' } });
+  assert.ok((await call('POST', '/phipop/redeem', { token: a, body: { code: sent.code } })).has_access);
+  const p1 = await call('POST', '/posts', { token: a, body: { text: 'woi @phipop', audios: 0 } });
+  const p2 = await call('POST', '/posts', { token: b, body: { text: 'woi @phipop', audios: 0 } });
+  const g = async (id, t) => (await call('GET', `/posts/${id}`, { token: t })).post;
+  assert.equal((await g(p1.id, a)).ptag, true); assert.equal((await g(p2.id, b)).ptag, false);
+  let cm; for (let i = 0; i < 30; i++) { cm = (await call('GET', `/posts/${p1.id}/comments`, { token: a })).items; if (cm.length && !cm[0].ph) break; await new Promise((r) => setTimeout(r, 100)); }
+  assert.equal(cm[0].username, 'phipop'); assert.equal(cm[0].ph, '');
+  assert.equal((await call('GET', `/posts/${p2.id}/comments`, { token: b })).items.length, 0); // tanpa akses: tidak dijawab
+  // tag di komentar
+  const c1 = await call('POST', `/posts/${p1.id}/comments`, { token: a, body: { text: '@phipop lanjut' } });
+  const c2 = await call('POST', `/posts/${p1.id}/comments`, { token: b, body: { text: '@phipop dong' } });
+  const all = (await call('GET', `/posts/${p1.id}/comments`, { token: a })).items; const mine = all.find((x) => x.id === c1.id), his = all.find((x) => x.id === c2.id);
+  assert.equal(mine.ptag, true); assert.equal(his.ptag, false);
+  // saran tag: phipop disembunyikan untuk yang tanpa akses
+  assert.equal((await call('GET', '/search?q=phipop&m=1', { token: b })).users.length, 0);
+  assert.equal((await call('GET', '/search?q=phipop&m=1', { token: a })).users.length, 1);
+  // chat async + polling
+  const st = await call('POST', '/phipop/chat', { token: a, body: { text: 'halo', async: true } });
+  assert.ok(st.id); let it; for (let i = 0; i < 30; i++) { it = (await call('GET', `/phipop/chat/${st.id}`, { token: a })).item; if (it.status !== 'run') break; await new Promise((r) => setTimeout(r, 100)); }
+  assert.equal(it.status, 'done'); assert.match(it.text, /jawab/); assert.ok(Array.isArray(it.links));
+  assert.ok((await call('GET', '/phipop/chat', { token: a })).items.length >= 2);
+  // memori tersimpan
+  assert.ok((await q(`select turns from phipop_mem where user_id=(select id from users where username='uv2a')`)).rows[0].turns >= 1);
+  // kelola post phipop: hanya admin
+  assert.equal((await call('GET', '/phipop/admin/posts', { token: a })).error, 'forbidden');
+  const mk = await call('POST', '/phipop/admin/post', { token: adm, body: { text: 'post dari phipop' } });
+  assert.ok(mk.id);
+  assert.equal((await call('GET', '/phipop/admin/posts', { token: adm })).items[0].text, 'post dari phipop');
+  assert.ok((await call('POST', `/phipop/admin/posts/${mk.id}/replace`, { token: adm, body: { text: 'diganti' } })).ok);
+  assert.equal((await call('GET', '/phipop/admin/posts', { token: adm })).items[0].text, 'diganti');
+  assert.ok((await call('DELETE', `/phipop/admin/posts/${mk.id}`, { token: adm })).ok);
+  assert.equal((await call('GET', '/phipop/admin/posts', { token: adm })).items.length, 0);
+  // post otomatis (cron): dipakai mesin; di tes memakai kait palsu
+  process.env.CRON_SECRET = 'sekret';
+  const cr = await handle(Object.assign(Readable.from([]), { method: 'GET', socket: {}, headers: { authorization: 'Bearer sekret' } }), new URL('/cron/phipop-post?slot=am', 'http://x'));
+  assert.ok(cr.ok && (cr.id || cr.skipped));
+  const cr2 = await handle(Object.assign(Readable.from([]), { method: 'GET', socket: {}, headers: { authorization: 'Bearer sekret' } }), new URL('/cron/phipop-post?slot=am', 'http://x'));
+  assert.equal(cr2.skipped, true); // satu kali per slot per hari
+  delete globalThis.__phipopGen;
+});

@@ -316,3 +316,26 @@ CREATE TABLE IF NOT EXISTS phipop_chat (
   created BIGINT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS phipop_chat_u ON phipop_chat(user_id, id DESC);
+
+-- Phipop v2: memori per user, progres pencarian, tag khusus, log posting otomatis
+CREATE TABLE IF NOT EXISTS phipop_mem (
+  user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  notes   TEXT NOT NULL DEFAULT '',
+  buf     TEXT NOT NULL DEFAULT '',
+  turns   INT NOT NULL DEFAULT 0,
+  updated BIGINT NOT NULL DEFAULT 0
+);
+ALTER TABLE phipop_chat ADD COLUMN IF NOT EXISTS links JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE phipop_chat ADD COLUMN IF NOT EXISTS steps JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE phipop_chat ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'done';
+ALTER TABLE audios ADD COLUMN IF NOT EXISTS ptag BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE comments ADD COLUMN IF NOT EXISTS ptag BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE comments ADD COLUMN IF NOT EXISTS ph_state TEXT NOT NULL DEFAULT '';
+CREATE TABLE IF NOT EXISTS phipop_posts (
+  id      BIGSERIAL PRIMARY KEY,
+  day     TEXT NOT NULL,
+  slot    TEXT NOT NULL,
+  post_id BIGINT,
+  created BIGINT NOT NULL,
+  UNIQUE (day, slot)
+);

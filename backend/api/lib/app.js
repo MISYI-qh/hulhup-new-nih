@@ -4,7 +4,7 @@ import { preview, imgUrlOf, fetchImage } from './preview.js';
 import { q, one, many, tx } from './db.js';
 import { ApiErr, now, sha, token, hashPw, checkPw, dayStr, okBirth, ageOf, imageMime, audioMime, readBody } from './util.js';
 import { storeFor, putAudio, getAudio, delAudio } from './blobs.js';
-import { randomInt, timingSafeEqual } from 'node:crypto';
+import { randomInt, timingSafeEqual, createHash } from 'node:crypto';
 import * as PH from './phipop.js';
 import { OFFICIAL_IMG } from './official_assets.js';
 import { pushLater, pushDiag, pushReminders } from './push.js';
@@ -152,23 +152,23 @@ async function uv(u, me, today) {
   return {
     rels,
     username: u.username, name: u.name, bio: u.bio, age: mine ? ageOf(u.birth) : 0, birth: mine ? u.birth : '',
-    avatar: avUrl(u), avatar_ai: u.av_ver > 0 && u.av_ai === true, avatar_ai_kind: u.av_ver > 0 && u.av_ai === true ? (u.av_ai_kind || 'made') : '', cover: cvUrl(u), taps: mine ? Number(u.taps) : 0, pvis: mine ? u.pvis : '', rvis: mine ? (u.rvis || 'public') : '',
+    avatar: avUrl(u), avatar_ai: u.av_ver > 0 && u.av_ai === true && !OFFICIAL.includes(u.username), avatar_ai_kind: u.av_ver > 0 && u.av_ai === true && !OFFICIAL.includes(u.username) ? (u.av_ai_kind || 'made') : '', cover: cvUrl(u), taps: mine ? Number(u.taps) : 0, pvis: mine ? u.pvis : '', rvis: mine ? (u.rvis || 'public') : '',
     streak: streakOf(u, today), days: mine ? u.days : 0,
     followers: u.followers, following: u.following, audios: r.audios, is_following: r.isf, is_me: mine, verified: u.verified,
     labels: mine ? (await many('select id, name from rel_labels where owner=$1 order by lower(name)', [u.id])).map((x) => ({ id: Number(x.id), name: x.name })) : undefined,
   };
 }
 
-const AUD_SQL = `select a.id, a.descr, a.secs, a.pprof, a.rand, a.created, a.likes, a.plays, a.views, a.owner, a.body_len, a.in_rand, a.in_hups, a.n_audio, a.comments, a.bgm, a.bgm_idx, a.media, a.ai, a.ai_kind, a.body btext, u.username ou, u.name oname, u.av_ver oav, u.av_ai oai, u.av_ai_kind oaik, u.verified ov, u.pvis opvis,
+const AUD_SQL = `select a.id, a.descr, a.secs, a.pprof, a.rand, a.created, a.likes, a.plays, a.views, a.owner, a.body_len, a.in_rand, a.in_hups, a.n_audio, a.comments, a.bgm, a.bgm_idx, a.media, a.ai, a.ai_kind, a.ptag, a.body btext, u.username ou, u.name oname, u.av_ver oav, u.av_ai oai, u.av_ai_kind oaik, u.verified ov, u.pvis opvis,
   exists(select 1 from likes l where l.audio_id=a.id and l.user_id=$1) liked, exists(select 1 from saves sv where sv.post_id=a.id and sv.user_id=$1) saved from audios a join users u on u.id=a.owner`;
 
 function av(a) {
   const na = a.n_audio ?? 1;
   const files = Array.from({ length: na }, (_, i) => ({ url: `/audios/${a.id}/file${i ? `?i=${i}` : ''}`, secs: i === 0 ? a.secs : 0 }));
   return {
-    id: Number(a.id), desc: a.descr, secs: a.secs, popup: true, vis: 'public', url: files.length ? files[0].url : '', pprof: a.pprof, rand: a.rand,
+    id: Number(a.id), ptag: a.ptag === true, desc: a.descr, secs: a.secs, popup: true, vis: 'public', url: files.length ? files[0].url : '', pprof: a.pprof, rand: a.rand,
     created: Number(a.created), likes: a.likes, plays: a.plays || 0, views: a.views || 0, liked: a.liked, owner: a.ou, owner_name: a.oname,
-    owner_avatar: a.oav > 0 ? `/users/${a.ou}/avatar?v=${a.oav}` : null, owner_avatar_ai: a.oav > 0 && a.oai === true, owner_avatar_ai_kind: a.oav > 0 && a.oai === true ? (a.oaik || 'made') : '', ai: a.ai === true, ai_kind: a.ai === true ? (a.ai_kind || 'made') : '', owner_verified: a.ov,
+    owner_avatar: a.oav > 0 ? `/users/${a.ou}/avatar?v=${a.oav}` : null, owner_avatar_ai: a.oav > 0 && a.oai === true && !OFFICIAL.includes(a.ou), owner_avatar_ai_kind: a.oav > 0 && a.oai === true && !OFFICIAL.includes(a.ou) ? (a.oaik || 'made') : '', ai: a.ai === true, ai_kind: a.ai === true ? (a.ai_kind || 'made') : '', owner_verified: a.ov,
     long: Number(a.body_len || 0) > String(a.descr || '').length, in_rand: a.in_rand !== false, in_hups: a.in_hups === true,
     files, comments: a.comments || 0, saved: a.saved === true,
     bgm: a.bgm === true, bgm_idx: a.bgm_idx || 0, text: a.btext ?? null,
@@ -381,6 +381,7 @@ route('GET', /^\/search$/, async (c) => {
     const where = terms.map((_, i) => `(lower(username) like $${i + 1} or lower(name) like $${i + 1} or lower(bio) like $${i + 1})`).join(' and ');
     users.push(...await many(`select * from users where status='active' and ${where} order by (lower(username) like $${terms.length + 1}) desc, username limit 30`, [...terms.map((x) => '%' + esc(x) + '%'), esc(terms[0]) + '%']));
   }
+  if (c.query.m === '1' && !(c.me && await PH.accessOf(c.me.id))) { for (let i = users.length - 1; i >= 0; i--) if (users[i].username === PH.PH_USER) users.splice(i, 1); }
   const vid = c.me ? Number(c.me.id) : 0;
   const pc = terms.map((_, i) => `(lower(a.descr) like $${i + 2} or lower(coalesce(a.body,'')) like $${i + 2} or lower(u.username) like $${i + 2} or lower(u.name) like $${i + 2} or lower(a.mentions) like $${i + 2} or exists(select 1 from comments cm where cm.post_id=a.id and not cm.pending and lower(cm.body) like $${i + 2}))`).join(' and ');
   const rows = await many(`${AUD_SQL} where not a.hidden and not a.pending and u.status='active' and ${pc} order by a.id desc limit 120`, [vid, ...terms.map((x) => '%' + esc(x) + '%')]);
@@ -687,38 +688,27 @@ route('GET', /^\/audios\/(\d+)\/file$/, async (c, m) => {
 });
 
 
-/** Akun resmi (phipop, hulhup, misyi): foto profil dipasang otomatis saat pertama diminta. misyi diambil dari situsnya. */
-async function officialAvatar(username) {
-  const u = await one(`select id from users where username=$1 and av_ver > 0`, [username]);
-  if (!u) return null;
-  let mime = null, data = null;
-  if (OFFICIAL_IMG[username]) { mime = OFFICIAL_IMG[username][0]; data = Buffer.from(OFFICIAL_IMG[username][1], 'base64'); }
-  else if (username === 'misyi') {
-    try {
-      const base = 'https://misyi.my.id/';
-      const html = await (await fetch(base, { signal: AbortSignal.timeout(6000), headers: { 'user-agent': 'Mozilla/5.0 (HulhupBot)' } })).text();
-      const tags = [...html.matchAll(/<link[^>]+>/gi)].map((x) => x[0]).filter((t) => /rel=["'][^"']*(apple-touch-icon|icon)/i.test(t));
-      tags.sort((a, b) => (/apple-touch/i.test(b) ? 1 : 0) - (/apple-touch/i.test(a) ? 1 : 0));
-      const og = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)/i)?.[1];
-      const cands = [...tags.map((t) => t.match(/href=["']([^"']+)/i)?.[1]), og, '/favicon.png', '/icons/Icon-512.png', '/favicon.ico'].filter(Boolean);
-      for (const href of cands) {
-        try {
-          const url = new URL(href, base); if (url.hostname !== 'misyi.my.id') continue;
-          const res = await fetch(url, { signal: AbortSignal.timeout(6000) }); if (!res.ok) continue;
-          const buf = Buffer.from(await res.arrayBuffer()); const mm = buf.length && buf.length < 1500000 ? imageMime(buf) : null;
-          if (mm) { mime = mm; data = buf; break; }
-        } catch {}
-      }
-    } catch {}
-  }
-  if (!data) return null;
-  await q(`insert into photos(user_id, kind, mime, data) values ($1,'avatar',$2,$3) on conflict (user_id, kind) do nothing`, [u.id, mime, data]);
-  return { mime, data };
+/** Akun resmi (phipop, hulhup, misyi): foto profil dipasang/diperbarui otomatis dari aset tertanam, tanpa label AI. Sekali per instance. */
+const OFFICIAL = Object.keys(OFFICIAL_IMG);
+let officialDone = null;
+function ensureOfficial() {
+  officialDone ??= (async () => {
+    for (const un of OFFICIAL) {
+      const u = await one(`select id, av_ver, av_ai from users where username=$1`, [un]); if (!u) continue;
+      const [mime, b64] = OFFICIAL_IMG[un]; const data = Buffer.from(b64, 'base64');
+      const cur = await one(`select md5(data) h from photos where user_id=$1 and kind='avatar'`, [u.id]);
+      const want = createHash('md5').update(data).digest('hex');
+      if (!cur || (cur.h !== want && un !== 'hulhup')) {
+        await q(`insert into photos(user_id, kind, mime, data) values ($1,'avatar',$2,$3) on conflict (user_id, kind) do update set mime=$2, data=$3`, [u.id, mime, data]);
+        await q(`update users set av_ver=$2, av_ai=false, av_ai_kind='', av_deks=null where id=$1`, [u.id, now()]);
+      } else if (u.av_ai) await q(`update users set av_ai=false, av_ai_kind='' where id=$1`, [u.id]);
+    }
+  })().catch((e) => { officialDone = null; console.error('official sync', e?.message); });
+  return officialDone;
 }
 
 route('GET', /^\/users\/([a-z0-9_]+)\/(avatar|cover)$/, async (c, m) => {
   let r = await one(`select p.mime, p.data from photos p join users u on u.id=p.user_id where u.username=$1 and p.kind=$2 and u.status='active'`, [m[1], m[2]]);
-  if (!r && m[2] === 'avatar') r = await officialAvatar(m[1]);
   if (!r) throw new ApiErr('not_found', 404);
   return { binary: r.data, mime: r.mime, cache: 'public, max-age=31536000, immutable' };
 });
@@ -767,6 +757,7 @@ route('POST', /^\/relations$/, async (c) => {
   if (t === 'custom' && !lab) throw new ApiErr('empty');
   if (!o) throw new ApiErr('not_found', 404);
   if (o.id === u.id) throw new ApiErr('forbidden', 403);
+  if (o.username === PH.PH_USER && u.username !== 'qih') throw new ApiErr('forbidden', 403); // Phipop hanya berhubungan dengan bosnya
   await tx(async (c2) => {
     const ex = await c2.query(`select 1 from rels where (a=$1 and b=$2) or (a=$2 and b=$1)`, [u.id, o.id]);
     if (ex.rows.length) throw new ApiErr('rel_exists', 409);
@@ -974,7 +965,7 @@ async function openPost(id, c) {
   return a;
 }
 async function recount(postId) {
-  await q('update audios set comments=(select count(*) from comments where post_id=$1 and not pending) where id=$1', [postId]);
+  await q("update audios set comments=(select count(*) from comments where post_id=$1 and not pending and ph_state='') where id=$1", [postId]);
 }
 
 /** Daftar URL media (hanya URL yang disimpan): http/https, ≤ 2048 huruf, tanpa duplikat, maks 100 sebagai batas anti-penyalahgunaan. */
@@ -1022,7 +1013,7 @@ route('POST', /^\/posts$/, async (c) => {
     });
   } catch (e) { if (key) await delAudio('mongo', key); throw e; }
   if (n === 0) await mentionNotify(id, u.id);
-  if (PH_TAG.test(text)) await PH.later(phipopReply(u, id, null, text));
+  if (PH_TAG.test(text) && await PH.accessOf(u.id)) { await q('update audios set ptag=true where id=$1', [id]); await PH.later(phipopReply(u, id, null, text)); }
   return { ok: true, id };
 });
 
@@ -1133,15 +1124,15 @@ function cv(r, me, files) {
     text: r.body, long: !!r.body_key, audios: files || [],
     audio: files && files.length ? files[0] : null,
     likes: r.likes, liked: r.liked === true, created: Number(r.created), mine: !!me && Number(r.owner) === Number(me.id),
-    pinned: r.pinned === true,
+    pinned: r.pinned === true, ptag: r.ptag === true, ph: r.ph_state || '',
   };
 }
-const CMT_SQL = `select c.id, c.parent, c.owner, c.body, c.body_key, c.likes, c.created, c.pinned, u.username, u.name, u.av_ver, u.verified,
+const CMT_SQL = `select c.id, c.parent, c.owner, c.body, c.body_key, c.likes, c.created, c.pinned, c.ptag, c.ph_state, u.username, u.name, u.av_ver, u.verified,
   exists(select 1 from comment_likes l where l.comment_id=c.id and l.user_id=$2) liked from comments c join users u on u.id=c.owner`;
 
 route('GET', /^\/posts\/(\d+)\/comments$/, async (c, m) => {
   await openPost(m[1], c);
-  const rows = await many(`${CMT_SQL} where c.post_id=$1 and not c.pending and u.status='active' order by c.id asc limit 500`, [m[1], c.me ? c.me.id : 0]);
+  const rows = await many(`${CMT_SQL} where c.post_id=$1 and not c.pending and u.status='active' and not (c.ph_state<>'' and c.created < $3) order by c.id asc limit 500`, [m[1], c.me ? c.me.id : 0, now() - 150000]);
   const fl = await many(`select ca.comment_id, ca.idx, ca.secs from comment_audios ca join comments c on c.id=ca.comment_id where c.post_id=$1 order by ca.comment_id, ca.idx`, [m[1]]);
   const by = new Map();
   for (const f of fl) { const k = Number(f.comment_id); if (!by.has(k)) by.set(k, []); by.get(k).push({ url: `/comments/${k}/file?i=${f.idx}`, secs: f.secs }); }
@@ -1176,7 +1167,7 @@ route('POST', /^\/posts\/(\d+)\/comments$/, async (c, m) => {
   } catch (e) { if (key) await delAudio('mongo', key); throw e; }
   await recount(post.id);
   await mentionNotify(post.id, u.id, mentionsOf(text), [parentOwner, Number(post.owner)].filter(Boolean), snip);
-  if (PH_TAG.test(text)) await PH.later(phipopReply(u, post.id, id, text));
+  if (PH_TAG.test(text) && await PH.accessOf(u.id)) { await q('update comments set ptag=true where id=$1', [id]); await PH.later(phipopReply(u, post.id, id, text)); }
   return { ok: true, id };
 });
 
@@ -1293,21 +1284,93 @@ route('POST', /^\/phipop\/redeem$/, async (c) => {
   return { ok: true, ...(await phStatus(u)) };
 });
 
+const chatRow = (r) => ({ id: Number(r.id), role: r.role, text: r.body, created: Number(r.created), status: r.status, steps: r.steps || [], links: r.links || [] });
 route('GET', /^\/phipop\/chat$/, async (c) => {
   const u = c.need();
   if (!(await PH.accessOf(u.id))) throw new ApiErr('phipop_locked', 403);
-  const rows = await many('select id, role, body, created from phipop_chat where user_id=$1 order by id desc limit 40', [u.id]);
-  return { items: rows.reverse().map((r) => ({ id: Number(r.id), role: r.role, text: r.body, created: Number(r.created) })), ...(await phStatus(u)) };
+  await PH.reapChat(u.id);
+  const rows = await many('select id, role, body, created, status, steps, links from phipop_chat where user_id=$1 order by id desc limit 40', [u.id]);
+  return { ok: true, items: rows.reverse().map(chatRow), ...(await phStatus(u)) };
+});
+/** Progres satu jawaban (di-poll saat Phipop sedang mencari). */
+route('GET', /^\/phipop\/chat\/(\d+)$/, async (c, m) => {
+  const u = c.need();
+  await PH.reapChat(u.id);
+  const r = await one('select id, role, body, created, status, steps, links from phipop_chat where id=$1 and user_id=$2', [m[1], u.id]);
+  if (!r) throw new ApiErr('not_found', 404);
+  return { ok: true, item: chatRow(r), ...(r.status !== 'run' ? await phStatus(u) : {}) };
 });
 route('POST', /^\/phipop\/chat$/, async (c) => {
   const u = c.need(); await hit(`phc:${u.id}`, 30, 600);
   const txt = okText(c.body.text);
-  const reply = await PH.ask(u.id, txt, { chat: true, ctx: await PH.buildContext(txt.slice(0, PH.PH_MAX_IN)) });
-  return { ok: true, reply, ...(await phStatus(u)) };
+  const ctx = await PH.buildContext(txt.slice(0, PH.PH_MAX_IN));
+  if (c.body.async === true) { // klien baru: balik cepat, progres di-poll lewat GET /phipop/chat/:id
+    const j = await PH.chatStart(u.id, txt, ctx); await PH.later(j.job);
+    const rows = await many('select id, role, body, created, status, steps, links from phipop_chat where user_id=$1 order by id desc limit 2', [u.id]);
+    return { ok: true, id: j.id, items: rows.reverse().map(chatRow), ...(await phStatus(u)) };
+  }
+  const r = await PH.askFull(u.id, txt, { chat: true, ctx });
+  return { ok: true, reply: r.reply, links: r.links, ...(await phStatus(u)) };
 });
-route('DELETE', /^\/phipop\/chat$/, async (c) => { const u = c.need(); await q('delete from phipop_chat where user_id=$1', [u.id]); return { ok: true }; });
+route('DELETE', /^\/phipop\/chat$/, async (c) => { const u = c.need(); await q('delete from phipop_chat where user_id=$1', [u.id]); return { ok: true }; }); // memori jangka panjang tetap ada
 
 // admin (hanya akun ber-role admin): tinjau permintaan, kirim kode lewat notifikasi, atur pengecualian batas
+/** Phipop memposting sendiri (cron 07.00/21.00 WIB atau perintah qih). Tanpa audio, hanya teks + URL sumber. */
+async function phipopPublish(ph, p) {
+  const text = okText(p.text), media = okMedia(p.media);
+  const { body, key } = await putText(text);
+  const mentions = [...new Set((text.match(/@([a-z0-9_]{3,20})/g) || []).map((x) => x.slice(1)))].filter((x) => x !== PH.PH_USER).slice(0, 10);
+  const id = await tx(async (t) => Number((await t.query(`insert into audios(owner, descr, secs, rand, pprof, created, body, body_key, body_len, in_rand, in_hups, n_audio, pending, bgm, mentions, bgm_idx, media) values ($1,$2,0,'public',true,$3,$4,$5,$6,true,true,0,false,false,$7,0,$8::jsonb) returning id`,
+    [ph.id, cutPreview(text), now(), body, key, text.length, mentions.join(','), JSON.stringify(media)])).rows[0].id));
+  await mentionNotify(id, ph.id);
+  return id;
+}
+async function phipopAutoPost(slot, hint = '', log = true) {
+  const ph = await PH.phipopUser(); if (!ph) throw new ApiErr('not_found', 404);
+  const wib = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
+  let logId = null;
+  if (log) { const r = await one('insert into phipop_posts(day, slot, created) values ($1,$2,$3) on conflict do nothing returning id', [wib, slot, now()]); if (!r) return { ok: true, skipped: true }; logId = r.id; }
+  let draft = null;
+  try { draft = await PH.composePost(slot, hint); } catch (e) { console.error('phipop post', e?.message); }
+  if (!draft) { if (logId) await q('delete from phipop_posts where id=$1', [logId]); throw new ApiErr('phipop_busy', 503); }
+  const id = await phipopPublish(ph, draft);
+  if (logId) await q('update phipop_posts set post_id=$2 where id=$1', [logId, id]);
+  return { ok: true, id };
+}
+route('GET', /^\/phipop\/admin\/posts$/, async (c) => {
+  needAdmin(c);
+  const ph = await PH.phipopUser();
+  const rows = await many(`select a.id, a.descr, a.body, a.body_key, a.body_len, a.created, a.likes, a.comments, a.media from audios a where a.owner=$1 order by a.id desc limit 30`, [ph.id]);
+  return { items: await Promise.all(rows.map(async (r) => ({ id: Number(r.id), text: r.body_key ? await PH.postBody(r) : (r.body ?? r.descr), created: Number(r.created), likes: r.likes, comments: r.comments, media: r.media || [] }))) };
+});
+route('POST', /^\/phipop\/admin\/post$/, async (c) => {
+  needAdmin(c); await hit(`phpost:${c.me.id}`, 12, 3600);
+  const text = okText(c.body.text);
+  if (text) { const ph = await PH.phipopUser(); return { ok: true, id: await phipopPublish(ph, { text, media: c.body.media }) }; }
+  return phipopAutoPost('pm', String(c.body.hint ?? ''), false);
+});
+route('POST', /^\/phipop\/admin\/posts\/(\d+)\/replace$/, async (c, m) => {
+  needAdmin(c); await hit(`phrep:${c.me.id}`, 20, 3600);
+  const ph = await PH.phipopUser();
+  const old = await one('select id, body_key from audios where id=$1 and owner=$2', [m[1], ph.id]);
+  if (!old) throw new ApiErr('not_found', 404);
+  let text = okText(c.body.text), media = okMedia(c.body.media);
+  if (!text) { const d = await PH.composePost('pm', String(c.body.hint ?? '')); if (!d) throw new ApiErr('phipop_busy', 503); text = d.text; media = d.media; }
+  const { body, key } = await putText(text);
+  await q('update audios set descr=$2, body=$3, body_key=$4, body_len=$5, media=$6::jsonb where id=$1', [old.id, cutPreview(text), body, key, text.length, JSON.stringify(media)]);
+  if (old.body_key) await delAudio('mongo', old.body_key);
+  return { ok: true, id: Number(old.id) };
+});
+route('DELETE', /^\/phipop\/admin\/posts\/(\d+)$/, async (c, m) => {
+  needAdmin(c);
+  const ph = await PH.phipopUser();
+  const own = await one('select id from audios where id=$1 and owner=$2', [m[1], ph.id]);
+  if (!own) throw new ApiErr('not_found', 404);
+  const bl = await blobsOf('a.id=$1', 'c.post_id=$1', [own.id]);
+  await q('delete from audios where id=$1', [own.id]);
+  await Promise.all(bl.map((b) => delAudio(b.store, b.key)));
+  return { ok: true };
+});
 route('GET', /^\/phipop\/admin$/, async (c) => {
   needAdmin(c);
   const reqs = await many(`select r.id, r.why, r.status, r.created, u.username, u.name from phipop_requests r join users u on u.id=r.user_id order by (r.status='pending') desc, r.created desc limit 100`);
@@ -1347,22 +1410,30 @@ route('POST', /^\/phipop\/admin\/grant$/, async (c) => {
 /** Tag @phipop di post/komentar: jawab sebagai komentar (hanya bila pengirim punya akses). */
 const PH_TAG = /(^|[^a-z0-9_])@phipop(?![a-z0-9_])/i;
 async function phipopReply(u, postId, parentId, text) {
+  let ph = null, cid = 0;
   try {
-    const ph = await PH.phipopUser(); if (!ph || Number(u.id) === Number(ph.id)) return;
+    ph = await PH.phipopUser(); if (!ph || Number(u.id) === Number(ph.id)) return;
     const post = await one(`select a.id, a.rand, a.body, a.body_key, a.descr, o.username ou from audios a join users o on o.id=a.owner where a.id=$1`, [postId]);
     if (!post) return;
-    let reply;
     const clean = String(text).replace(/@phipop(?![a-z0-9_])/ig, '').trim() || 'halo';
-    const ctx = await PH.buildContext(clean.slice(0, PH.PH_MAX_IN), { id: Number(post.id), owner: post.ou, priv: !String(post.rand || 'public').split(',').includes('public'), text: parentId ? await PH.postBody(post) : '' });
-    try { reply = await PH.ask(u.id, clean, { ctx });
-    }
-    catch (e) { if (e.code === 'phipop_limit') reply = 'jatah lu abis dulu. nunggu reset, sabar dikit napa.'; else return; }
+    // balasan langsung muncul sebagai komentar "sedang mikir/mencari" (animasi), lalu diisi saat jawaban jadi
+    cid = Number((await one(`insert into comments(post_id, owner, parent, body, body_len, pending, n_audio, created, ph_state) values ($1,$2,$3,'',0,false,0,$4,'run:mikir') returning id`, [postId, ph.id, parentId, now()])).id);
+    const label = (st) => { const x = st[st.length - 1]; return x ? `run:${x.k}|${x.t}`.slice(0, 120) : 'run:mikir'; };
+    const ctx = [await PH.buildThread(Number(postId)), await PH.buildContext(clean.slice(0, PH.PH_MAX_IN))].filter(Boolean).join('\n');
+    const priv = !String(post.rand || 'public').split(',').includes('public');
+    let reply, links = [];
+    try {
+      const r = await PH.askFull(u.id, clean, { ctx, allowId: Number(postId), who: `@${u.username}`, where: 'komentar', priv, onStep: (st) => { q('update comments set ph_state=$2 where id=$1', [cid, label(st)]).catch(() => {}); } });
+      reply = r.reply; links = r.links;
+    } catch (e) { if (e.code === 'phipop_limit') reply = 'jatah lu abis dulu. nunggu reset, sabar dikit napa.'; else throw e; }
+    const web = links.filter((x) => !/hulhup\.my\.id\/p\//.test(x)), hul = links.find((x) => /hulhup\.my\.id\/p\//.test(x));
+    const body = (reply + (hul && !priv && /\b(post|ini|itu)\b/i.test(reply) ? `\n${hul}` : '') + (web.length ? '\n' + web.slice(0, 3).join('\n') : '')).slice(0, 4000);
     await tx(async (t) => {
-      await t.query('insert into comments(post_id, owner, parent, body, body_len, pending, n_audio, created) values ($1,$2,$3,$4,$5,false,0,$6)', [postId, ph.id, parentId, reply, reply.length, now()]);
+      await t.query(`update comments set body=$2, body_len=$3, ph_state='', created=$4 where id=$1`, [cid, body, body.length, now()]);
       await notify(t, Number(u.id), parentId ? 'reply' : 'comment', Number(ph.id), Number(postId), reply.slice(0, 80));
     });
     await recount(postId);
-  } catch {}
+  } catch (e) { if (cid) await q('delete from comments where id=$1', [cid]).catch(() => {}); }
 }
 
 /** Diagnostik internal hanya untuk pemegang CRON_SECRET. */
@@ -1376,6 +1447,10 @@ function cronOk(req, url) {
 export async function handle(req, url) {
   const m0 = req.method;
   const path = url.pathname.replace(/\/+$/, '') || '/';
+  if (path === '/cron/phipop-post') {
+    if (!cronOk(req, url)) throw new ApiErr('unauthorized', 401);
+    return phipopAutoPost(url.searchParams.get('slot') === 'pm' ? 'pm' : 'am');
+  }
   if (path === '/cron/reminder') {
     const k = process.env.CRON_SECRET, got = String(req.headers.authorization || '').replace('Bearer ', '') || url.searchParams.get('key');
     const ga = Buffer.from(String(got)), ka = Buffer.from(String(k || ''));
@@ -1384,6 +1459,7 @@ export async function handle(req, url) {
   }
   if (path === '/' || path === '/health') { if (url.searchParams.get('warm')) await one('select 1 as x'); if (url.searchParams.get('push') && cronOk(req, url)) return { ok: true, push: await pushDiag() }; return { ok: true, service: 'hulhup-api' }; }
   if (path === '/deks/selftest') { if (!cronOk(req, url)) throw new ApiErr('not_found', 404); return runSelfTest(); }
+  await ensureOfficial();
   const me = await authUser(req);
   const ip = ipOf(req);
   if (!/^\/users\/[a-z0-9_]+\/(avatar|cover)$/.test(path)) await hit(`ip:${ip}`, 600, 60); // foto profil di-cache lama; tidak dihitung agar daftar panjang tidak terblokir

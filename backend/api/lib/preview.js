@@ -31,7 +31,7 @@ export function privateIp(ip) {
 }
 
 // Alamat diperiksa tepat saat koneksi dibuat, jadi tidak bisa dibelokkan ke jaringan dalam (SSRF / DNS rebinding).
-const safeLookup = (host, opts, cb) => dns.lookup(host, { all: true }, (err, list) => {
+export const safeLookup = (host, opts, cb) => dns.lookup(host, { all: true }, (err, list) => {
   if (err) return cb(err);
   const ok = list.filter((x) => !privateIp(x.address));
   if (!ok.length) return cb(new Error('blocked'));
@@ -39,7 +39,7 @@ const safeLookup = (host, opts, cb) => dns.lookup(host, { all: true }, (err, lis
   cb(null, ok[0].address, ok[0].family);
 });
 
-function get(url, ua) {
+export function get(url, ua) {
   return new Promise((resolve, reject) => {
     const u = new URL(url);
     if (!/^https?:$/.test(u.protocol) || u.username || u.password) return reject(new Error('bad_url'));
@@ -63,7 +63,7 @@ function get(url, ua) {
   });
 }
 
-const ent = (s) => String(s || '').replace(/&(#x?[0-9a-f]+|amp|lt|gt|quot|apos|nbsp);/gi, (m, e) => {
+export const ent = (s) => String(s || '').replace(/&(#x?[0-9a-f]+|amp|lt|gt|quot|apos|nbsp);/gi, (m, e) => {
   const l = e.toLowerCase();
   if (l === 'amp') return '&'; if (l === 'lt') return '<'; if (l === 'gt') return '>'; if (l === 'quot') return '"'; if (l === 'apos') return "'"; if (l === 'nbsp') return ' ';
   const code = l[1] === 'x' ? parseInt(l.slice(2), 16) : parseInt(l.slice(1), 10);

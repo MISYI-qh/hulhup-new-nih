@@ -4,7 +4,7 @@
   ],
   "functions": {
     "api/index.js": {
-      "maxDuration": 20,
+      "maxDuration": 60,
       "memory": 512
     }
   },
@@ -12,6 +12,16 @@
     {
       "source": "/(.*)",
       "destination": "/api/index.js"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/cron/phipop-post?slot=am",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/cron/phipop-post?slot=pm",
+      "schedule": "0 14 * * *"
     }
   ]
 }
