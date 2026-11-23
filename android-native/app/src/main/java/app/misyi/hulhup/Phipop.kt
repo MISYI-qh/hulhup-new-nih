@@ -165,15 +165,17 @@ private fun fmtCode(s: String): String = s.uppercase().filter { it.isLetterOrDig
     fun send() {
         val t = text.trim(); if (t.isEmpty() || busy || out) return
         busy = true; text = ""; val sentReply = replyTo; replyTo = null
-        val mine = JSONObject().put("id", -System.nanoTime()).put("role", "user").put("text", t).put("created", System.currentTimeMillis()); msgs.add(mine)
+        val mine = JSONObject().put("id", -System.nanoTime()).put("role", "user").put("text", t).put("created", System.currentTimeMillis()).apply { if (sentReply != null) put("reply", JSONObject().put("id", sentReply.optLong("id")).put("role", sentReply.optString("role")).put("text", sentReply.optString("text").take(140))) }; msgs.add(mine)
         sc.launch {
             var rid = 0L
             try {
-                val j = Api.req("POST", "/phipop/chat", JSONObject().put("text", t).put("async", true).apply { val rt = replyTo; if (rt != null && rt.optLong("id") > 0) put("reply_to", rt.optLong("id")) })
+                val j = Api.req("POST", "/phipop/chat", JSONObject().put("text", t).put("async", true).apply { val rt = sentReply; if (rt != null && rt.optLong("id") > 0) put("reply_to", rt.optLong("id")) })
                 setSt(j); rid = j.optLong("id")
                 val its = j.optJSONArray("items")
                 val row = if (its != null && its.length() > 0) its.getJSONObject(its.length() - 1) else JSONObject().put("id", rid).put("role", "phipop").put("text", "").put("status", "run")
                 msgs.add(row)
+                // ganti pesan sementara dengan baris asli dari server supaya punya ID dan bisa dibalas
+                if (its != null && its.length() >= 2) { val urow = its.getJSONObject(its.length() - 2); if (urow.optString("role") == "user" && urow.optLong("id") > 0) { val mi = msgs.indexOf(mine); if (mi >= 0 && msgs.none { it.optLong("id") == urow.optLong("id") }) msgs[mi] = urow } }
                 var fails = 0; val t0 = System.currentTimeMillis()
                 while (System.currentTimeMillis() - t0 < 150000) {
                     kotlinx.coroutines.delay(700)

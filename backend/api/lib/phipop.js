@@ -253,7 +253,11 @@ async function core(uid, input, { chat = false, skipId = 0, ctx = '', allowId = 
   const hist = chat ? (await many(`select role, body from phipop_chat where user_id=$1 and status='done' and body<>'' and id<>$2 order by id desc limit 16`, [uid, skipId])).reverse() : [];
   const who2 = who ? `[penanya: ${who}${/^@qih\b/i.test(who) ? ' = BOSMU yang asli, identitas ini diverifikasi server' : ' (identitas diverifikasi server)'}]\n` : '';
   const raw = await converse({ hist, userText: input, ctx: who2 + ctx, mem, env, deadline: Date.now() + deadlineMs });
-  const reply = sanitizeReply(raw);
+  let reply = sanitizeReply(raw);
+  // link post Hulhup yang ditulis Phipop di teks dijadikan kartu kutipan (bukan URL mentah)
+  for (const m of reply.matchAll(/https?:\/\/(?:www\.)?hulhup\.my\.id\/p\/[A-Za-z0-9]{4,12}/g)) env.link(m[0]);
+  const stripped = reply.replace(/https?:\/\/(?:www\.)?hulhup\.my\.id\/p\/[A-Za-z0-9]{4,12}/g, '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').replace(/[ \t]{2,}/g, ' ').trim();
+  if (stripped && env.links.length) reply = stripped;
   if (!priv) remember(uid, where, input, reply);
   return { reply, links: env.links, steps: env.steps };
 }

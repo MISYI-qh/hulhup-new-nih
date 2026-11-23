@@ -72,7 +72,8 @@ export function PhipopScreen() {
     let r: any;
     try { r = await Api.req('POST', '/phipop/chat', { text: t, async: true, ...(cur && cur.id > 0 ? { reply_to: cur.id } : {}) }); }
     catch (e) { setMsgs((m) => m.slice(0, -1)); setText(t); setRp(cur); throw e; }
-    setSt(r); setMsgs((m) => [...m, { id: r.id, role: 'phipop', text: '', created: Date.now(), status: 'run', steps: [], links: [] }]);
+    setSt(r); const its: Msg[] = r.items ?? []; const ur = its.length >= 2 ? its[its.length - 2] : null; // pesan sementara diganti baris asli server supaya bisa dibalas
+    setMsgs((m) => { const x = [...m]; if (ur && ur.role === 'user' && ur.id > 0) { for (let i = x.length - 1; i >= 0; i--) if (x[i].id < 0 && x[i].role === 'user') { x[i] = ur; break; } } return [...x, { id: r.id, role: 'phipop', text: '', created: Date.now(), status: 'run', steps: [], links: [] }]; });
     await poll(r.id);
   });
   const meter = st.limit === null ? s.t('ph_unlimited') : `${s.t('ph_left').replace('{n}', `${st.left}`).replace('{m}', `${st.limit}`)}${st.reset_at ? ' · ' + s.t('ph_reset').replace('{t}', leftT(st.reset_at - Date.now())) : ''}`;
