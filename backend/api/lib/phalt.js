@@ -19,12 +19,24 @@ async function discover() {
   } catch (e) { console.error('phipop clouvia /models gagal', String(e.message || e).slice(0, 100)); }
 }
 
+// kumpulan kunci: satu kunci tunggal + daftar dipisah koma; urutan diputar tiap panggilan agar beban merata
+let rr = 0;
+function pool(single, plural, onlyPlural = false) {
+  const ks = [...new Set([onlyPlural ? '' : process.env[single], ...String(process.env[plural] || '').split(',')].map((x) => (x || '').trim()).filter(Boolean))];
+  if (ks.length > 1) { const o = (rr++) % ks.length; return [...ks.slice(o), ...ks.slice(0, o)]; }
+  return ks;
+}
+
 // lvl: 1 = gratis/kecil (pertanyaan ringan), 2 = gratis/besar, 3 = berbayar/kuat (Clouvia, OpenRouter)
 export function providers(lvls = [3, 2, 1]) {
   const list = [];
-  const or = process.env.OPENROUTER_API_KEY;
-  if (or) for (const m of (process.env.PHIPOP_OR_MODELS || 'google/gemini-2.5-flash,openai/gpt-4o-mini').split(',').map((x) => x.trim()).filter(Boolean))
-    list.push({ lvl: 3, name: 'openrouter', url: 'https://openrouter.ai/api/v1/chat/completions', key: or, model: m, headers: { 'HTTP-Referer': 'https://hulhup.my.id', 'X-Title': 'Hulhup' } });
+  for (const or of pool('OPENROUTER_API_KEY', 'OPENROUTER_API_KEYS'))
+    for (const m of (process.env.PHIPOP_OR_MODELS || 'google/gemini-2.5-flash,openai/gpt-4o-mini').split(',').map((x) => x.trim()).filter(Boolean))
+      list.push({ lvl: 3, name: 'openrouter', url: 'https://openrouter.ai/api/v1/chat/completions', key: or, model: m, headers: { 'HTTP-Referer': 'https://hulhup.my.id', 'X-Title': 'Hulhup' } });
+  // model gratis OpenRouter (satu akun satu kunci): dicoba setelah yang berbayar
+  for (const or of pool('OPENROUTER_API_KEY', 'OPENROUTER_API_KEYS'))
+    for (const m of (process.env.PHIPOP_ORFREE_MODELS || 'meta-llama/llama-3.3-70b-instruct:free,google/gemma-3-27b-it:free').split(',').map((x) => x.trim()).filter(Boolean))
+      list.push({ lvl: 2, name: 'openrouter', url: 'https://openrouter.ai/api/v1/chat/completions', key: or, model: m, headers: { 'HTTP-Referer': 'https://hulhup.my.id', 'X-Title': 'Hulhup' } });
   const cv = process.env.CLAUVIA_API_KEY;
   if (cv) { const base = (process.env.CLAUVIA_BASE_URL || 'https://router.clouvia.id/v1').replace(/\/+$/, '');
     const ms = (process.env.CLAUVIA_MODELS || '').split(',').map((x) => x.trim()).filter(Boolean);
@@ -34,10 +46,13 @@ export function providers(lvls = [3, 2, 1]) {
     ['mistral', 'MISTRAL_API_KEY', 'https://api.mistral.ai/v1', [['mistral-small-latest', 1]]],
     ['pollinations', 'POLLINATIONS_API_KEY', 'https://gen.pollinations.ai/v1', [['openai', 1]]],
     ['together', 'TOGETHER_API_KEY', 'https://api.together.xyz/v1', [['meta-llama/Llama-3.3-70B-Instruct-Turbo', 2]]],
-    ['cohere', 'COHERE_API_KEY', 'https://api.cohere.com/compatibility/v1', [['command-a-03-2025', 2]]]];
-  for (const [name, env, base, ms] of EX) { const k = process.env[env]; if (!k) continue;
+    ['cohere', 'COHERE_API_KEYS', 'https://api.cohere.com/compatibility/v1', [['command-r7b-12-2024', 1], ['command-a-03-2025', 2]]],
+    ['nvidia', 'NVIDIA_API_KEYS', 'https://integrate.api.nvidia.com/v1', [['meta/llama-3.1-8b-instruct', 1], ['meta/llama-3.3-70b-instruct', 2]]],
+    ['sambanova', 'SAMBANOVA_API_KEYS', 'https://api.sambanova.ai/v1', [['Meta-Llama-3.1-8B-Instruct', 1], ['Meta-Llama-3.3-70B-Instruct', 2]]]];
+  for (const [name, env, base, ms] of EX) {
     const ov = (process.env['PHIPOP_' + name.toUpperCase() + '_MODELS'] || '').split(',').map((x) => x.trim()).filter(Boolean);
-    for (const [m, lvl] of ov.length ? ov.map((x) => [x, 2]) : ms) list.push({ lvl, name, url: base + '/chat/completions', key: k, model: m, headers: {} }); }
+    for (const k of pool(env.replace(/S$/, ''), env, name === 'cohere')) // cohere: kunci lama diabaikan
+      for (const [m, lvl] of ov.length ? ov.map((x) => [x, 2]) : ms) list.push({ lvl, name, url: base + '/chat/completions', key: k, model: m, headers: {} }); }
   return lvls.flatMap((l) => list.filter((p) => p.lvl === l));
 }
 
@@ -82,7 +97,7 @@ const cool = new Map();
 export async function altcall(body, deadline, perCall = 20000, lvls = [3, 2, 1]) {
   let last = null; await discover();
   for (const p of providers(lvls)) {
-    const id = p.name + p.model; if ((cool.get(id) || 0) > Date.now()) continue;
+    const id = p.name + p.model + p.key.slice(-6); if ((cool.get(id) || 0) > Date.now()) continue;
     const left = deadline - Date.now(); if (left < 3000) break;
     const ac = new AbortController(); const tm = setTimeout(() => ac.abort(), Math.min(perCall, left));
     try {

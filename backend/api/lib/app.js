@@ -1238,7 +1238,10 @@ route('DELETE', /^\/comments\/(\d+)$/, async (c, m) => {
     ...(await many(`${tree} select body_key from t where body_key is not null`, [r.id])).map((x) => ({ store: 'mongo', key: x.body_key })),
     ...(await many(`${tree} select ca.store, ca.blob_key from comment_audios ca join t on t.id=ca.comment_id`, [r.id])).map((x) => ({ store: x.store, key: x.blob_key })),
   ];
+  const phU = await PH.phipopUser().catch(() => null);
+  const phIn = phU ? await one(`${tree} select 1 x from t where exists (select 1 from comments c where c.id=t.id and c.owner=$2) limit 1`, [r.id, phU.id]) : null;
   await q('delete from comments where id=$1', [r.id]);
+  if (phIn) await PH.clearMem(r.owner).catch(() => {}); // percakapan dengan Phipop di komentar ini hilang, memorinya ikut dihapus
   await recount(r.post_id);
   await Promise.all(bl.map((b) => delAudio(b.store, b.key)));
   return { ok: true };
@@ -1322,7 +1325,7 @@ route('POST', /^\/phipop\/chat$/, async (c) => {
   const r = await PH.askFull(u.id, txt, { chat: true, ctx });
   return { ok: true, reply: r.reply, links: r.links, ...(await phStatus(u)) };
 });
-route('DELETE', /^\/phipop\/chat$/, async (c) => { const u = c.need(); await q('delete from phipop_chat where user_id=$1', [u.id]); return { ok: true }; }); // memori jangka panjang tetap ada
+route('DELETE', /^\/phipop\/chat$/, async (c) => { const u = c.need(); await q('delete from phipop_chat where user_id=$1', [u.id]); await PH.clearMem(u.id).catch(() => {}); return { ok: true }; }); // hapus chat = memori Phipop tentang akun ini ikut hilang
 
 // admin (hanya akun ber-role admin): tinjau permintaan, kirim kode lewat notifikasi, atur pengecualian batas
 /** Phipop memposting sendiri (cron 07.00/21.00 WIB atau perintah qih). Tanpa audio, hanya teks + URL sumber. */
@@ -1435,7 +1438,7 @@ async function phipopReply(u, postId, parentId, text, free = false) {
     try {
       const r = await PH.askFull(u.id, clean, { ctx, allowId: Number(postId), who: `@${u.username}`, where: 'komentar', priv, free, onStep: (st) => { q('update comments set ph_state=$2 where id=$1', [cid, label(st)]).catch(() => {}); } });
       reply = r.reply; links = r.links;
-    } catch (e) { if (e.code === 'phipop_limit') reply = 'jatah lu abis dulu. nunggu reset, sabar dikit napa.'; else throw e; }
+    } catch (e) { if (e.code === 'phipop_limit') reply = PH.LIMIT_LINES[Math.floor(Math.random() * PH.LIMIT_LINES.length)]; else throw e; }
     const web = links.filter((x) => !/hulhup\.my\.id\/p\//.test(x)), hul = links.find((x) => /hulhup\.my\.id\/p\//.test(x));
     const body = (reply + (hul && !priv && /\b(post|ini|itu)\b/i.test(reply) ? `\n${hul}` : '') + (web.length ? '\n' + web.slice(0, 3).join('\n') : '')).slice(0, 4000);
     await tx(async (t) => {

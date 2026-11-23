@@ -89,7 +89,8 @@ export function PhipopScreen() {
           ? <div key={m.id} style={{ alignSelf: 'flex-end', maxWidth: '82%', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
             {m.reply ? <div className="rplsnip" style={{ background: 'var(--soft)', padding: '6px 10px', borderRadius: 12, maxWidth: '100%' }}><b>{m.reply.role === 'phipop' ? 'Phipop' : s.t('ph_you')}</b><span>{m.reply.text}</span></div> : null}
             {body ? <div className="tap" onClick={() => m.id > 0 && setRp(m)} style={{ background: 'var(--btn)', color: 'var(--cream)', padding: '10px 14px', borderRadius: '20px 20px 6px 20px', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.4 }}>{body}</div> : null}
-            {q.quote ? <div style={{ width: 'min(100%, 320px)' }}><PhLink url={q.quote} /></div> : null}</div>
+            {q.quote ? <div style={{ width: 'min(100%, 320px)' }}><PhLink url={q.quote} /></div> : null}
+            {m.links?.length ? <div className="phlinks" style={{ width: 'min(100%, 320px)' }}>{m.links.map((u) => <PhLink key={u} url={u} />)}</div> : null}</div>
           : <div key={m.id} className="row2" style={{ alignSelf: 'flex-start', maxWidth: '90%', gap: 8, alignItems: 'flex-end' }}><Logo size={30} />
             {m.status === 'run' ? <div style={{ background: 'var(--soft)', padding: '8px 14px', borderRadius: '20px 20px 20px 6px', minWidth: 0 }}><PhRun label={runLabel(m.steps)} size={20} /></div>
               : <div style={{ minWidth: 0 }}>
