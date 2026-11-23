@@ -1,6 +1,7 @@
 package app.misyi.hulhup
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -79,8 +80,28 @@ private fun fmtCode(s: String): String = s.uppercase().filter { it.isLetterOrDig
             if (access) {
                 if (cur?.optBoolean("admin") == true) Tap(onTap = { go("/phipop/admin") }) { Box(Modifier.height(48.dp).padding(horizontal = 6.dp), contentAlignment = Alignment.Center) { Box(Modifier.clip(RoundedCornerShape(50)).background(soft()).padding(10.dp, 5.dp)) { HText(s.t("phipop_manage"), 12.5f, FontWeight.Bold) } } }
                 IconBtn(Icons.Rounded.MoreVert) { sc.launch {
-                    if (!confirm(s.t("phipop_clear"), s.t("phipop_clear_b"), s.t("phipop_clear"), true)) return@launch
-                    try { Api.req("DELETE", "/phipop/chat"); msgs.clear() } catch (e: Exception) { toast(s.err(e), true) }
+                    val act = sheet<String> { done -> Column {
+                        PBtn(s.t("ph_persona"), { done("persona") }, ghost = true, icon = Icons.Rounded.Face); Spacer(Modifier.height(10.dp))
+                        PBtn(s.t("phipop_clear"), { done("clear") }, ghost = true, icon = Icons.Rounded.DeleteOutline, fgc = Heart)
+                    } } ?: return@launch
+                    if (act == "persona") {
+                        val now = cur?.optString("persona")?.ifEmpty { null } ?: "brutal"
+                        val pick = sheet<String> { done -> Column {
+                            HText(s.t("ph_persona"), 18f, FontWeight.ExtraBold, modifier = Modifier.padding(bottom = 10.dp))
+                            listOf("penjilat", "jujur", "normal", "negatif", "brutal").forEach { k ->
+                                Tap(Modifier.fillMaxWidth(), .98f, onTap = { done(k) }) {
+                                    Row(Modifier.fillMaxWidth().padding(vertical = 12.dp, horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Box(Modifier.size(22.dp).border(2.dp, if (k == now) Brand else ink().copy(alpha = .3f), CircleShape), contentAlignment = Alignment.Center) { if (k == now) Box(Modifier.size(11.dp).background(Brand, CircleShape)) }
+                                        Spacer(Modifier.width(14.dp)); HText(s.t("ph_p_$k"), 16f, if (k == now) FontWeight.ExtraBold else FontWeight.SemiBold)
+                                    }
+                                }
+                            }
+                        } } ?: return@launch
+                        try { Api.req("PUT", "/phipop/persona", JSONObject().put("persona", pick)); st = JSONObject((cur ?: JSONObject()).toString()).put("persona", pick) } catch (e: Exception) { toast(s.err(e), true) }
+                    } else {
+                        if (!confirm(s.t("phipop_clear"), s.t("phipop_clear_b"), s.t("phipop_clear"), true)) return@launch
+                        try { Api.req("DELETE", "/phipop/chat"); msgs.clear() } catch (e: Exception) { toast(s.err(e), true) }
+                    }
                 } }
             }
         })
@@ -200,7 +221,8 @@ private fun fmtCode(s: String): String = s.uppercase().filter { it.isLetterOrDig
             val mineB = m.optString("role") == "user"; val run = m.optString("status") == "run"
             val links = (m.optJSONArray("links") ?: JSONArray()).let { ar -> (0 until ar.length()).map { ar.optString(it) }.filter { it.isNotEmpty() } }
             val raw = m.optString("text")
-            val shownText = if (mineB) { val q = quoteRef(raw); if (q != null) textWithout(raw, listOf(raw.substring(q.at, q.at + q.len))) else raw } else textWithout(raw, links)
+            val qUrl = if (mineB && links.isEmpty()) quoteRef(raw)?.let { raw.substring(it.at, it.at + it.len) } else null
+            val shownText = textWithout(raw, links + listOfNotNull(qUrl))
             val rp = m.optJSONObject("reply")
             Column(Modifier.fillMaxWidth(), horizontalAlignment = if (mineB) Alignment.End else Alignment.Start) {
                 if (rp != null) Row(Modifier.widthIn(max = 290.dp).padding(bottom = 4.dp).height(androidx.compose.foundation.layout.IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
@@ -217,7 +239,7 @@ private fun fmtCode(s: String): String = s.uppercase().filter { it.isLetterOrDig
                         else SelectionContainer { HText(shownText, 15f, color = if (mineB) bgOf() else ink(), lh = 21f) }
                     }
                 }
-                if (!run) Box(Modifier.widthIn(max = 320.dp).padding(start = if (mineB) 0.dp else 36.dp)) { if (mineB) { quoteRef(raw)?.let { QuoteCard(it.id) } } else LinkCards(links) }
+                if (!run) Box(Modifier.widthIn(max = 320.dp).padding(start = if (mineB) 0.dp else 36.dp)) { if (links.isNotEmpty()) LinkCards(links) else if (mineB) quoteRef(raw)?.let { QuoteCard(it.id) } }
             }
         }
         if (busy && msgs.none { it.optString("status") == "run" }) item(key = "typing") {
@@ -325,11 +347,11 @@ private fun fmtCode(s: String): String = s.uppercase().filter { it.isLetterOrDig
     suspend fun load() { try { val j = Api.req("GET", "/phipop/admin/posts"); items = (j.optJSONArray("items") ?: JSONArray()).let { a -> (0 until a.length()).map { a.getJSONObject(it) } } } catch (e: Exception) { toast(s.err(e), true); if (items == null) items = emptyList() } }
     LaunchedEffect(Unit) { load() }
     HText(s.t("pa_posts"), 18f, FontWeight.ExtraBold, modifier = Modifier.padding(top = 26.dp, bottom = 10.dp))
-    PField(newText, { newText = it.take(600) }, s.t("pa_text_ph"), min = 2, max = 6, enabled = !posting)
-    HText(s.t("pa_cancel_hint"), 12f, color = sub(), modifier = Modifier.padding(start = 6.dp, top = 6.dp, bottom = 10.dp))
-    PBtn(s.t(if (newText.isBlank()) "pa_post_now" else "pa_post_text"), { sc.launch {
+    PField(newText, { newText = it.take(300) }, s.t("ph_post_hint"), min = 2, max = 5, enabled = !posting)
+    Spacer(Modifier.height(10.dp))
+    PBtn(s.t("pa_post_now"), { sc.launch {
         posting = true
-        try { val b = JSONObject(); if (newText.isNotBlank()) b.put("text", newText.trim()); Api.req("POST", "/phipop/admin/post", b); newText = ""; toast(s.t("pa_done")); load() }
+        try { val b = JSONObject(); if (newText.isNotBlank()) b.put("hint", newText.trim()); Api.req("POST", "/phipop/admin/post", b); newText = ""; toast(s.t("pa_done")); load() }
         catch (e: Exception) { toast(s.err(e), true) }
         posting = false
     } }, loading = posting)

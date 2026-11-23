@@ -180,7 +180,7 @@ import org.json.JSONObject
             if (replyTo != null) Row(Modifier.padding(bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     HText(s.t("replying").replace("{n}", replyTo!!.optString("name")), 13f, FontWeight.Bold, acc())
-                    val snip = replyTo!!.optString("text").replace(Regex("\\s+"), " ").trim().take(120)
+                    val snip = replyTo!!.optString("text").ifBlank { replyTo!!.optString("body") }.replace(Regex("\\s+"), " ").trim().take(120)
                     if (snip.isNotEmpty()) HText(snip, 12.5f, color = sub(), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                 }
                 Tap(onTap = { val cur = input.text; if (cur.startsWith(autoTag)) input = TextFieldValue(cur.substring(autoTag.length)); autoTag = ""; replyTo = null }) { Icon(Icons.Rounded.Close, null, Modifier.padding(11.dp).size(26.dp), tint = sub()) }
@@ -208,7 +208,7 @@ import org.json.JSONObject
     var loadingFull by remember { mutableStateOf(false) }
     val liked = c.optBoolean("liked"); val isAuthor = c.optString("username") == postOwner
     val audios = (c.optJSONArray("audios") ?: JSONArray()).objects()
-    val shown = full ?: c.optString("text")
+    val shown = full ?: c.optString("text").ifBlank { c.optString("body") }
     suspend fun menu() {
         val iAmOwner = s.me?.username == postOwner
         val r = sheet<String> { done ->
@@ -230,8 +230,8 @@ import org.json.JSONObject
                 HText(c.optString("name"), 14.5f, FontWeight.ExtraBold, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
                 if (c.optBoolean("verified")) Icon(Icons.Rounded.Verified, null, Modifier.padding(start = 3.dp).size(14.dp), tint = Blue)
                 if (isAuthor) Box(Modifier.padding(start = 6.dp).background(ink(), RoundedCornerShape(8.dp)).padding(horizontal = 7.dp, vertical = 2.dp)) { HText(s.t("author"), 10.5f, FontWeight.ExtraBold, bgOf()) }
-                Spacer(Modifier.width(8.dp))
-                HText(s.`when`(c.optLong("created")), 12f, color = sub(), maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                Spacer(Modifier.width(6.dp))
+                HText(s.`when`(c.optLong("created")), 12f, color = sub(), maxLines = 1)
             }
             if (c.optBoolean("pinned")) Row(Modifier.padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Rounded.PushPin, null, Modifier.size(12.dp), tint = sub()); Spacer(Modifier.width(4.dp)); HText(s.t("pinned"), 11.5f, FontWeight.Bold, sub()) }
             val ph = c.optString("ph"); val isPh = c.optString("username") == "phipop"

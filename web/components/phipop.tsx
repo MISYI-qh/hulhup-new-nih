@@ -7,7 +7,7 @@ import { LinkEmbed, PhRun, QuoteCard, pullQuote, quoteRef } from './rich';
 import { postCode } from '@/lib/links';
 import { Api, useStore } from '@/lib/store';
 
-type St = { has_access: boolean; requested: boolean; used: number; limit: number | null; left: number | null; reset_at: number; exempt: boolean; admin: boolean };
+type St = { has_access: boolean; requested: boolean; used: number; limit: number | null; left: number | null; reset_at: number; exempt: boolean; admin: boolean; persona?: string };
 type Step = { k: string; t: string };
 type Msg = { id: number; role: 'user' | 'phipop'; text: string; created: number; status?: string; steps?: Step[]; links?: string[]; reply?: { id: number; role: 'user' | 'phipop'; text: string } };
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -42,7 +42,7 @@ export function PhipopScreen() {
   };
   useEffect(() => { if (ready && s.me) load(); }, [ready, s.me?.username]);
   useEffect(() => { end.current?.scrollIntoView({ block: 'end' }); }, [msgs.length, busy]);
-  const [, tick] = useState(0);
+  const [, tick] = useState(0); const [pp, setPp] = useState(false);
   useEffect(() => { const t = setInterval(() => tick((x) => x + 1), 30000); return () => clearInterval(t); }, []);
   if (!ready) return <Screen title="Phipop"><Loader k="form" /></Screen>;
   if (!s.me) return <Screen title="Phipop"><NeedLogin /></Screen>;
@@ -79,7 +79,11 @@ export function PhipopScreen() {
   const meter = st.limit === null ? s.t('ph_unlimited') : `${s.t('ph_left').replace('{n}', `${st.left}`).replace('{m}', `${st.limit}`)}${st.reset_at ? ' · ' + s.t('ph_reset').replace('{t}', leftT(st.reset_at - Date.now())) : ''}`;
   return <Screen title="Phipop" actions={<>
     {st.admin ? <button className="tap" style={{ padding: 10, fontWeight: 700 }} onClick={() => n.push('/phipop/admin')}>{s.t('ph_manage')}</button> : null}
+    <button className="tap" aria-label={s.t('ph_persona')} style={{ padding: 10 }} onClick={() => setPp((v) => !v)}><Icon n="tune_rounded" size={22} /></button>
     <button className="tap" aria-label={s.t('ph_clear')} style={{ padding: 10 }} onClick={async () => { if (await confirmDlg(s.t('ph_clear'), s.t('ph_clear') + '?', s.t('delete'), true)) { await Api.req('DELETE', '/phipop/chat'); setMsgs([]); } }}><Icon n="delete_outline_rounded" size={22} /></button></>}>
+    {pp ? <div style={{ padding: '4px 16px 10px' }}>
+      <div style={{ fontWeight: 800, fontSize: 13, margin: '0 4px 8px' }}>{s.t('ph_persona')}</div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>{['penjilat', 'jujur', 'normal', 'negatif', 'brutal'].map((k) => { const on = (st.persona || 'brutal') === k; return <button key={k} className="tap" style={{ padding: '8px 14px', borderRadius: 999, fontWeight: 700, fontSize: 13.5, background: on ? 'var(--btn)' : 'var(--soft)', color: on ? 'var(--cream)' : 'inherit' }} onClick={async () => { setSt((p: any) => ({ ...p, persona: k })); try { await Api.req('PUT', '/phipop/persona', { persona: k }); } catch (e) { toast(s.err(e), { bad: true }); } }}>{s.t('ph_p_' + k)}</button>; })}</div></div> : null}
     <div style={{ padding: '0 20px 6px', color: 'var(--sub)', fontWeight: 700, fontSize: 12.5, textAlign: 'center' }}>{meter}</div>
     <div className="pad" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 12 }}>
       {!msgs.length ? <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--sub)' }}><Logo size={72} /><div style={{ marginTop: 10, fontWeight: 600 }}>{s.t('ph_empty_chat')}</div></div> : null}
@@ -139,8 +143,7 @@ export function PhipopAdmin() {
     <div style={{ margin: '30px 0 8px', fontWeight: 800, fontSize: 16 }}>{s.t('ph_posts')}</div>
     <div className="sheetfield"><textarea rows={3} value={hint} placeholder={s.t('ph_post_hint')} onChange={(e) => setHint(e.target.value)} /></div>
     <div className="row2" style={{ gap: 8, marginTop: 8 }}>
-      <div style={{ flex: 1 }}><PBtn loading={pb} onClick={() => pact(async () => { await Api.req('POST', '/phipop/admin/post', { hint }, 90000); setHint(''); toast(s.t('ph_saved')); })}>{s.t('ph_post_now')}</PBtn></div>
-      {hint.trim() ? <div style={{ flex: 1 }}><PBtn ghost loading={pb} onClick={() => pact(async () => { await Api.req('POST', '/phipop/admin/post', { text: hint }); setHint(''); toast(s.t('ph_saved')); })}>{s.t('upload')}</PBtn></div> : null}</div>
+      <div style={{ flex: 1 }}><PBtn loading={pb} onClick={() => pact(async () => { await Api.req('POST', '/phipop/admin/post', { hint }, 90000); setHint(''); toast(s.t('ph_saved')); })}>{s.t('ph_post_now')}</PBtn></div></div>
     {pb ? <div style={{ color: 'var(--sub)', fontSize: 13, padding: '8px 2px', fontWeight: 600 }}>{s.t('ph_posting')}</div> : null}
     <div style={{ marginTop: 14 }}>
       {posts && !posts.length ? <div style={{ color: 'var(--sub)', padding: '10px 0' }}>{s.t('ph_posts_none')}</div> : null}

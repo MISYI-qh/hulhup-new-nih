@@ -72,7 +72,9 @@ val mentionRe = Regex("${linkRe.pattern}|@([a-z0-9_]{3,20})", RegexOption.IGNORE
     val body: @Composable () -> Unit = {
         var lay by remember { mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null) }
         val fsz = if (st.fontSize.isSp) st.fontSize.value else 15f
-        val inl = mapOf("phipop" to androidx.compose.foundation.text.InlineTextContent(androidx.compose.ui.text.Placeholder((fsz * 5.6f).sp, (fsz * 1.4f).sp, androidx.compose.ui.text.PlaceholderVerticalAlign.TextCenter)) { PhipopChip(fsz) })
+        val tmeas = rememberTextMeasurer(); val dens = androidx.compose.ui.platform.LocalDensity.current
+        val chipW = remember(fsz) { with(dens) { (tmeas.measure(AnnotatedString("Phipop"), TextStyle(fontSize = fsz.sp, fontWeight = FontWeight.ExtraBold, fontFamily = Outfit)).size.width.toDp() + (fsz * 1.15f).dp + 6.dp).toSp() } }
+        val inl = mapOf("phipop" to androidx.compose.foundation.text.InlineTextContent(androidx.compose.ui.text.Placeholder(chipW, (fsz * 1.4f).sp, androidx.compose.ui.text.PlaceholderVerticalAlign.TextCenter)) { PhipopChip(fsz) })
         androidx.compose.foundation.text.BasicText(ann, style = st, maxLines = maxLines, overflow = if (maxLines == Int.MAX_VALUE) TextOverflow.Clip else TextOverflow.Ellipsis, inlineContent = inl, onTextLayout = { lay = it },
             modifier = Modifier.pointerInput(ann) { detectTapGestures { pos ->
                 val l = lay ?: return@detectTapGestures; val off = l.getOffsetForPosition(pos)

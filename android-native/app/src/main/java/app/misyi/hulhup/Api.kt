@@ -74,6 +74,7 @@ object Api {
         val rq = when (m) {
             "GET" -> rb.get()
             "POST" -> rb.post((b?.toString() ?: "").toRequestBody("application/json".toMediaType()))
+            "PUT" -> rb.put((b?.toString() ?: "").toRequestBody("application/json".toMediaType()))
             "PATCH" -> rb.patch((b?.toString() ?: "").toRequestBody("application/json".toMediaType()))
             "DELETE" -> rb.delete()
             else -> throw ApiErr("not_found")

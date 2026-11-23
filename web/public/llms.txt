@@ -23,3 +23,4 @@ Hulhup is a home for voices and writing by Misyi: tap one button to hear a rando
 - Privasi per post: publik, pengikut, mengikuti, keduanya, teman, sahabat, pasangan, keluarga, atau akun tertentu
 - Tidak ada API publik; data hanya diakses lewat aplikasi
 - Bahasa: Indonesia dan Inggris
+- Phipop: AI di dalam Hulhup; chat dan tag di komentar, mencari post/akun publik, mencari web dengan sumber, melihat gambar dan mendengar audio (lewat mesin pengenal media), 5 kepribadian pilihan pengguna (penjilat, jujur, normal, negatif, brutal tanpa filter); hanya membaca data publik; ingatan chat dipisah dari komentar publik

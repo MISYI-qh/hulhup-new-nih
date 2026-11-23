@@ -1265,7 +1265,7 @@ route('POST', /^\/comments\/(\d+)\/like$/, async (c, m) => {
 
 // ---------- Phipop (AI) ----------
 const needAdmin = (c) => { const u = c.need(); if (u.role !== 'admin') throw new ApiErr('forbidden', 403); return u; };
-const phStatus = async (u) => ({ ...PH.statusOf(await PH.accessOf(u.id), await one(`select 1 x from phipop_requests where user_id=$1 and status='pending'`, [u.id])), admin: u.role === 'admin' });
+const phStatus = async (u) => ({ ...PH.statusOf(await PH.accessOf(u.id), await one(`select 1 x from phipop_requests where user_id=$1 and status='pending'`, [u.id])), admin: u.role === 'admin', persona: await PH.getPersona(u.id) });
 
 route('GET', /^\/phipop\/status$/, async (c) => ({ ok: true, ...(await phStatus(c.need())) }));
 
@@ -1324,6 +1324,13 @@ route('POST', /^\/phipop\/chat$/, async (c) => {
   }
   const r = await PH.askFull(u.id, txt, { chat: true, ctx });
   return { ok: true, reply: r.reply, links: r.links, ...(await phStatus(u)) };
+});
+route('PUT', /^\/phipop\/persona$/, async (c) => {
+  const u = c.need(); const p = String(c.body?.persona || '');
+  if (!PH.PERSONA_KEYS.includes(p)) throw new ApiErr('bad_request', 400);
+  const r = await q('update phipop_access set persona=$2 where user_id=$1', [u.id, p]);
+  if (r && r.rowCount === 0) throw new ApiErr('phipop_locked', 403);
+  return { ok: true, persona: p };
 });
 route('DELETE', /^\/phipop\/chat$/, async (c) => { const u = c.need(); await q('delete from phipop_chat where user_id=$1', [u.id]); await PH.clearMem(u.id).catch(() => {}); return { ok: true }; }); // hapus chat = memori Phipop tentang akun ini ikut hilang
 
@@ -1482,7 +1489,7 @@ export async function handle(req, url) {
     if (method !== m0) continue;
     const m = re.exec(path);
     if (!m) continue;
-    if (['POST', 'PATCH'].includes(m0) && String(req.headers['content-type'] || '').includes('json')) {
+    if (['POST', 'PATCH', 'PUT'].includes(m0) && String(req.headers['content-type'] || '').includes('json')) {
       const raw = await readBody(req, /^\/(posts|comments)/.test(path) ? 1024 * 1024 : 64 * 1024);
       try { ctx.body = raw.length ? JSON.parse(raw.toString('utf8')) : {}; } catch { throw new ApiErr('bad_file'); }
       if (typeof ctx.body !== 'object' || ctx.body === null || Array.isArray(ctx.body)) ctx.body = {};

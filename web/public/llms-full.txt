@@ -49,3 +49,4 @@ Dibuat dengan Flutter. Server Node.js di Vercel, database Postgres, audio di pen
 
 ## Kontak
 Misyi — https://hulhup.my.id
+- Phipop: AI di dalam Hulhup; chat dan tag di komentar, mencari post/akun publik, mencari web dengan sumber, melihat gambar dan mendengar audio (lewat mesin pengenal media), 5 kepribadian pilihan pengguna (penjilat, jujur, normal, negatif, brutal tanpa filter); hanya membaca data publik; ingatan chat dipisah dari komentar publik

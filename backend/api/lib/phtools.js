@@ -73,6 +73,26 @@ export async function searchHulhup({ q = '', kind = 'post', sort = 'baru' } = {}
   return { hasil: await Promise.all(rows.map((r) => card(r))) };
 }
 
+/** Pantau Hulhup (hanya baca, hanya yang publik): peringkat akun, post ramai, komentar terbaru, akun baru. */
+export async function pantau(jenis) {
+  const j = String(jenis || '');
+  if (j === 'pengikut_terbanyak') {
+    const rows = await many(`select u.username, u.name, count(f.src)::int n from users u left join follows f on f.dst=u.id where u.status='active' and u.pvis='public' group by u.id order by n desc, u.id asc limit 8`);
+    return { hasil: rows.map((r) => ({ akun: `@${r.username}`, nama: r.name, pengikut: r.n })) };
+  }
+  if (j === 'akun_baru') {
+    const rows = await many(`select username, name, bio from users where status='active' and pvis='public' order by id desc limit 8`);
+    return { hasil: rows.map((r) => ({ akun: `@${r.username}`, nama: r.name, bio: clip(r.bio, 100) })) };
+  }
+  if (j === 'komentar_baru') {
+    const since = Date.now() - 36 * 3600e3;
+    const rows = await many(`select c.body, c.post_id, cu.username cuser, pu.username puser from comments c join audios a on a.id=c.post_id join users cu on cu.id=c.owner join users pu on pu.id=a.owner where a.rand ~ '(^|,)public(,|$)' and not a.hidden and not a.pending and pu.status='active' and pu.pvis='public' and cu.status='active' and cu.pvis='public' and not c.pending and c.ph_state='' and c.created > $1 order by c.id desc limit 18`, [since]);
+    return { hasil: rows.map((r) => ({ oleh: `@${r.cuser}`, di_post_milik: `@${r.puser}`, url: postUrl(r.post_id), komentar: clip(r.body, 200) })) };
+  }
+  const rows = await many(`${POSTQ} where ${PUB} and a.created > ${Date.now() - 3 * 86400e3} order by (a.likes + a.comments * 2) desc, a.id desc limit 8`);
+  return { hasil: await Promise.all(rows.map((r) => card(r))) };
+}
+
 export async function getPost(ref, allowId = 0) {
   const id = refToId(ref); if (!id) return { error: 'referensi post tidak valid' };
   const r = await one(`${POSTQ} where a.id=$1`, [id]);
@@ -224,6 +244,8 @@ export async function viewAvatar(username, askerId = 0) {
 export const TOOL_DECLS = [
   { name: 'search_hulhup', description: 'Cari post atau akun di Hulhup (hanya yang publik). Pakai kalau pengguna minta cari/lihat post, akun, atau topik di Hulhup, atau butuh contoh/bahan dari Hulhup. sort=top untuk yang paling banyak disorot minggu ini.',
     parameters: { type: 'OBJECT', properties: { q: { type: 'STRING', description: 'kata kunci (boleh kosong untuk terbaru/top)' }, kind: { type: 'STRING', enum: ['post', 'akun'] }, sort: { type: 'STRING', enum: ['baru', 'top'] } } } },
+  { name: 'pantau_hulhup', description: 'Akses baca-saja ke data publik Hulhup. jenis: pengikut_terbanyak (akun dengan pengikut terbanyak), post_ramai (post publik paling ramai 3 hari terakhir), komentar_baru (komentar publik 36 jam terakhir, termasuk yang lagi ribut), akun_baru. Pakai untuk pertanyaan peringkat/statistik/lagi viral apa di Hulhup.',
+    parameters: { type: 'OBJECT', properties: { jenis: { type: 'STRING', enum: ['pengikut_terbanyak', 'post_ramai', 'komentar_baru', 'akun_baru'] } }, required: ['jenis'] } },
   { name: 'get_post', description: 'Baca satu post Hulhup lengkap beserta komentarnya. ref = id, kode 7 huruf, atau URL hulhup.my.id/p/...', parameters: { type: 'OBJECT', properties: { ref: { type: 'STRING' } }, required: ['ref'] } },
   { name: 'get_account', description: 'Lihat profil akun Hulhup publik dan post publik terbarunya.', parameters: { type: 'OBJECT', properties: { username: { type: 'STRING' } }, required: ['username'] } },
   { name: 'view_avatar', description: 'Lihat foto profil (avatar) sebuah akun Hulhup: akun publik mana pun, penanya sendiri, atau kamu sendiri (username phipop).', parameters: { type: 'OBJECT', properties: { username: { type: 'STRING' } }, required: ['username'] } },
