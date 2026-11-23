@@ -164,6 +164,18 @@ async function converse({ hist = [], userText, ctx = '', mem = '', env, extraSys
   const gc = { maxOutputTokens: 1400, temperature: 1.1, topP: 0.95, thinkingConfig: { thinkingBudget: 0 } };
   const hard = !!(ctx.length > 400 || env.media || /https?:\/\/|hulhup\.my\.id|\b(cari|cariin|cek|cekin|liat|lihat|tonton|nonton|dengerin|dengar|video|audio|reel|post|postingan|akun|profil|link|rangkum|ringkas|jelasin|jelaskan|analisis|bandingin|berita|terbaru|search|web|kenapa|gimana)\b/i.test(userText)) || !!extraSystem;
   if (!hard) tools = false; gc.maxOutputTokens = hard ? 900 : 350;
+  // media dari link (video/reel/gambar/audio): dibuka server lebih dulu, jangan bergantung pada model yang suka lupa memanggil alat
+  if (hard && !env.noPre && /(liat|lihat|tonton|nonton|dengerin|dengar|putar|video|reel|audio|suara|gambar|foto|isi(nya)?|tentang apa|apa (itu|ini)|bahas|jelasin|rangkum|ringkas|maksud)/i.test(userText)) {
+    const urls = [...new Set(`${userText}\n${ctx}`.match(/https?:\/\/[^\s)\]"'<>]+/g) || [])].map((u) => u.replace(/[.,;!?]+$/, '')).filter((u) => !/hulhup\.my\.id\/(?!p\/)/.test(u)).slice(0, 2);
+    const notes = [];
+    for (const u of urls) {
+      if (deadline - Date.now() < 15000) break;
+      const r = await runTool({ name: 'view_media', args: { url: u } }, env);
+      if (r.parts?.length) { for (const m of r.parts) turn.parts.push(m.fileUri ? { fileData: { mimeType: m.mimeType, fileUri: m.fileUri } } : { inlineData: m }); env.media = true; notes.push(`media dari ${u} sudah dilampirkan di bawah: lihat/dengarkan lalu jawab sesuai isinya. ${r.json?.catatan || ''}`); }
+      else notes.push(`media dari ${u} GAGAL dibuka (${r.json?.error || 'tidak ada media'}${r.json?.caption ? '; keterangan yang terbaca: ' + r.json.caption : ''}). Bilang jujur kamu cuma bisa baca keterangannya, bukan nonton/mendengar isinya, dan JANGAN mengarang isi videonya.`);
+    }
+    if (notes.length) turn.parts[0].text = `[sistem] ${notes.join(' ')}\n` + turn.parts[0].text;
+  }
   let regen = false, emptyTry = 0;
   for (let round = 0; round < 8; round++) {
     const withTools = tools && round < 5 && env.calls < 6;
