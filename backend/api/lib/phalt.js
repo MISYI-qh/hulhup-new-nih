@@ -19,25 +19,26 @@ async function discover() {
   } catch (e) { console.error('phipop clouvia /models gagal', String(e.message || e).slice(0, 100)); }
 }
 
-export function providers() {
+// lvl: 1 = gratis/kecil (pertanyaan ringan), 2 = gratis/besar, 3 = berbayar/kuat (Clouvia, OpenRouter)
+export function providers(lvls = [3, 2, 1]) {
   const list = [];
   const or = process.env.OPENROUTER_API_KEY;
   if (or) for (const m of (process.env.PHIPOP_OR_MODELS || 'google/gemini-2.5-flash,openai/gpt-4o-mini').split(',').map((x) => x.trim()).filter(Boolean))
-    list.push({ name: 'openrouter', url: 'https://openrouter.ai/api/v1/chat/completions', key: or, model: m, headers: { 'HTTP-Referer': 'https://hulhup.my.id', 'X-Title': 'Hulhup' } });
+    list.push({ lvl: 3, name: 'openrouter', url: 'https://openrouter.ai/api/v1/chat/completions', key: or, model: m, headers: { 'HTTP-Referer': 'https://hulhup.my.id', 'X-Title': 'Hulhup' } });
   const cv = process.env.CLAUVIA_API_KEY;
   if (cv) { const base = (process.env.CLAUVIA_BASE_URL || 'https://router.clouvia.id/v1').replace(/\/+$/, '');
     const ms = (process.env.CLAUVIA_MODELS || '').split(',').map((x) => x.trim()).filter(Boolean);
-    for (const m of ms.length ? ms : cvModels.length ? cvModels : ['']) if (m || !ms.length) list.push({ name: 'clouvia', url: base + '/chat/completions', key: cv, model: m, headers: {}, base }); }
-  // penyedia lain bergaya OpenAI; model bisa diganti lewat PHIPOP_<NAMA>_MODELS
+    for (const m of ms.length ? ms : cvModels.length ? cvModels : ['']) if (m || !ms.length) list.push({ lvl: 3, name: 'clouvia', url: base + '/chat/completions', key: cv, model: m, headers: {}, base }); }
   const EX = [
-    ['groq', 'GROQ_API_KEY', 'https://api.groq.com/openai/v1', 'llama-3.3-70b-versatile'],
-    ['mistral', 'MISTRAL_API_KEY', 'https://api.mistral.ai/v1', 'mistral-small-latest'],
-    ['together', 'TOGETHER_API_KEY', 'https://api.together.xyz/v1', 'meta-llama/Llama-3.3-70B-Instruct-Turbo'],
-    ['cohere', 'COHERE_API_KEY', 'https://api.cohere.com/compatibility/v1', 'command-a-03-2025'],
-    ['pollinations', 'POLLINATIONS_API_KEY', 'https://gen.pollinations.ai/v1', 'openai']];
-  for (const [name, env, base, def] of EX) { const k = process.env[env]; if (!k) continue;
-    for (const m of (process.env['PHIPOP_' + name.toUpperCase() + '_MODELS'] || def).split(',').map((x) => x.trim()).filter(Boolean)) list.push({ name, url: base + '/chat/completions', key: k, model: m, headers: {} }); }
-  return list;
+    ['groq', 'GROQ_API_KEY', 'https://api.groq.com/openai/v1', [['llama-3.1-8b-instant', 1], ['llama-3.3-70b-versatile', 2]]],
+    ['mistral', 'MISTRAL_API_KEY', 'https://api.mistral.ai/v1', [['mistral-small-latest', 1]]],
+    ['pollinations', 'POLLINATIONS_API_KEY', 'https://gen.pollinations.ai/v1', [['openai', 1]]],
+    ['together', 'TOGETHER_API_KEY', 'https://api.together.xyz/v1', [['meta-llama/Llama-3.3-70B-Instruct-Turbo', 2]]],
+    ['cohere', 'COHERE_API_KEY', 'https://api.cohere.com/compatibility/v1', [['command-a-03-2025', 2]]]];
+  for (const [name, env, base, ms] of EX) { const k = process.env[env]; if (!k) continue;
+    const ov = (process.env['PHIPOP_' + name.toUpperCase() + '_MODELS'] || '').split(',').map((x) => x.trim()).filter(Boolean);
+    for (const [m, lvl] of ov.length ? ov.map((x) => [x, 2]) : ms) list.push({ lvl, name, url: base + '/chat/completions', key: k, model: m, headers: {} }); }
+  return lvls.flatMap((l) => list.filter((p) => p.lvl === l));
 }
 
 export function toOpenAI(body, model) {
@@ -78,9 +79,9 @@ export function fromOpenAI(j) {
 
 const cool = new Map();
 /** Coba tiap penyedia cadangan sampai batas waktu; lempar galat terakhir bila semua gagal. */
-export async function altcall(body, deadline, perCall = 20000) {
+export async function altcall(body, deadline, perCall = 20000, lvls = [3, 2, 1]) {
   let last = null; await discover();
-  for (const p of providers()) {
+  for (const p of providers(lvls)) {
     const id = p.name + p.model; if ((cool.get(id) || 0) > Date.now()) continue;
     const left = deadline - Date.now(); if (left < 3000) break;
     const ac = new AbortController(); const tm = setTimeout(() => ac.abort(), Math.min(perCall, left));
