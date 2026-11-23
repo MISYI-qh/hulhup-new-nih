@@ -1315,7 +1315,7 @@ route('POST', /^\/phipop\/chat$/, async (c) => {
   if (c.body.async === true) { // klien baru: balik cepat, progres di-poll lewat GET /phipop/chat/:id
     let replyTo = 0;
     if (c.body.reply_to) { const rp = await one('select id from phipop_chat where id=$1 and user_id=$2', [Number(c.body.reply_to) || 0, u.id]); if (rp) replyTo = Number(rp.id); }
-    const j = await PH.chatStart(u.id, txt, ctx, replyTo); await PH.later(j.job);
+    const j = await PH.chatStart(u.id, txt, ctx, replyTo, `@${u.username}${u.name ? ` (nama tampil: ${String(u.name).slice(0, 40)})` : ''}`); await PH.later(j.job);
     const rows = await many(CHAT_SQL + ' where c.user_id=$1 order by c.id desc limit 2', [u.id]);
     return { ok: true, id: j.id, items: rows.reverse().map(chatRow), ...(await phStatus(u)) };
   }
