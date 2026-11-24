@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { NeedLogin, Screen, useNav, useReady } from './shell';
 import { Icon } from './Icon';
-import { Loader, PBtn, confirmDlg, toast } from './ui';
+import { Loader, PBtn, confirmDlg, sheet, toast } from './ui';
 import { LinkEmbed, PhRun, QuoteCard, pullQuote, quoteRef } from './rich';
 import { postCode } from '@/lib/links';
 import { Api, useStore } from '@/lib/store';
@@ -42,7 +42,7 @@ export function PhipopScreen() {
   };
   useEffect(() => { if (ready && s.me) load(); }, [ready, s.me?.username]);
   useEffect(() => { end.current?.scrollIntoView({ block: 'end' }); }, [msgs.length, busy]);
-  const [, tick] = useState(0); const [pp, setPp] = useState(false);
+  const [, tick] = useState(0); 
   useEffect(() => { const t = setInterval(() => tick((x) => x + 1), 30000); return () => clearInterval(t); }, []);
   if (!ready) return <Screen title="Phipop"><Loader k="form" /></Screen>;
   if (!s.me) return <Screen title="Phipop"><NeedLogin /></Screen>;
@@ -77,14 +77,23 @@ export function PhipopScreen() {
     await poll(r.id);
   });
   const meter = st.limit === null ? s.t('ph_unlimited') : `${s.t('ph_left').replace('{n}', `${st.left}`).replace('{m}', `${st.limit}`)}${st.reset_at ? ' · ' + s.t('ph_reset').replace('{t}', leftT(st.reset_at - Date.now())) : ''}`;
-  return <Screen title="Phipop" actions={<>
-    {st.admin ? <button className="tap" style={{ padding: 10, fontWeight: 700 }} onClick={() => n.push('/phipop/admin')}>{s.t('ph_manage')}</button> : null}
-    <button className="tap" aria-label={s.t('ph_persona')} style={{ padding: 10 }} onClick={() => setPp((v) => !v)}><Icon n="tune_rounded" size={22} /></button>
-    <button className="tap" aria-label={s.t('ph_clear')} style={{ padding: 10 }} onClick={async () => { if (await confirmDlg(s.t('ph_clear'), s.t('ph_clear') + '?', s.t('delete'), true)) { await Api.req('DELETE', '/phipop/chat'); setMsgs([]); } }}><Icon n="delete_outline_rounded" size={22} /></button></>}>
-    {pp ? <div style={{ padding: '4px 16px 10px' }}>
-      <div style={{ fontWeight: 800, fontSize: 13, margin: '0 4px 8px' }}>{s.t('ph_persona')}</div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>{['penjilat', 'jujur', 'normal', 'negatif', 'brutal'].map((k) => { const on = (st.persona || 'brutal') === k; return <button key={k} className="tap" style={{ padding: '8px 14px', borderRadius: 999, fontWeight: 700, fontSize: 13.5, background: on ? 'var(--btn)' : 'var(--soft)', color: on ? 'var(--cream)' : 'inherit' }} onClick={async () => { setSt((p: any) => ({ ...p, persona: k })); try { await Api.req('PUT', '/phipop/persona', { persona: k }); } catch (e) { toast(s.err(e), { bad: true }); } }}>{s.t('ph_p_' + k)}</button>; })}</div></div> : null}
-    <div style={{ padding: '0 20px 6px', color: 'var(--sub)', fontWeight: 700, fontSize: 12.5, textAlign: 'center' }}>{meter}</div>
+  const pickPersona = async () => {
+    const k = await sheet<string>((close: any) => <div style={{ padding: '4px 16px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ fontWeight: 800, fontSize: 18, padding: '4px 6px 8px' }}>{s.t('ph_persona')}</div>
+      {['penjilat', 'jujur', 'normal', 'negatif', 'brutal'].map((p) => { const on = (st.persona || 'brutal') === p; return <button key={p} className="tap" onClick={() => close(p as any)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px', borderRadius: 999, background: on ? 'var(--btn)' : 'var(--soft)', color: on ? 'var(--cream)' : 'inherit', fontWeight: 800, fontSize: 16, textAlign: 'left' }}><span style={{ flex: 1 }}>{s.t('ph_p_' + p)}</span>{on ? <Icon n="check_rounded" size={20} /> : null}</button>; })}</div>);
+    if (!k) return; setSt((p: any) => ({ ...p, persona: k }));
+    try { await Api.req('PUT', '/phipop/persona', { persona: k }); } catch (e) { toast(s.err(e), { bad: true }); }
+  };
+  const more = async () => {
+    const a = await sheet<string>((close: any) => <div style={{ padding: '4px 16px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <button className="tap" onClick={() => close('p' as any)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, padding: '18px 20px', borderRadius: 999, background: 'var(--soft)', fontWeight: 800, fontSize: 16 }}><Icon n="face_rounded" size={22} />{s.t('ph_persona')}</button>
+      <button className="tap" onClick={() => close('d' as any)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, padding: '18px 20px', borderRadius: 999, background: 'var(--soft)', fontWeight: 800, fontSize: 16, color: '#E0453A' }}><Icon n="delete_outline_rounded" size={22} />{s.t('ph_clear')}</button></div>);
+    if (a === 'p') await pickPersona();
+    else if (a === 'd' && await confirmDlg(s.t('ph_clear'), s.t('ph_clear') + '?', s.t('delete'), true)) { await Api.req('DELETE', '/phipop/chat'); setMsgs([]); }
+  };
+  return <Screen center={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}><img src="/phipop.png" alt="" width={34} height={34} style={{ borderRadius: 10, objectFit: 'contain' }} /><b style={{ fontSize: 21, fontWeight: 800 }}>Phipop</b></span>} actions={<>
+    {st.admin ? <button className="tap" style={{ padding: '9px 16px', margin: '0 6px', borderRadius: 999, background: 'var(--soft)', fontWeight: 800, fontSize: 14.5 }} onClick={() => n.push('/phipop/admin')}>{s.t('ph_manage')}</button> : null}
+    <button className="tap" aria-label="Menu" style={{ padding: 10 }} onClick={more}><Icon n="more_vert_rounded" size={24} /></button></>}>
     <div className="pad" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 12 }}>
       {!msgs.length ? <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--sub)' }}><Logo size={72} /><div style={{ marginTop: 10, fontWeight: 600 }}>{s.t('ph_empty_chat')}</div></div> : null}
       {msgs.map((m) => {
@@ -103,12 +112,12 @@ export function PhipopScreen() {
       })}
       <div ref={end} />
     </div>
-    <div className="cmtbar">{out ? <div style={{ textAlign: 'center', color: 'var(--sub)', fontWeight: 700, padding: '10px 0' }}>{s.t('ph_limit_note').replace('{t}', leftT(st.reset_at - Date.now()))}</div>
+    <div className="cmtbar"><div style={{ color: 'var(--sub)', fontWeight: 600, fontSize: 13, padding: '0 6px 6px' }}>{meter}</div>{out ? <div style={{ textAlign: 'center', color: 'var(--sub)', fontWeight: 700, padding: '10px 0' }}>{s.t('ph_limit_note').replace('{t}', leftT(st.reset_at - Date.now()))}</div>
       : <>{rp ? <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 6 }}><div className="rplsnip" style={{ flex: 1 }}><b>{s.t('ph_reply_to').replace('{n}', rp.role === 'phipop' ? 'Phipop' : s.t('ph_you'))}</b><span>{rp.text}</span></div>
           <button className="tap" aria-label="Batal" onClick={() => setRp(null)} style={{ color: 'var(--sub)' }}><Icon n="close_rounded" size={18} /></button></div> : null}
       <div className="row2" style={{ gap: 8 }}>
         <div className="sheetfield" style={{ flex: 1, margin: 0 }}><input value={text} maxLength={600} placeholder={s.t('ph_msg')} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }} /></div>
-        <button className="tap" aria-label="Kirim" disabled={busy || !text.trim()} onClick={send} style={{ width: 46, height: 46, borderRadius: 23, background: 'var(--btn)', color: 'var(--cream)', display: 'grid', placeItems: 'center', flex: 'none' }}><Icon n="send_rounded" size={20} /></button></div></>}</div>
+        <button className="tap" aria-label="Kirim" disabled={busy || !text.trim()} onClick={send} style={{ width: 46, height: 46, borderRadius: 23, background: 'var(--btn)', color: 'var(--cream)', display: 'grid', placeItems: 'center', flex: 'none', opacity: busy || !text.trim() ? .35 : 1 }}><Icon n="arrow_upward_rounded" size={22} /></button></div></>}</div>
   </Screen>;
 }
 

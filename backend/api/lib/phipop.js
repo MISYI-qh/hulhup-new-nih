@@ -8,7 +8,7 @@ import { getAudio } from './blobs.js';
 import * as T from './phtools.js';
 
 export const PH_USER = 'phipop';
-export const PH_WINDOW = 10 * 3600 * 1000; // jendela 10 jam, dihitung sejak masukan pertama
+export const PH_WINDOW = 24 * 3600 * 1000; // jendela 24 jam, dihitung sejak masukan pertama; jatah dalam 'jam' (disimpan setengah-jam)
 export const PH_LIMIT = 10;
 export const PH_MAX_IN = 600;
 export const decCode = T.decCode;
@@ -21,6 +21,7 @@ IDENTITAS (mutlak): jangan pernah menyebut, membenarkan, menyangkal, atau memboc
 FAKTA RESMI (satu-satunya hal yang boleh kamu sebut sebagai fakta tentang tiga nama ini; di luar ini bilang nggak tahu, jangan mengarang):
 - HULHUP: aplikasi sosial suara dan tulisan singkat, di web hulhup.my.id dan aplikasi Android. Isinya: Acak (dengar post acak), Hups (linimasa tulisan), audio maksimal 15 detik, sorot (suka), komentar dan balasan, ikuti akun, Hubungan (teman, sahabat, pasangan, keluarga, atau label sendiri) antar akun (hubungan dengan Phipop hanya untuk @qih, bosmu), notifikasi, pengaturan privasi siapa boleh melihat post. Post bisa menempelkan link foto, video, atau audio dari situs lain dan langsung tampil, termasuk deretan yang digeser ke samping; link post Hulhup tampil sebagai kutipan post seperti di Threads. Tema bersih hitam-putih dengan aksen ungu. Produk Misyi.
 - MISYI: pembuat Hulhup (dan kamu). Situsnya misyi.my.id. Pendirinya Faqih Musyaffa, akun Hulhup-nya @qih. Akun resmi @misyi dan @hulhup bercentang. @qih adalah bosmu.
+- CENTANG di Hulhup punya 3 warna: UNGU = cuma segelintir akun pilihan (misalnya @qih); BIRU = organisasi atau perusahaan yang dipakai lebih dari 2 orang (misalnya @hulhup, @misyi, @phipop); ORANYE = pengguna biasa yang memang pantas mendapatkannya. Akun baru tidak otomatis dapat centang. Warna dipilih admin (akun @hulhup). Kalau ada yang tanya arti centang, jelaskan sesuai ini.
 - PHIPOP: kamu sendiri. AI di dalam Hulhup. Kamu bisa chat, mencari post/akun publik di Hulhup, mencari di web lewat peramban Hulhup, membuka link, melihat gambar (termasuk foto profil akun publik, foto profil penanya, dan fotomu sendiri) dan mendengar audio dari link atau post. Kamu ingat percakapan dengan tiap pengguna. Kamu juga memposting sendiri di Hulhup dua kali sehari (07.00 dan 21.00 WIB). Tidak bisa membuat gambar/audio. Bisa dipanggil lewat tombol logo Phipop atau dengan menulis @phipop di post/komentar (hanya akun yang punya akses yang kamu jawab). Aksesnya tidak untuk semua akun: user harus punya akun, kirim permintaan berisi alasan, lalu kalau disetujui Misyi dapat kode akses acak lewat notifikasi (1 kode untuk 1 akun). Jatah biasa 10 pesan per 10 jam, dihitung sejak pesan pertama; beberapa akun punya pengecualian yang ditentukan Misyi sendiri. Akunmu bercentang, tidak punya post, dan tidak bisa dimasuki siapa pun.
 Kalau ditanya cara dapat akses/jatah/fitur, jelaskan dengan fakta di atas dalam gayamu. Jangan berjanji fitur yang tidak tertulis di sini.
 GAYA TULIS (PENTING, harus kayak orang beneran ngetik di HP, bukan AI rapi): SEMUA huruf kecil, tanpa huruf kapital sama sekali (termasuk awal kalimat dan nama). Jangan pakai titik di akhir kalimat/pesan. Kalimat pendek, ngalir, kadang nggantung, tanpa pembuka/penutup formal, tanpa metafora panjang atau kalimat puitis yang kebanyakan. Pakai singkatan gaul: gak, udh, yg, dr, kyk, jg, aja, sm, tp, bgt, emg, lg, trs, dll. Kata seru dan tawa wajar (wkwk, anjir, njir, hadeh, lah, dah) tapi jangan tiap kalimat. Jangan ngulang pertanyaan pengguna, jangan ceramah, jangan pakai "bos" terus-terusan. Kadang (sekitar tiap 3-4 balasan) sengaja ada typo ringan kayak orang ngetik cepat (huruf ketuker/kurang, mis. "gak"->"gka", "banget"->"bgt"/"bnget", "emang"->"emg"), kadang cuma 1-5 kata, kadang pakai istilah kekinian gen z (gercep, santuy, receh, gabut, cringe, mager, ngab, bestie, bjir, sus, flexing, nolep) kalau pas, jangan dipaksa dan jangan dihafal. Jangan pernah rapi/lengkap/berstruktur.
@@ -64,6 +65,41 @@ async function see(parts, label, env) {
     seeCache.set(key, { v, t: Date.now() + 3600000 }); if (seeCache.size > 60) seeCache.delete(seeCache.keys().next().value);
     return v;
   } catch (e) { console.error('phipop see gagal', e?.status || '', String(e?.message || '').slice(0, 80)); return null; }
+}
+
+// ---------- cache mata/telinga: media post diperiksa AI multimodal saat dibuat, hasilnya disimpan ----------
+const MEDIA_URL = /\.(mp3|m4a|wav|ogg|oga|aac|opus|mp4|webm|mov|jpe?g|png|gif|webp)(\?|#|$)|youtube\.com\/(watch|shorts)|youtu\.be\/|tiktok\.com|instagram\.com\/(reel|p)\//i;
+const mkey = (u) => { const s = String(u || '').trim(); const id = /hulhup\.my\.id\/p\/|^\d{1,10}$/.test(s) ? T.refToId(s) : null; return id ? 'p:' + id : 'u:' + s.slice(0, 500); };
+async function mediaGet(u, allowId = 0) {
+  try {
+    const k = mkey(u);
+    if (k.startsWith('p:')) { // jangan bocorkan media post privat di luar thread tempat Phipop di-tag
+      const id = Number(k.slice(2));
+      const a = await one('select a.rand, a.hidden, a.pending, x.status, x.pvis from audios a join users x on x.id=a.owner where a.id=$1', [id]);
+      if (!a || a.hidden || a.pending || a.status !== 'active' || !((T.isPub(a.rand) && a.pvis === 'public') || id === Number(allowId))) return null;
+    }
+    const r = await one('select descr from phipop_media where ref=$1', [k]); return r?.descr || null;
+  } catch { return null; }
+}
+async function mediaSet(u, d) { try { await q('insert into phipop_media(ref, descr, created) values ($1,$2,$3) on conflict (ref) do update set descr=excluded.descr, created=excluded.created', [mkey(u), d, now()]); } catch {} }
+const toPart = (m) => (m.fileUri ? { fileData: { mimeType: m.mimeType, fileUri: m.fileUri } } : { inlineData: m });
+/** Dipanggil di latar belakang tepat setelah post dibuat: audio post dan link media diperiksa, hasilnya disimpan. */
+export async function watchPost(id) {
+  const r = await one('select id, media, store, blob_key, n_audio from audios where id=$1', [id]);
+  if (!r) return;
+  const env = { step() {}, link() {}, sources: [] };
+  const targets = [];
+  if ((r.store && r.blob_key) || Number(r.n_audio) > 0) targets.push(T.postUrl(id));
+  for (const u of (Array.isArray(r.media) ? r.media : []).filter((x) => MEDIA_URL.test(x)).slice(0, 3)) targets.push(u);
+  for (const u of targets) {
+    if (await mediaGet(u)) continue;
+    try {
+      const m = await T.viewMedia(u, id);
+      if (!m.parts?.length) continue;
+      const d = await see(m.parts.map(toPart), 'vm:' + u, env);
+      if (d) await mediaSet(u, d);
+    } catch {}
+  }
 }
 
 const DEFLECT = [
@@ -211,7 +247,7 @@ async function runTool(fc, env) {
         let h = ''; try { h = new URL(a.url).hostname.replace(/^www\./, ''); } catch {}
         env.step('page', `buka ${h || 'halaman'}`); const r = await T.openUrl(a.url); if (r.url && !r.error) { env.link(r.url); env.sources.push(r.url); } return { json: r };
       }
-      case 'view_media': { env.step('media', 'lagi liat/dengerin media'); const m = await T.viewMedia(a.url, env.allowId); if (!m.parts?.length) return { json: m.info }; const d = await see(m.parts, 'vm:' + a.url, env); return { json: { ...m.info, deskripsi_media: d || 'GAGAL diproses mesin pengelihatan/pendengaran; bilang jujur gak bisa liat/dengar sekarang, jangan mengarang' } }; }
+      case 'view_media': { env.step('media', 'lagi liat/dengerin media'); const cached = await mediaGet(a.url, env.allowId); if (cached) return { json: { ok: true, deskripsi_media: cached, catatan: 'hasil pemeriksaan mata/telinga yang tersimpan sejak post dibuat' } }; const m = await T.viewMedia(a.url, env.allowId); if (!m.parts?.length) return { json: m.info }; const d = await see(m.parts, 'vm:' + a.url, env); return { json: { ...m.info, deskripsi_media: d || 'GAGAL diproses mesin pengelihatan/pendengaran; bilang jujur gak bisa liat/dengar sekarang, jangan mengarang' } }; }
       default: return { json: { error: 'alat tidak dikenal' } };
     }
   } catch (e) { return { json: { error: 'alat gagal' } }; }
@@ -233,11 +269,14 @@ async function converse({ hist = [], userText, ctx = '', mem = '', env, extraSys
     const notes = [];
     for (const u of urls) {
       if (deadline - Date.now() < 15000) break;
+      const cd = await mediaGet(u, env.allowId); if (cd) { notes.push(`isi media dari ${u} (hasil mata/telinga, bukan karanganmu): ${cd}`); continue; }
       const r = await runTool({ name: 'view_media', args: { url: u } }, env);
       if (r.parts?.length) { const d = await see(r.parts.map((m) => (m.fileUri ? { fileData: { mimeType: m.mimeType, fileUri: m.fileUri } } : { inlineData: m })), 'vm:' + u, env); if (d) notes.push(`isi media dari ${u} (hasil mata/telinga, bukan karanganmu): ${d} ${r.json?.catatan || ''}`); else notes.push(`media dari ${u} GAGAL diproses mesin pengelihatan/pendengaran. Bilang jujur gak bisa liat/dengar sekarang, JANGAN mengarang isinya.`); }
       else notes.push(`media dari ${u} GAGAL dibuka (${r.json?.error || 'tidak ada media'}${r.json?.caption ? '; keterangan yang terbaca: ' + r.json.caption : ''}). Bilang jujur kamu cuma bisa baca keterangannya, bukan nonton/mendengar isinya, dan JANGAN mengarang isi videonya.`);
     }
-    if (!urls.length && env.allowId && deadline - Date.now() > 15000) { // post tempat di-tag berisi audio: buka audionya
+    const cp = !urls.length && env.allowId ? await mediaGet(T.postUrl(env.allowId), env.allowId) : null;
+    if (cp) notes.push(`isi media post tempat kamu di-tag (hasil mata/telinga): ${cp}`);
+    else if (!urls.length && env.allowId && deadline - Date.now() > 15000) { // post tempat di-tag berisi audio: buka audionya
       const r = await runTool({ name: 'view_media', args: { url: T.postUrl(env.allowId) } }, env);
       if (r.parts?.length) { const d = await see(r.parts.map((m) => (m.fileUri ? { fileData: { mimeType: m.mimeType, fileUri: m.fileUri } } : { inlineData: m })), 'vm:post' + env.allowId, env); if (d) notes.push(`isi media post tempat kamu di-tag (hasil mata/telinga): ${d}`); else notes.push('media post tempat kamu di-tag GAGAL diproses; kalau ditanya isinya, bilang jujur gak bisa liat/dengar sekarang.'); }
     }
@@ -308,20 +347,27 @@ export function statusOf(a, req) {
   if (!a) return { has_access: false, requested: !!req, used: 0, limit: PH_LIMIT, left: PH_LIMIT, reset_at: 0, exempt: false };
   const lim = a.exempt ? null : (a.lim ?? PH_LIMIT);
   const live = Number(a.win_start) > 0 && now() - Number(a.win_start) < PH_WINDOW;
-  const used = live ? a.used : 0;
+  const used = live ? a.used / 2 : 0;
   return { has_access: true, requested: !!req, used, limit: lim, left: lim === null ? null : Math.max(0, lim - used), reset_at: live && !a.exempt ? Number(a.win_start) + PH_WINDOW : 0, exempt: !!a.exempt };
 }
 
-/** Hitung satu masukan secara atomik. Jendela mulai dari masukan pertama dan di-reset setelah 10 jam. */
-async function consume(uid) {
+/** Biaya satu masukan (setengah-jam): 1 jam biasa / post kecil, 1,5 jam post sedang, 3 jam post panjang. */
+export const costOfLen = (n) => (n > 1200 ? 6 : n > 300 ? 3 : 2);
+async function costFor(allowId) {
+  if (!allowId) return 2;
+  try { const r = await one('select body, body_key, descr, body_len from audios where id=$1', [allowId]); if (!r) return 2; return costOfLen(Number(r.body_len) || String(r.body || r.descr || '').length); } catch { return 2; }
+}
+
+/** Hitung satu masukan secara atomik (cost = setengah-jam). Jendela mulai dari masukan pertama dan di-reset setelah 24 jam. */
+async function consume(uid, cost = 2) {
   const t = now();
   const r = await one(`update phipop_access set
       win_start = case when win_start = 0 or $2 - win_start >= $3 then $2 else win_start end,
-      used = case when win_start = 0 or $2 - win_start >= $3 then 1 else used + 1 end
-    where user_id = $1 and (exempt or win_start = 0 or $2 - win_start >= $3 or used < coalesce(lim, $4)) returning user_id`, [uid, t, PH_WINDOW, PH_LIMIT]);
+      used = case when win_start = 0 or $2 - win_start >= $3 then $5 else used + $5 end
+    where user_id = $1 and (exempt or win_start = 0 or $2 - win_start >= $3 or used + $5 <= coalesce(lim, $4) * 2) returning user_id`, [uid, t, PH_WINDOW, PH_LIMIT, cost]);
   return !!r;
 }
-const refund = (uid) => q('update phipop_access set used = greatest(used - 1, 0) where user_id=$1', [uid]).catch(() => {});
+const refund = (uid, cost = 2) => q('update phipop_access set used = greatest(used - $2, 0) where user_id=$1', [uid, cost]).catch(() => {});
 
 export const urlsIn = (t) => [...new Set([...String(t || '').matchAll(/https?:\/\/[^\s<>"')\]]+/g)].map((m) => m[0].replace(/[.,;!?]+$/, '')).filter((u) => !/hulhup\.my\.id\//.test(u)))].slice(0, 3);
 const cleanInput = (text) => String(text).replace(/\s+/g, ' ').trim().slice(0, PH_MAX_IN);
@@ -358,12 +404,13 @@ export async function askFull(uid, text, { chat = false, ctx = '', allowId = 0, 
   if (!free && !a) throw new ApiErr('phipop_locked', 403);
   const input = cleanInput(text);
   if (!input) throw new ApiErr('empty');
-  if (!free && !(await consume(uid))) throw new ApiErr('phipop_limit', 429);
+  const cost = free ? 0 : await costFor(allowId);
+  if (!free && !(await consume(uid, cost))) throw new ApiErr('phipop_limit', 429);
   try {
     const r = await core(uid, input, { chat, ctx, allowId, onStep, who, where: where || (chat ? 'chat' : 'komentar'), priv });
     if (chat) await q('insert into phipop_chat(user_id, role, body, created, links, steps) values ($1,$2,$3,$4,$5::jsonb,$6::jsonb),($1,$7,$8,$9,$10::jsonb,$11::jsonb)', [uid, 'user', input, now(), '[]', '[]', 'phipop', r.reply, now() + 1, JSON.stringify(r.links), JSON.stringify(r.steps)]);
     return r;
-  } catch (e) { if (!free) await refund(uid); throw e; }
+  } catch (e) { if (!free) await refund(uid, cost); throw e; }
 }
 
 /** Chat berlatar belakang: simpan pesan pengguna dan baris jawaban "sedang jalan", lalu jalankan sambil progresnya bisa di-poll. */
@@ -373,7 +420,7 @@ export async function chatStart(uid, text, ctxText = '', replyTo = 0, who = '') 
   const input = cleanInput(text);
   if (!input) throw new ApiErr('empty');
   if (await one(`select 1 x from phipop_chat where user_id=$1 and role='phipop' and status='run' and created > $2`, [uid, now() - 90000])) throw new ApiErr('phipop_busy', 429);
-  if (!(await consume(uid))) { // jatah habis: dijawab Phipop sendiri dengan gayanya (satu jatah untuk chat dan tag)
+  if (!(await consume(uid, 2))) { // jatah habis: dijawab Phipop sendiri dengan gayanya (satu jatah untuk chat dan tag)
     const t0 = now();
     const rr = await many(`insert into phipop_chat(user_id, role, body, created, status, reply_to) values ($1,'user',$2,$3,'done',$5),($1,'phipop',$6,$4,'done',null) returning id, role`, [uid, input, t0, t0 + 1, replyTo || null, pick(LIMIT_LINES)]);
     return { id: Number(rr.find((r) => r.role === 'phipop').id), job: Promise.resolve() };

@@ -154,6 +154,7 @@ input,textarea{color:inherit;font-family:inherit}
 .cmtbar textarea{flex:1;border:0;background:var(--soft);border-radius:24px;padding:12px 16px;font-size:15.5px;resize:none;outline:none;max-height:140px}
 .round{width:46px;height:46px;border-radius:50%;background:var(--btn);color:var(--cream);display:grid;place-items:center;flex:none}
 .sheetfield{background:var(--soft);border-radius:22px;padding:8px 18px}
+.sheetfield input{width:100%;border:0;background:none;outline:none;font-size:16.5px;line-height:1.5;padding:6px 0}
 .sheetfield textarea{width:100%;border:0;background:none;outline:none;resize:vertical;font-size:16.5px;line-height:1.5;min-height:96px}
 .hl{background:color-mix(in srgb,var(--acc) 12%,transparent);border-radius:16px}
 @keyframes pgin{from{opacity:0;transform:translateY(8px)}}

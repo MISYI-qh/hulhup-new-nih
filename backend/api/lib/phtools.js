@@ -104,12 +104,12 @@ export async function getPost(ref, allowId = 0) {
 
 export async function getAccount(username) {
   const un = String(username || '').toLowerCase().replace(/^@/, '').replace(/[^a-z0-9_]/g, '').slice(0, 20);
-  const u = await one(`select id, username, name, bio, pvis, status, verified from users where username=$1`, [un]);
+  const u = await one(`select id, username, name, bio, pvis, status, verified, badge from users where username=$1`, [un]);
   if (!u || u.status !== 'active') return { error: 'akun tidak ada' };
   if (u.pvis !== 'public') return { error: 'akun privat: kamu tidak boleh membahas isinya' };
   const fo = await one(`select (select count(*)::int from follows where dst=$1) pengikut, (select count(*)::int from follows where src=$1) mengikuti`, [u.id]).catch(() => null);
   const rows = await many(`${POSTQ} where ${PUB} and a.owner=$1 order by a.id desc limit 6`, [u.id]);
-  return { akun: `@${u.username}`, nama: u.name, bio: clip(u.bio, 240), centang: !!u.verified, ...(fo || {}), post_publik_terbaru: await Promise.all(rows.map((r) => card(r))) };
+  return { akun: `@${u.username}`, nama: u.name, bio: clip(u.bio, 240), centang: u.badge ? { warna: { purple: 'ungu', blue: 'biru', orange: 'oranye' }[u.badge] || u.badge } : !!u.verified, ...(fo || {}), post_publik_terbaru: await Promise.all(rows.map((r) => card(r))) };
 }
 
 // ---------- tools web ----------

@@ -662,13 +662,16 @@ route('POST', /^\/audios$/, async (c) => {
   const store = storeFor(secs);
   const dk = deksAudio(body); logDeks(`u${u.id} audio`, dk);
   const key = await putAudio(store, body, mime);
+  let newId = 0;
   try {
-    await tx(async (t) => {
+    newId = await tx(async (t) => {
       const r = await t.query(`insert into audios(owner, descr, secs, store, blob_key, mime, rand, pprof, created, in_rand, in_hups, ai, ai_kind, deks) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,true,true,$10,$11,$12) returning id`,
         [u.id, desc, secs, store, key, mime, rnd, f.pprof !== '0', now(), dk.ai, dk.kind, brief(dk)]);
       for (const id of to) await t.query('insert into audio_to(audio_id, user_id) values ($1,$2)', [r.rows[0].id, id]);
+      return Number(r.rows[0].id);
     });
   } catch (e) { await delAudio(store, key); throw e; }
+  if (newId) await PH.later(PH.watchPost(newId));
   return { ok: true };
 });
 
@@ -1013,6 +1016,7 @@ route('POST', /^\/posts$/, async (c) => {
     });
   } catch (e) { if (key) await delAudio('mongo', key); throw e; }
   if (n === 0) await mentionNotify(id, u.id);
+  if (media.length) await PH.later(PH.watchPost(id));
   if (PH_TAG.test(text) && await PH.accessOf(u.id)) { await q('update audios set ptag=true where id=$1', [id]); await PH.later(phipopReply(u, id, null, text)); }
   return { ok: true, id };
 });
@@ -1036,7 +1040,7 @@ route('POST', /^\/posts\/(\d+)\/audio$/, async (c, m) => {
     else await q('insert into post_audios(post_id, idx, store, blob_key, mime, secs) values ($1,$2,$3,$4,$5,$6)', [a.id, have, store, key, mime, secs]);
     if (have + 1 >= a.n_audio) await q('update audios set pending=false where id=$1', [a.id]);
   } catch (e) { await delAudio(store, key); throw e; }
-  if (have + 1 >= a.n_audio) await mentionNotify(a.id, u.id);
+  if (have + 1 >= a.n_audio) { await mentionNotify(a.id, u.id); await PH.later(PH.watchPost(Number(a.id))); }
   return { ok: true, done: have + 1 >= a.n_audio };
 });
 
@@ -1402,7 +1406,39 @@ route('GET', /^\/phipop\/admin$/, async (c) => {
   const reqs = await many(`select r.id, r.why, r.status, r.created, u.username, u.name from phipop_requests r join users u on u.id=r.user_id order by (r.status='pending') desc, r.created desc limit 100`);
   const acc = await many(`select u.username, u.name, a.exempt, a.lim, a.used, a.win_start, a.code is not null has_code from phipop_access a join users u on u.id=a.user_id order by a.granted desc limit 200`);
   return { requests: reqs.map((r) => ({ id: Number(r.id), username: r.username, name: r.name, why: r.why, status: r.status, created: Number(r.created) })),
-    access: acc.map((a) => ({ username: a.username, name: a.name, exempt: a.exempt, lim: a.lim, used: a.used, has_code: a.has_code })) };
+    access: acc.map((a) => ({ username: a.username, name: a.name, exempt: a.exempt, lim: a.lim, used: a.used / 2, has_code: a.has_code })) };
+});
+// ---------- centang & dasbor admin (akun hulhup) ----------
+const BADGES = ['blue', 'purple', 'orange'];
+route('GET', /^\/badges$/, async () => {
+  const r = await many(`select username, badge from users where badge is not null and status='active'`);
+  return { badges: Object.fromEntries(r.map((x) => [x.username, x.badge])) };
+});
+route('GET', /^\/admin\/overview$/, async (c) => {
+  needAdmin(c);
+  const d0 = new Date(); d0.setUTCHours(0, 0, 0, 0);
+  const [us, ps, bd, ac, rq, pp] = await Promise.all([
+    one(`select count(*)::int n from users where status='active'`), one(`select count(*)::int n from audios`),
+    many(`select badge, count(*)::int n from users where badge is not null group by badge`),
+    one(`select count(*)::int n from phipop_access`), one(`select count(*)::int n from phipop_requests where status='pending'`),
+    one(`select count(*)::int n from phipop_posts where day=$1`, [d0.toISOString().slice(0, 10)])]);
+  return { users: us.n, posts: ps.n, badges: Object.fromEntries(bd.map((x) => [x.badge, x.n])), ai_holders: ac.n, ai_pending: rq.n, ai_posts_today: pp.n, ai_window_hours: PH.PH_WINDOW / 3600000, ai_default_limit: PH.PH_LIMIT };
+});
+route('GET', /^\/admin\/users$/, async (c) => {
+  needAdmin(c);
+  const qs = String(c.query.q ?? '').toLowerCase().replace(/[\\%_]/g, '').slice(0, 40);
+  const r = await many(`select u.username, u.name, u.badge, u.role, u.status, a.user_id is not null ai, a.exempt, a.lim, a.used, a.win_start from users u left join phipop_access a on a.user_id=u.id where ($1='' or u.username like $2 or lower(u.name) like $2) order by (u.badge is null), u.id limit 60`, [qs, `%${qs}%`]);
+  return { users: r.map((x) => ({ username: x.username, name: x.name, badge: x.badge, role: x.role, status: x.status, ai: x.ai, exempt: !!x.exempt, lim: x.lim, used: x.ai ? PH.statusOf(x, null).used : 0 })) };
+});
+route('PUT', /^\/admin\/badge$/, async (c) => {
+  const me = needAdmin(c);
+  const o = await one(`select id, username, badge from users where username=$1`, [String(c.body.username ?? '').toLowerCase()]);
+  if (!o) throw new ApiErr('not_found', 404);
+  const b = c.body.badge === null || c.body.badge === '' || c.body.badge === undefined ? null : String(c.body.badge);
+  if (b !== null && !BADGES.includes(b)) throw new ApiErr('bad_badge');
+  await q('update users set badge=$2, verified=$3 where id=$1', [o.id, b, b !== null]);
+  if (b && b !== o.badge) { await q(`insert into notifs(to_user, type, actor, extra, created) values ($1,'badge',$2,$3,$4)`, [o.id, me.id, b, now()]); pushLater(Number(o.id), 'badge', Number(me.id), ''); }
+  return { ok: true, username: o.username, badge: b };
 });
 route('POST', /^\/phipop\/admin\/send$/, async (c) => {
   needAdmin(c);
