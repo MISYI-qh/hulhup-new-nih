@@ -1325,6 +1325,12 @@ route('POST', /^\/phipop\/chat$/, async (c) => {
   const r = await PH.askFull(u.id, txt, { chat: true, ctx });
   return { ok: true, reply: r.reply, links: r.links, ...(await phStatus(u)) };
 });
+route('POST', /^\/clientlog$/, async (c) => { // laporan error dari browser, supaya penyebab crash kunjungan pertama kelihatan di log
+  await hit(`clog:${c.ip}`, 10, 600);
+  const b = c.body || {}; const cut = (x, n) => String(x ?? '').replace(/[\r\n]+/g, ' | ').slice(0, n);
+  console.error('CLIENTERR', cut(b.m, 300), '#', cut(b.s, 700), '#', cut(b.u, 120), '#', cut(b.ua, 120), '#', cut(b.b, 40));
+  return { ok: true };
+});
 route('PUT', /^\/phipop\/persona$/, async (c) => {
   const u = c.need(); const p = String(c.body?.persona || '');
   if (!PH.PERSONA_KEYS.includes(p)) throw new ApiErr('bad_request', 400);

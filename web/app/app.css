@@ -246,6 +246,7 @@ button:has(.avatar),button:has(.avatar):focus,button:has(.avatar):focus-visible,
 
 /* ===== Desktop: menu samping + kolom isi lebih lebar ===== */
 .rail{display:none}
+@media(min-width:600px) and (max-width:899px){.app{max-width:600px}}
 @media(min-width:900px){
   body{padding-left:84px}
   .rail{display:flex;flex-direction:column;position:fixed;left:0;top:0;bottom:0;width:84px;padding:18px 10px;z-index:30;background:var(--bg);border-right:1px solid var(--hair);align-items:center}
