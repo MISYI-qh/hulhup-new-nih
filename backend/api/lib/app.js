@@ -267,7 +267,6 @@ route('POST', /^\/register$/, async (c) => {
   try {
     u = await one(`insert into users(username, name, birth, pass_hash, pass_salt, created, rem) values ($1,$2,$3,$4,$5,$6,$7) returning *`,
       [username, name, birth, hash, salt, now(), c.body.slot ? String(c.body.slot).slice(0, 10) : null]);
-    await q(`insert into notifs(to_user, type, n, created) values ($1,'badge',0,$2)`, [u.id, now()]).catch(() => {}); // akun baru juga dapat centang oranye
   } catch (e) {
     if (e.code === '23505') throw new ApiErr('username_taken', 409);
     throw e;
