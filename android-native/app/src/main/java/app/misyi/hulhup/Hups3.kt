@@ -267,6 +267,7 @@ import org.json.JSONObject
     var picked by remember { mutableStateOf<Map<String, JSONObject>>(emptyMap()) }
     val media = remember { mutableStateListOf<String>() }
     var quote by remember { mutableStateOf(quote0) }
+    var aiV by remember { mutableStateOf(true) }; var aiC by remember { mutableStateOf(true) }
     DisposableEffect(Unit) { onDispose { Store.stop() } }
 
     suspend fun add() { val c = sheet<AudioClip> { done -> RecordSheet { done(it) } } ?: return; Store.stop(); clip = c; playing = false }
@@ -288,7 +289,7 @@ import org.json.JSONObject
         busy = true
         var id: Int? = null
         try {
-            val b = JSONObject().put("text", t).put("audios", if (c == null) 0 else 1).put("pprof", pprof).put("rand", JSONArray(audSplit(rand))).put("to", JSONArray(picked.keys.toList()))
+            val b = JSONObject().put("text", t).put("audios", if (c == null) 0 else 1).put("pprof", pprof).put("ai_view", aiV).put("ai_comment", aiC && aiV).put("rand", JSONArray(audSplit(rand))).put("to", JSONArray(picked.keys.toList()))
             if (c != null) b.put("bgm", bgm)
             if (media.isNotEmpty()) b.put("media", JSONArray(media.toList()))
             val j = Api.req("POST", "/posts", b); id = j.optInt("id")
@@ -326,6 +327,8 @@ import org.json.JSONObject
                 HText(s.t("media_hint"), 13f, color = sub(), lh = 19f)
             }
             Row2(s.t("pprof"), pprof, { pprof = it })
+            Row2(s.t("ai_see"), aiV, { aiV = it; if (!it) aiC = false }, s.t("ai_see_d"))
+            Row2(s.t("ai_cmt"), aiC && aiV, if (aiV) ({ aiC = it }) else null, s.t("ai_cmt_d"))
             Spacer(Modifier.height(2.dp))
             Pick(s.t("who_see"), rand, withLabels(uploadAud)) { v -> rand = v; if (audSplit(v).contains("accounts") && picked.isEmpty()) sc.launch { pickAcc() } }
             if (hasAcc) Box(Modifier.padding(top = 10.dp)) {

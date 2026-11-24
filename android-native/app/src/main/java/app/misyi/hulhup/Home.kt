@@ -131,6 +131,7 @@ val kBuild get() = BuildConfig.BUILD
             Box(Modifier.navigationBarsPadding().padding(60.dp, 6.dp, 60.dp, 12.dp)) {
                 Row(Modifier.fillMaxWidth().background(soft(), RoundedCornerShape(26.dp)).padding(4.dp)) {
                     for ((i, k, label) in listOf(Triple(0, HK.acak, s.t("rand_tab")), Triple(1, HK.hups, s.t("hups")))) {
+                        if (i == 1 && s.me?.username == "hulhup") Tap(onTap = { go("/admin") }) { Box(Modifier.height(44.dp).width(46.dp), contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Shield, null, Modifier.size(21.dp), tint = sub()) } }
                         val on = mode == i
                         val bg by animateColorAsState(if (on) ink() else Color.Transparent, tween(260), label = "seg")
                         Tap(Modifier.weight(1f), .97f, onTap = { if (i == 1 && !s.needNet()) return@Tap; if (mode != i) mode = i }) {
@@ -186,7 +187,6 @@ val kBuild get() = BuildConfig.BUILD
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             item(Icons.Rounded.Tune, "settings", net = true) { go("/settings") }
             if (s.me != null) item(Icons.Outlined.Send, "sent_title") { go("/sent") }
-            item(Icons.Rounded.DownloadDone, "offline_t") { go("/offline") }
             Tap(Modifier.fillMaxWidth(), onTap = { close(); appScope.launch { if (s.checkUpdate(true)) showUpdate() else toast(s.t("upd_none")) } }) {
                 Row(Modifier.padding(vertical = 14.dp, horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Rounded.SystemUpdate, null, Modifier.size(24.dp), tint = ink()); Spacer(Modifier.width(16.dp)); HText(s.t("upd_menu"), 16f, FontWeight.SemiBold) }
             }
@@ -254,8 +254,6 @@ val kBuild get() = BuildConfig.BUILD
         }
         Spacer(Modifier.height(6.dp))
         PostActions(a, onComments = { close(); openPost(a) })
-        val off = s.isOffline(a.id)
-        PBtn(if (off) s.t("is_offline") else s.t("mk_offline"), { sc.launch { toggleOfflinePost(a) } }, ghost = true, icon = if (off) Icons.Rounded.OfflinePin else Icons.Outlined.DownloadForOffline)
         if (s.me != null && s.me!!.username != a.owner) Tap(Modifier.fillMaxWidth(), onTap = { sc.launch { reportSheet(audio = a.id) } }) {
             Row(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 2.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Outlined.Flag, null, Modifier.size(16.dp), tint = sub()); Spacer(Modifier.width(6.dp)); HText(s.t("report"), 13f, FontWeight.SemiBold, sub()) }
         }

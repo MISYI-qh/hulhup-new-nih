@@ -57,7 +57,7 @@ val Brand = Color(0xFF5B47F5)
 val BrandDeep = Color(0xFF4330D0)
 val Blue = Color(0xFF3897F0)
 /** Warna centang: biru = akun resmi (hulhup, misyi, phipop), ungu = qih, oranye = akun lain. */
-fun badgeTint(u: String?): Color = when (u) { "hulhup", "misyi", "phipop" -> Blue; "qih" -> Color(0xFF8B5CF6); else -> Color(0xFFFF7A1A) }
+fun badgeTint(u: String?): Color = when (Store.badges[u ?: ""]) { "purple" -> Color(0xFF8B5CF6); "blue" -> Blue; else -> Color(0xFFFF7A1A) }
 val Cream = Color(0xFFFBF6E9)
 val Heart = Color(0xFFE0524A)
 val Outfit = FontFamily(Font(R.font.outfit_regular, FontWeight.Normal), Font(R.font.outfit_bold, FontWeight.Bold), Font(R.font.outfit_bold, FontWeight.SemiBold), Font(R.font.outfit_bold, FontWeight.ExtraBold), Font(R.font.outfit_bold, FontWeight.W700), Font(R.font.outfit_regular, FontWeight.Medium))

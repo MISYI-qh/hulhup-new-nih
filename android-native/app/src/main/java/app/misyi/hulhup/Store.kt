@@ -52,6 +52,8 @@ object Store {
     @set:JvmName("rawRate") var rate = 1.0f
     @set:JvmName("rawBgmMuted") var bgmMuted = false; var bgmKey: Int? = null
     var homeMode = 0
+    /** Warna centang dari server: username -> purple|blue|orange. */
+    var badges: Map<String, String> = emptyMap()
     var updateReady by mutableStateOf(false)
     private var updChecked = 0L
     var searches: MutableList<String> = mutableListOf()
@@ -83,6 +85,7 @@ object Store {
         pushed = sp.getInt("pushed", 0)
         searches = (sp.getString("search_hist", null)?.let { s -> try { JSONArray(s).let { a -> (0 until a.length()).map { a.getString(it) } } } catch (_: Exception) { null } } ?: emptyList()).toMutableList()
         try { JSONArray(sp.getString("offline", "[]")).objects().forEach { offline.add(A(it)) } } catch (_: Exception) {}
+        try { val b = JSONObject(sp.getString("badges", "{}") ?: "{}"); badges = b.keys().asSequence().associateWith { b.optString(it) } } catch (_: Exception) {}
         // Cadangan Acak otomatis (versi lama) dihapus: offline hanya berisi yang kamu simpan sendiri.
         try { sp.getString("acak_cache", null)?.let { old -> JSONArray(old).objects().forEach { Offline.delete("rc${it.optInt("id")}.audio") }; sp.edit().remove("acak_cache").apply() } } catch (_: Exception) {}
         p = ExoPlayer.Builder(app).build(); bg = ExoPlayer.Builder(app).build()
@@ -139,6 +142,7 @@ object Store {
                 unread = j.int("unread"); unreadSocial = j.int("unread_social")
                 if (unreadSocial < pushed) { pushed = unreadSocial; sp.edit().putInt("pushed", pushed).apply() }
             }
+            try { val b = Api.req("GET", "/badges").optJSONObject("badges"); if (b != null) { badges = b.keys().asSequence().associateWith { b.optString(it) }; sp.edit().putString("badges", b.toString()).apply() } } catch (_: Exception) {}
             val st = Api.req("GET", "/stats")
             st.optJSONObject("tapf")?.let { o ->
                 tapf = o.keys().asSequence().associateWith { o.optInt(it) }
@@ -225,7 +229,7 @@ object Store {
         }
     }
 
-    private fun clear() { Api.setSession(null); me = null; unread = 0; unreadSocial = 0; pushed = 0; sp.edit().putInt("pushed", 0).apply(); Notifier.watch(false) }
+    private fun clear() { HupsCache.m.clear(); Api.setSession(null); me = null; unread = 0; unreadSocial = 0; pushed = 0; sp.edit().putInt("pushed", 0).apply(); Notifier.watch(false) }
 
     suspend fun auth(path: String, body: JSONObject): JSONObject {
         val j = Api.req("POST", path, body)
@@ -243,6 +247,7 @@ object Store {
     fun notifText(type: String, extra: String): String = when (type) {
         "like" -> t("n_like"); "comment" -> t("n_comment"); "reply" -> t("n_reply"); "mention" -> t("n_mention")
         "rel_req" -> t("n_rel_req").replace("{r}", relName(extra)); "rel_ok" -> t("n_rel_ok").replace("{r}", relName(extra))
+        "takedown_post" -> t("n_td_post").replace("{r}", extra); "takedown_comment" -> t("n_td_comment").replace("{r}", extra)
         "phipop_code" -> t("n_phipop_code").replace("{extra}", extra)
         else -> t("n_follow")
     }

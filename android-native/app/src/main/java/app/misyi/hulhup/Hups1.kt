@@ -45,6 +45,8 @@ suspend fun savePost(a: A) {
     try {
         val j = Api.req("POST", "/audios/${a.id}/save")
         a.saved = j.optBoolean("saved"); s.poke(); toast(s.t(if (a.saved) "saved_post" else "unsaved_post"))
+        // Simpan = sekaligus salinan offline; batal simpan = hapus salinannya.
+        try { if (a.saved != s.isOffline(a.id)) s.toggleOffline(a) } catch (_: Exception) {}
     } catch (e: Exception) { toast(s.err(e), true) }
 }
 

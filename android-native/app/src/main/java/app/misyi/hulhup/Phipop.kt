@@ -45,7 +45,8 @@ import org.json.JSONObject
     Tap(onTap = { if (Store.me == null) go("/login") else go("/phipop") }) { Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) { PhipopLogo(28.dp) } }
 }
 
-private fun JSONObject.lng(k: String): Long? = if (isNull(k) || !has(k)) null else optLong(k)
+private fun JSONObject.lng(k: String): Double? = if (isNull(k) || !has(k)) null else optDouble(k)
+fun fmtH(d: Double): String { val r = Math.round(d * 10) / 10.0; val t = if (r % 1.0 == 0.0) r.toLong().toString() else r.toString(); return if (Store.lang == "id") t.replace('.', ',') else t }
 
 private fun leftTime(resetAt: Long): String {
     val ms = resetAt - System.currentTimeMillis(); if (ms <= 0) return "0m"
@@ -53,7 +54,7 @@ private fun leftTime(resetAt: Long): String {
     return if (h > 0) "${h}j ${m % 60}m" else if (m > 0) "${m}m" else "<1m"
 }
 
-@Composable private fun PField(v: String, on: (String) -> Unit, ph: String, modifier: Modifier = Modifier, min: Int = 1, max: Int = 1, caps: KeyboardCapitalization = KeyboardCapitalization.Sentences, enabled: Boolean = true) {
+@Composable fun PField(v: String, on: (String) -> Unit, ph: String, modifier: Modifier = Modifier, min: Int = 1, max: Int = 1, caps: KeyboardCapitalization = KeyboardCapitalization.Sentences, enabled: Boolean = true) {
     Box(modifier.fillMaxWidth().background(soft(), RoundedCornerShape(20.dp)).padding(16.dp, 13.dp)) {
         if (v.isEmpty()) HText(ph, 15.5f, color = sub())
         BasicTextField(v, { if (enabled) on(it) }, Modifier.fillMaxWidth(), textStyle = TextStyle(fontSize = 15.5.sp, lineHeight = 22.sp, color = ink(), fontFamily = Outfit), cursorBrush = SolidColor(ink()), minLines = min, maxLines = max, singleLine = max == 1,
@@ -78,7 +79,6 @@ private fun fmtCode(s: String): String = s.uppercase().filter { it.isLetterOrDig
         val msgs = remember { mutableStateListOf<JSONObject>() }
         TopBar(back = true, center = { Row(verticalAlignment = Alignment.CenterVertically) { PhipopLogo(26.dp); Spacer(Modifier.width(8.dp)); HText("Phipop", 18f, FontWeight.ExtraBold) } }, nActions = 2, actions = {
             if (access) {
-                if (cur?.optBoolean("admin") == true) Tap(onTap = { go("/phipop/admin") }) { Box(Modifier.height(48.dp).padding(horizontal = 6.dp), contentAlignment = Alignment.Center) { Box(Modifier.clip(RoundedCornerShape(50)).background(soft()).padding(10.dp, 5.dp)) { HText(s.t("phipop_manage"), 12.5f, FontWeight.Bold) } } }
                 IconBtn(Icons.Rounded.MoreVert) { sc.launch {
                     val act = sheet<String> { done -> Column {
                         PBtn(s.t("ph_persona"), { done("persona") }, ghost = true, icon = Icons.Rounded.Face); Spacer(Modifier.height(10.dp))
@@ -181,7 +181,7 @@ private fun fmtCode(s: String): String = s.uppercase().filter { it.isLetterOrDig
     }
     LaunchedEffect(msgs.size, busy, loaded) { val n = msgs.size + if (busy) 1 else 0; if (n > 0) ls.animateScrollToItem(n - 1) }
     val limit = cur.lng("limit"); val left = cur.lng("left"); val resetAt = cur.optLong("reset_at")
-    val out = limit != null && left != null && left <= 0
+    val out = limit != null && left != null && left <= 0.04
     @Suppress("UNUSED_EXPRESSION") now
     fun send() {
         val t = text.trim(); if (t.isEmpty() || busy || out) return
@@ -248,7 +248,7 @@ private fun fmtCode(s: String): String = s.uppercase().filter { it.isLetterOrDig
     }
     Column(Modifier.fillMaxWidth().padding(16.dp, 4.dp, 16.dp, 12.dp).navigationBarsPadding()) {
         val info = if (limit == null || left == null) s.t("phipop_unl")
-            else if (resetAt > 0) s.t("phipop_left").replace("{l}", "$left").replace("{n}", "$limit").replace("{t}", leftTime(resetAt)) else s.t("phipop_left0").replace("{l}", "$left").replace("{n}", "$limit")
+            else if (resetAt > 0) s.t("phipop_left").replace("{l}", fmtH(left)).replace("{n}", fmtH(limit)).replace("{t}", leftTime(resetAt)) else s.t("phipop_left0").replace("{l}", fmtH(left)).replace("{n}", fmtH(limit))
         if (out) HText(s.t("phipop_out").replace("{t}", if (resetAt > 0) leftTime(resetAt) else "…"), 13.5f, FontWeight.SemiBold, modifier = Modifier.padding(start = 6.dp, bottom = 8.dp))
         else HText(info, 12f, color = sub(), modifier = Modifier.padding(start = 6.dp, bottom = 6.dp))
         replyTo?.let { rt ->
@@ -273,19 +273,25 @@ private fun fmtCode(s: String): String = s.uppercase().filter { it.isLetterOrDig
 
 // ───────── admin Phipop ─────────
 @Composable fun PhipopAdminPage() {
+    Column(Modifier.fillMaxSize()) {
+        TopBar(back = true, title = Store.t("pa_title"))
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(22.dp, 4.dp, 22.dp, 40.dp)) { PhipopAdminBody() }
+    }
+}
+
+/** Isi pengelolaan Phipop (permintaan, akses, postingan); dipakai di tab Phipop layar Admin. */
+@Composable fun PhipopAdminBody() {
     val s = Store; val sc = rememberCoroutineScope()
     var data by remember { mutableStateOf<JSONObject?>(null) }
     val codes = remember { mutableStateMapOf<Int, String>() }
     var user by remember { mutableStateOf("") }; var exempt by remember { mutableStateOf(false) }; var lim by remember { mutableStateOf("") }; var busy by remember { mutableStateOf(false) }
     suspend fun load() { try { data = Api.req("GET", "/phipop/admin") } catch (e: Exception) { toast(s.err(e), true) } }
     LaunchedEffect(Unit) { if (s.me == null) Nav.replace(Screen("/login") { AuthPage() }) else load() }
-    Column(Modifier.fillMaxSize()) {
-        TopBar(back = true, title = s.t("pa_title"))
-        val d = data
-        if (d == null) { Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { androidx.compose.material3.CircularProgressIndicator(Modifier.size(28.dp), color = ink(), strokeWidth = 2.5.dp) }; return@Column }
+    val d = data
+    if (d == null) { Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) { androidx.compose.material3.CircularProgressIndicator(Modifier.size(28.dp), color = ink(), strokeWidth = 2.5.dp) }; return }
         val reqs = d.optJSONArray("requests") ?: JSONArray(); val acc = d.optJSONArray("access") ?: JSONArray()
         val pending = (0 until reqs.length()).map { reqs.getJSONObject(it) }.filter { it.optString("status") == "pending" }
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(22.dp, 4.dp, 22.dp, 40.dp)) {
+        Column(Modifier.fillMaxWidth()) {
             HText(s.t("pa_req"), 18f, FontWeight.ExtraBold, modifier = Modifier.padding(bottom = 10.dp))
             if (pending.isEmpty()) HText(s.t("pa_none"), 14f, color = sub(), modifier = Modifier.padding(bottom = 10.dp))
             pending.forEach { r ->
@@ -328,14 +334,13 @@ private fun fmtCode(s: String): String = s.uppercase().filter { it.isLetterOrDig
                 Row(Modifier.padding(bottom = 8.dp).fillMaxWidth().background(soft(), RoundedCornerShape(20.dp)).padding(16.dp, 10.dp, 6.dp, 10.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         HText("${a.optString("name")} · @$u", 14.5f, FontWeight.Bold, maxLines = 1)
-                        val l = if (a.optBoolean("exempt")) s.t("pa_unl") else if (a.isNull("lim")) "—" else "${a.optInt("lim")}"
-                        HText("$l · ${a.optInt("used")} ${s.t("pa_used")}", 12.5f, color = sub())
+                        val l = if (a.optBoolean("exempt")) s.t("pa_unl") else if (a.isNull("lim")) "—" else fmtH(a.optDouble("lim"))
+                        HText("$l · ${fmtH(a.optDouble("used"))} ${s.t("pa_used")}", 12.5f, color = sub())
                     }
                     Tap(onTap = { sc.launch { if (!confirm(s.t("pa_revoke"), s.t("pa_revoke_q").replace("{u}", u), s.t("pa_revoke"), danger = true)) return@launch; try { Api.req("POST", "/phipop/admin/grant", JSONObject().put("username", u).put("revoke", true)); load() } catch (e: Exception) { toast(s.err(e), true) } } }) { HText(s.t("pa_revoke"), 13f, FontWeight.ExtraBold, Heart, Modifier.padding(12.dp)) }
                 }
             }
         }
-    }
 }
 
 /** Bagian "Postingan Phipop" di layar Kelola: daftar, hapus, ganti (tulis ulang / manual), dan suruh Phipop posting. */

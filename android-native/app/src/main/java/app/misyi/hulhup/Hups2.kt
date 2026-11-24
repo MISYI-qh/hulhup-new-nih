@@ -202,15 +202,17 @@ suspend fun postMenu(a: A, onDeleted: (() -> Unit)? = null) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable fun HupsFeed(filter: String) {
     val s = Store; val sc = rememberCoroutineScope()
-    val items = remember { mutableStateListOf<A>() }
-    var loading by remember { mutableStateOf(true) }
+    val cached = remember(filter) { HupsCache.m[filter]?.takeIf { System.currentTimeMillis() - it.at < 15 * 60 * 1000L } }
+    val items = remember { mutableStateListOf<A>().also { l -> cached?.let { l.addAll(it.items) } } }
+    var loading by remember { mutableStateOf(cached == null) }
     var error by remember { mutableStateOf<String?>(null) }
-    var next by remember { mutableIntStateOf(0) }
+    var next by remember { mutableIntStateOf(cached?.next ?: 0) }
     var refreshing by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var more by remember { mutableStateOf(false) }
     val owner = remember { Any() }
-    val ls = rememberLazyListState()
+    val ls = rememberLazyListState(cached?.idx ?: 0, cached?.off ?: 0)
+    DisposableEffect(filter) { onDispose { if (items.isNotEmpty()) HupsCache.m[filter] = HupsCache.E(System.currentTimeMillis(), items.toList(), next, ls.firstVisibleItemIndex, ls.firstVisibleItemScrollOffset) } }
     val top = Nav.stack.lastOrNull()
     val screen = remember { top }
 
@@ -221,7 +223,7 @@ suspend fun postMenu(a: A, onDeleted: (() -> Unit)? = null) {
         } catch (e: Exception) { error = s.err(e) }
         loading = false
     }
-    LaunchedEffect(filter) { load() }
+    LaunchedEffect(filter) { val c = cached; if (c != null) { items.clear(); items.addAll(c.items); next = c.next; loading = false; ls.scrollToItem(c.idx, c.off) } else load() }
     // Real-time: segarkan diam-diam; di paling atas diganti utuh, di bawahnya hanya angka sorot/komentar yang diperbarui.
     LaunchedEffect(filter) {
         while (true) {
@@ -275,4 +277,10 @@ suspend fun postMenu(a: A, onDeleted: (() -> Unit)? = null) {
             }
         }
     }
+}
+
+/** Cadangan daftar Hups di memori (±15 menit): kembali dari profil/post tetap di posisi terakhir. */
+object HupsCache {
+    class E(val at: Long, val items: List<A>, val next: Int, val idx: Int, val off: Int)
+    val m = HashMap<String, E>()
 }

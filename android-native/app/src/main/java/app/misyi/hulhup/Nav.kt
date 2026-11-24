@@ -66,7 +66,7 @@ fun pageFor(name: String): Screen? {
         }
         "search" -> Screen("/search") { SearchPage() }
         "streak" -> Screen("/streak") { StreakPage() }
-        "offline" -> Screen("/offline") { OfflinePage() }
+        "admin" -> Screen("/admin") { AdminPage() }
         "phipop" -> if (seg.getOrNull(1) == "admin") Screen("/phipop/admin") { PhipopAdminPage() } else Screen("/phipop") { PhipopPage(Regex("[?&]code=([^&#]+)").find(name)?.groupValues?.get(1)?.let { java.net.URLDecoder.decode(it, "UTF-8") }) }
         "new" -> Screen("/new") { ComposePage(Regex("[?&]quote=([^&#]+)").find(name)?.groupValues?.get(1)?.let { java.net.URLDecoder.decode(it, "UTF-8") }) }
         "login" -> Screen("/login") { AuthPage() }

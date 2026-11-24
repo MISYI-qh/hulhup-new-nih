@@ -391,8 +391,6 @@ suspend fun newRecovery() {
                     if (a.url.isNotEmpty()) HText(if (on) "${mmss(s.posMs / 1000)} / ${mmss(a.secs)}" else mmss(a.secs), 13f, FontWeight.Bold, if (on) ink() else sub())
                     Spacer(Modifier.width(10.dp)); Box(Modifier.weight(1f, false)) { AudChip(a.rand, a.to) }
                     if (showOwner) { Spacer(Modifier.width(10.dp)); HText(a.ownerName, 13f, color = sub(), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, false)) }
-                    Spacer(Modifier.width(6.dp))
-                    Tap(onTap = { sc.launch { toggleOfflinePost(a) } }) { Icon(if (s.isOffline(a.id)) Icons.Rounded.OfflinePin else Icons.Outlined.DownloadForOffline, null, Modifier.padding(4.dp).size(20.dp), tint = if (s.isOffline(a.id)) ink() else sub()) }
                 }
             }
             if (!mine && s.me != null && s.me!!.username != a.owner) Tap(onTap = { sc.launch { reportSheet(audio = a.id) } }) { Icon(Icons.Outlined.Flag, null, Modifier.padding(6.dp).size(19.dp), tint = sub()) }
