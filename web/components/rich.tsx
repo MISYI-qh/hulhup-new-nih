@@ -18,8 +18,11 @@ export function Avatar({ url, name, size }: { url?: string | null; name: string;
   return <span className="avatar" style={{ width: size, height: size, fontSize: size * .42, ...(off ? { background: 'var(--bg)' } : {}) }}>
     {url && !bad ? <img src={mediaUrl(url)} alt="" width={size} height={size} loading="lazy" decoding="async" style={off ? { objectFit: 'contain' } : undefined} onError={() => setBad(true)} /> : init}</span>;
 }
-/** Warna centang: biru = akun resmi (hulhup, misyi, phipop), ungu = qih, oranye = semua akun lain. */
-export const badgeColor = (u?: string) => (['hulhup', 'misyi', 'phipop'].includes(`${u}`) ? 'var(--blue)' : u === 'qih' ? '#8B5CF6' : '#FF7A1A');
+/** Warna centang dari server (GET /badges): ungu = segelintir akun, biru = organisasi/perusahaan >2 orang, oranye = pengguna biasa. */
+const BADGE_MAP: Record<string, string> = {};
+const BADGE_COL: Record<string, string> = { purple: '#8B5CF6', blue: 'var(--blue)', orange: '#FF7A1A' };
+if (typeof window !== 'undefined') Api.req('GET', '/badges').then((j: any) => { Object.assign(BADGE_MAP, j.badges || {}); store.poke(); }).catch(() => {});
+export const badgeColor = (u?: string) => BADGE_COL[BADGE_MAP[`${u}`]] || '#FF7A1A';
 export const Verified = ({ size = 15, u }: { size?: number; u?: string }) => <Icon n="verified_rounded" size={size} color={badgeColor(u)} style={{ marginLeft: 4 }} />;
 
 export function AiTag({ label }: { label: string }) { return <div className="aitag"><Icon n="auto_awesome_rounded" size={13} color="#d6336c" />{label}</div>; }
