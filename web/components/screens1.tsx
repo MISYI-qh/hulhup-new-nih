@@ -253,12 +253,12 @@ export function NotifScreen() {
   };
   const open = (x: any) => { const k = `${x.type}`, post = x.post ?? 0; if (k === 'phipop_code') { n.push(`/phipop?code=${encodeURIComponent(`${x.extra ?? ''}`)}`); return; } if (['comment', 'reply', 'mention', 'like'].includes(k) && post) n.push(`/p/${postCode(post)}`); else n.push(`/@${x.username}`); };
   const body = (x: any) => {
-    const k = `${x.type}`, sys = ['streak', 'missed', 'tired'].includes(k), like = k === 'like', cm = k === 'comment' || k === 'reply', relk = k === 'rel_req' || k === 'rel_ok';
+    const k = `${x.type}`, sys = ['streak', 'missed', 'tired', 'badge'].includes(k), like = k === 'like', cm = k === 'comment' || k === 'reply', relk = k === 'rel_req' || k === 'rel_ok';
     const bg = x.seen === true ? 'var(--soft)' : 'color-mix(in srgb, var(--ink) 12%, transparent)';
     const when = <span style={{ color: 'var(--sub)', fontSize: 12 }}>{s.ago(x.created)}</span>;
     if (sys) return <div className="row2" style={{ gap: 14, padding: 12, background: bg, borderRadius: 26, marginBottom: 10, alignItems: 'center' }}>
       <span style={{ width: 46, height: 46, borderRadius: '50%', background: 'var(--brand)', display: 'grid', placeItems: 'center', flex: 'none' }}><AnimMark width={26} colors={['#fff', '#5b47f5', '#4330d0']} /></span>
-      <div style={{ flex: 1 }}><div className="row2"><b style={{ fontSize: 15, flex: 1 }}>{k === 'tired' ? s.t('r_title') : 'Hulhup'}</b>{when}</div><div style={{ fontSize: 15, lineHeight: 1.4, marginTop: 2 }}>{k === 'tired' ? s.t('r_body') : s.t(k === 'streak' ? 'n_streak' : 'n_missed').replace('{n}', `${x.n}`)}</div></div></div>;
+      <div style={{ flex: 1 }}><div className="row2"><b style={{ fontSize: 15, flex: 1 }}>{k === 'tired' ? s.t('r_title') : 'Hulhup'}</b>{when}</div><div style={{ fontSize: 15, lineHeight: 1.4, marginTop: 2 }}>{k === 'tired' ? s.t('r_body') : k === 'badge' ? s.t('n_badge') : s.t(k === 'streak' ? 'n_streak' : 'n_missed').replace('{n}', `${x.n}`)}</div></div></div>;
     return <div className="row2" style={{ gap: 14, padding: 12, background: bg, borderRadius: 26, marginBottom: 10, alignItems: 'center' }}>
       <span style={{ position: 'relative', flex: 'none' }}><Avatar url={x.avatar} name={x.name} size={46} />
         <span style={{ position: 'absolute', right: -4, bottom: -4, width: 22, height: 22, borderRadius: '50%', background: 'var(--btn)', border: '2px solid var(--bg)', display: 'grid', placeItems: 'center', color: 'var(--cream)' }}>
@@ -273,6 +273,6 @@ export function NotifScreen() {
       {items.map((x) => selecting
         ? <div key={x.id} className="row2 tap" role="checkbox" aria-checked={sel.has(x.id)} style={{ borderRadius: 28, border: `2px solid ${sel.has(x.id) ? 'var(--ink)' : 'transparent'}`, cursor: 'pointer' }} onClick={() => setSel((c) => { const m = new Set(c); m.has(x.id) ? m.delete(x.id) : m.add(x.id); return m; })}>
           <span style={{ padding: '0 4px 0 10px', color: sel.has(x.id) ? 'var(--ink)' : 'var(--sub)' }}><Icon n={sel.has(x.id) ? 'check_circle_rounded' : 'circle_outlined'} /></span><div style={{ flex: 1, pointerEvents: 'none' }}>{body(x)}</div></div>
-        : <div key={x.id} className="tap" style={{ cursor: 'pointer' }} onClick={() => ['streak', 'missed', 'tired'].includes(`${x.type}`) ? undefined : open(x)} onContextMenu={(e) => { e.preventDefault(); setSelecting(true); setSel(new Set([x.id])); }}>{body(x)}</div>)}
+        : <div key={x.id} className="tap" style={{ cursor: 'pointer' }} onClick={() => ['streak', 'missed', 'tired', 'badge'].includes(`${x.type}`) ? undefined : open(x)} onContextMenu={(e) => { e.preventDefault(); setSelecting(true); setSel(new Set([x.id])); }}>{body(x)}</div>)}
     </div>}</Screen>;
 }

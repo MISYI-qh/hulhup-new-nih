@@ -43,7 +43,7 @@ export function PopupBody({ a, close }: { a: A; close: () => void }) {
   return <div className="stack" style={{ gap: 0 }}>
     {a.pprof ? <button className="tap row2" style={{ textAlign: 'left' }} onClick={() => open(`/@${a.owner}`)}>
       <Avatar url={a.ownerAvatar} name={a.ownerName} size={46} />
-      <div style={{ flex: 1, minWidth: 0 }}><div style={{ display: 'flex', alignItems: 'center' }}><b style={{ fontSize: 16, fontWeight: 800 }}>{a.ownerName}</b>{a.ownerVerified ? <Verified /> : null}</div>
+      <div style={{ flex: 1, minWidth: 0 }}><div style={{ display: 'flex', alignItems: 'center' }}><b style={{ fontSize: 16, fontWeight: 800 }}>{a.ownerName}</b>{a.ownerVerified ? <Verified u={a.owner} /> : null}</div>
         <div className="hsub">{a.owner}{a.created > 0 ? ` · ${s.when(a.created)}` : ''}</div></div>
       <Icon n="chevron_right_rounded" color="var(--sub)" /></button>
       : a.created > 0 ? <div className="hsub" style={{ marginBottom: 6 }}>{s.when(a.created)}</div> : null}

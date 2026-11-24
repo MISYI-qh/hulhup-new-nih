@@ -403,6 +403,7 @@ object Strings {
         "sec_acc" to listOf("Akun", "Accounts"),
         "sec_audio" to listOf("Audio", "Audio"),
         "n_streak" to listOf("Kamu sudah masuk {n} hari berturut-turut", "You’ve signed in {n} days in a row"),
+        "n_badge" to listOf("Selamat! Akunmu sekarang punya centang oranye di Hulhup.", "Congrats! Your account now has the orange check on Hulhup."),
         "n_missed" to listOf("Kamu tidak masuk {n} hari. Rangkaianmu dimulai lagi dari awal.", "You missed {n} day(s). Your streak starts over."),
         "push_unread" to listOf("{n} notifikasi baru", "{n} new notifications"),
         "r_title" to listOf("Kamu lelah?", "Feeling tired?"),

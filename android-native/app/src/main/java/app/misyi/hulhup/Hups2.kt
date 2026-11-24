@@ -116,7 +116,7 @@ val mentionRe = Regex("${linkRe.pattern}|@([a-z0-9_]{3,20})", RegexOption.IGNORE
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     HText(a.ownerName, 15.5f, FontWeight.ExtraBold, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
-                    if (a.ownerVerified) Icon(Icons.Rounded.Verified, null, Modifier.padding(start = 4.dp).size(15.dp), tint = Blue)
+                    if (a.ownerVerified) Icon(Icons.Rounded.Verified, null, Modifier.padding(start = 4.dp).size(15.dp), tint = badgeTint(a.owner))
                 }
                 HText("${a.owner} · ${s.`when`(a.created)}", 12.5f, color = sub(), maxLines = 1)
             }

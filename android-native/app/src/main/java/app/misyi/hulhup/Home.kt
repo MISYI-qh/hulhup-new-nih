@@ -221,7 +221,7 @@ val kBuild get() = BuildConfig.BUILD
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Avatar(a.ownerAvatar, a.ownerName, 46.dp); Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) { HText(a.ownerName, 16f, FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, false)); if (a.ownerVerified) Icon(Icons.Rounded.Verified, null, Modifier.padding(start = 4.dp).size(16.dp), tint = Blue) }
+                    Row(verticalAlignment = Alignment.CenterVertically) { HText(a.ownerName, 16f, FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, false)); if (a.ownerVerified) Icon(Icons.Rounded.Verified, null, Modifier.padding(start = 4.dp).size(16.dp), tint = badgeTint(a.owner)) }
                     HText(if (a.created > 0) "${a.owner} · ${s.`when`(a.created)}" else a.owner, 13f, color = sub(), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 Icon(Icons.Rounded.ChevronRight, null, tint = sub())

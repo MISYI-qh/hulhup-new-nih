@@ -228,7 +228,7 @@ import org.json.JSONObject
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 HText(c.optString("name"), 14.5f, FontWeight.ExtraBold, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
-                if (c.optBoolean("verified")) Icon(Icons.Rounded.Verified, null, Modifier.padding(start = 3.dp).size(14.dp), tint = Blue)
+                if (c.optBoolean("verified")) Icon(Icons.Rounded.Verified, null, Modifier.padding(start = 3.dp).size(14.dp), tint = badgeTint(c.optString("username")))
                 if (isAuthor) Box(Modifier.padding(start = 6.dp).background(ink(), RoundedCornerShape(8.dp)).padding(horizontal = 7.dp, vertical = 2.dp)) { HText(s.t("author"), 10.5f, FontWeight.ExtraBold, bgOf()) }
                 Spacer(Modifier.width(6.dp))
                 HText(s.`when`(c.optLong("created")), 12f, color = sub(), maxLines = 1)

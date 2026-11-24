@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { Icon, HIcon } from './Icon';
 import { NeedLogin, Screen, useNav } from './shell';
 import { Empty, Field, IconBtn, Loader, PBtn, Seg, Toggle, confirmDlg, sheet, toast } from './ui';
-import { AiTag, Avatar, MentionText } from './rich';
+import { AiTag, Avatar, MentionText, badgeColor } from './rich';
 import { Pick, askLabel, audIcon, chooseSheet, profileAud, relKinds, reportSheet, withLabels } from './aud';
 import { PostCard } from './post';
 import LogoRefresh from './LogoRefresh';
@@ -122,7 +122,7 @@ export function ProfileScreen({ username, tab0 = 0 }: { username: string | null;
     {loading || !s.ready ? <Loader k="profile" /> : err || !user ? <Empty icon="cloud_off_rounded" text={err ?? ''} action={<button className="tap pbtn" style={{ width: 160 }} onClick={() => { setLoading(true); load(); }}>{s.t('retry')}</button>} /> : <LogoRefresh onRefresh={load}><div style={{ paddingBottom: 40 }}>
       <div style={{ padding: '10px 24px 0' }}><button className="tap" disabled={!user.avatar} onClick={() => setView(true)} aria-label={user.name} style={{ display: 'block', borderRadius: '50%' }}><Avatar url={user.avatar} name={user.name} size={96} /></button></div>
       <div style={{ padding: '16px 24px 0', textAlign: 'left' }}>
-        <div className="row2" style={{ gap: 6 }}><h1 style={{ margin: 0, fontWeight: 800, fontSize: 24, letterSpacing: -.5 }}>{user.name}</h1>{user.verified ? <Icon n="verified_rounded" size={22} color="var(--blue)" /> : null}</div>
+        <div className="row2" style={{ gap: 6 }}><h1 style={{ margin: 0, fontWeight: 800, fontSize: 24, letterSpacing: -.5 }}>{user.name}</h1>{user.verified ? <Icon n="verified_rounded" size={22} color={badgeColor(user.username)} /> : null}</div>
         <div style={{ color: 'var(--sub)', fontSize: 15, marginTop: 2 }}>{user.username}</div>
         {user.avatarAi ? <AiTag label={s.t(user.avatarAiKind === 'edited' ? 'ai_photo_edit' : 'ai_photo')} /> : null}
         {user.bio ? <div style={{ marginTop: 12 }}><MentionText text={user.bio} style={{ fontSize: 15, lineHeight: 1.45 }} /></div> : null}

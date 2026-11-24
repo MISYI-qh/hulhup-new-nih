@@ -119,7 +119,7 @@ private fun JSONObject.list(k: String) = optJSONArray(k)?.objects() ?: emptyList
                                 }
                                 Spacer(Modifier.height(16.dp))
                                 Column(Modifier.padding(horizontal = 24.dp)) { In(1) { Column {
-                                    Row(verticalAlignment = Alignment.CenterVertically) { HText(u.name, 24f, FontWeight.ExtraBold, ls = -.5f, modifier = Modifier.weight(1f, false)); if (u.verified) Icon(Icons.Rounded.Verified, null, Modifier.padding(start = 6.dp).size(22.dp), tint = Blue) }
+                                    Row(verticalAlignment = Alignment.CenterVertically) { HText(u.name, 24f, FontWeight.ExtraBold, ls = -.5f, modifier = Modifier.weight(1f, false)); if (u.verified) Icon(Icons.Rounded.Verified, null, Modifier.padding(start = 6.dp).size(22.dp), tint = badgeTint(u.username)) }
                                     Spacer(Modifier.height(2.dp)); HText(u.username, 15f, color = sub())
                                     if (u.avatarAi && !officialUser(u.username)) AiTag(s.t(if (u.avatarAiKind == "edited") "ai_photo_edit" else "ai_photo"))
                                     if (u.bio.isNotEmpty()) Box(Modifier.padding(top = 12.dp)) { MentionText(u.bio, androidx.compose.ui.text.TextStyle(fontSize = 15.sp, lineHeight = 21.75.sp, fontFamily = Outfit)) }
@@ -621,11 +621,11 @@ private fun Modifier.androidx_focus(f: androidx.compose.ui.focus.FocusRequester)
         if ((k == "comment" || k == "reply" || k == "mention" || k == "like") && post != 0) go("/p/${PostCode.enc(post.toLong())}") else go("/@${n.optString("username")}")
     }
     @Composable fun body(n: JSONObject, i: Int) {
-        val k = n.optString("type"); val sys = k == "streak" || k == "missed" || k == "tired"; val like = k == "like"; val cm = k == "comment" || k == "reply"; val relk = k == "rel_req" || k == "rel_ok"
+        val k = n.optString("type"); val sys = k == "streak" || k == "missed" || k == "tired" || k == "badge"; val like = k == "like"; val cm = k == "comment" || k == "reply"; val relk = k == "rel_req" || k == "rel_ok"
         val bg = if (n.optBoolean("seen")) soft() else ink().copy(alpha = .12f)
         val whenT = s.ago(n.optLong("created"))
         if (sys) {
-            val txt = if (k == "tired") s.t("r_body") else s.t(if (k == "streak") "n_streak" else "n_missed").replace("{n}", "${n.optInt("n")}")
+            val txt = if (k == "tired") s.t("r_body") else if (k == "badge") s.t("n_badge") else s.t(if (k == "streak") "n_streak" else "n_missed").replace("{n}", "${n.optInt("n")}")
             In(i) { Row(Modifier.padding(bottom = 10.dp).fillMaxWidth().background(bg, RoundedCornerShape(26.dp)).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(46.dp).background(Brand, CircleShape), contentAlignment = Alignment.Center) { Logo(26.dp) }; Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {

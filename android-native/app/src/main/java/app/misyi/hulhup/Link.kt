@@ -439,7 +439,7 @@ private suspend fun fetchQuote(id: Int): A? {
             if (q.pprof) Row(verticalAlignment = Alignment.CenterVertically) {
                 Avatar(q.ownerAvatar, q.ownerName, 26.dp); Spacer(Modifier.width(8.dp))
                 HText(q.ownerName, 14.5f, FontWeight.ExtraBold, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
-                if (q.ownerVerified) Icon(Icons.Rounded.Verified, null, Modifier.padding(start = 4.dp).size(14.dp), tint = Blue)
+                if (q.ownerVerified) Icon(Icons.Rounded.Verified, null, Modifier.padding(start = 4.dp).size(14.dp), tint = badgeTint(q.owner))
                 HText("  ${q.owner} · ${s.`when`(q.created)}", 13f, color = sub(), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
             }
             if (text.isNotEmpty()) HText(text.trimEnd(), 15f, modifier = Modifier.padding(top = 8.dp), maxLines = 6, overflow = TextOverflow.Ellipsis, lh = 21f)

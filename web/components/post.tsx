@@ -124,7 +124,7 @@ export function OwnerRow({ a, more }: { a: A; more?: () => void }) {
   return <div className="hrow">
     <Link href={`/@${a.owner}`} onClick={(e) => e.stopPropagation()}><Avatar url={a.ownerAvatar} name={a.ownerName} size={42} /></Link>
     <Link href={`/@${a.owner}`} onClick={(e) => e.stopPropagation()} style={{ flex: 1, minWidth: 0, textDecoration: 'none', color: 'inherit' }}>
-      <div style={{ display: 'flex', alignItems: 'center' }}><span className="hname" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.ownerName}</span>{a.ownerVerified ? <Verified /> : null}</div>
+      <div style={{ display: 'flex', alignItems: 'center' }}><span className="hname" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.ownerName}</span>{a.ownerVerified ? <Verified u={a.owner} /> : null}</div>
       <div className="hsub" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.owner} · {s.when(a.created)}</div></Link>
     {more ? <IconBtn n="more_horiz_rounded" color="var(--sub)" onClick={more} label="Menu" /> : null}
   </div>;

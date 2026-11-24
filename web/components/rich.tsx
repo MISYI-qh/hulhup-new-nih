@@ -18,7 +18,9 @@ export function Avatar({ url, name, size }: { url?: string | null; name: string;
   return <span className="avatar" style={{ width: size, height: size, fontSize: size * .42, ...(off ? { background: 'var(--bg)' } : {}) }}>
     {url && !bad ? <img src={mediaUrl(url)} alt="" width={size} height={size} loading="lazy" decoding="async" style={off ? { objectFit: 'contain' } : undefined} onError={() => setBad(true)} /> : init}</span>;
 }
-export const Verified = ({ size = 15 }: { size?: number }) => <Icon n="verified_rounded" size={size} color="var(--blue)" style={{ marginLeft: 4 }} />;
+/** Warna centang: biru = akun resmi (hulhup, misyi, phipop), ungu = qih, oranye = semua akun lain. */
+export const badgeColor = (u?: string) => (['hulhup', 'misyi', 'phipop'].includes(`${u}`) ? 'var(--blue)' : u === 'qih' ? '#8B5CF6' : '#FF7A1A');
+export const Verified = ({ size = 15, u }: { size?: number; u?: string }) => <Icon n="verified_rounded" size={size} color={badgeColor(u)} style={{ marginLeft: 4 }} />;
 
 export function AiTag({ label }: { label: string }) { return <div className="aitag"><Icon n="auto_awesome_rounded" size={13} color="#d6336c" />{label}</div>; }
 
@@ -99,7 +101,7 @@ export function QuoteCard({ id }: { id: number }) {
   const text = (a.text ?? a.desc ?? '').trim(); const go = (e: React.SyntheticEvent) => { e.stopPropagation(); r.push(`/p/${postCode(a.id)}`); };
   return <div ref={ref} className="embed quote tap" role="link" tabIndex={0} onClick={go} onKeyDown={(e) => { if (e.key === 'Enter') go(e); }}>
     {a.pprof ? <div className="qh"><Avatar url={a.ownerAvatar} name={a.ownerName} size={26} />
-      <b>{a.ownerName}</b>{a.ownerVerified ? <Verified size={14} /> : null}<span className="qs">{a.owner} · {s.when(a.created)}</span></div> : null}
+      <b>{a.ownerName}</b>{a.ownerVerified ? <Verified size={14} u={a.owner} /> : null}<span className="qs">{a.owner} · {s.when(a.created)}</span></div> : null}
     {text ? <div className="qt"><MentionText text={text.replace(/\s+$/, '')} hideQuote ptag={a.ptag} /></div> : null}
     {quoteRef(text) ? <MediaStrip items={a.media ?? []} /> : <div className="qm"><PostMedia text={text} media={a.media} /></div>}
     {a.files.length && !a.bgm ? <div style={{ padding: '4px 0 0' }}><FileBar keyId={fileKey(a, 0)} url={a.files[0].url} secs={a.files[0].secs ?? 0} onStart={() => store.countPlay(a)} /></div> : null}

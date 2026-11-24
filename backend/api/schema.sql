@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS users (
   last_day    TEXT,
   rem         TEXT,
   role        TEXT NOT NULL DEFAULT 'user'   CHECK (role IN ('user','admin')),
-  verified    BOOLEAN NOT NULL DEFAULT FALSE,
+  verified    BOOLEAN NOT NULL DEFAULT TRUE,
   status      TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','suspended','banned')),
   followers   INT NOT NULL DEFAULT 0,
   following   INT NOT NULL DEFAULT 0,
@@ -342,3 +342,4 @@ CREATE TABLE IF NOT EXISTS phipop_posts (
 );
 
 ALTER TABLE phipop_chat ADD COLUMN IF NOT EXISTS reply_to BIGINT;
+ALTER TABLE users ALTER COLUMN verified SET DEFAULT TRUE;

@@ -4,7 +4,7 @@ import { Icon, HIcon } from './Icon';
 import { NeedLogin, Screen, useNav } from './shell';
 import { Empty, Field, IconBtn, Loader, PBtn, Toggle, confirmDlg, sheet, toast } from './ui';
 import { Pick, askLabel, reportSheet, uploadAud, audSplit, withLabels } from './aud';
-import { Avatar, LinkEmbed, PostMedia, QuoteCard, MentionBar, MentionText, PhRun, QuoteSlot, pullQuote, firstUrl, quoteRef } from './rich';
+import { Avatar, LinkEmbed, PostMedia, QuoteCard, MentionBar, MentionText, PhRun, QuoteSlot, pullQuote, firstUrl, quoteRef, badgeColor } from './rich';
 import { ActBtn, AudioBars, BgmBar, FileBar, OwnerRow, PostActions, Wave, commentLink, mmss, postMenu, shareUrl } from './post';
 import { A, ApiErr, Api, store, useStore } from '@/lib/store';
 import { kindOfUrl } from '@/lib/links';
@@ -50,7 +50,7 @@ function CommentTile({ c, depth, postId, postOwner, scope, onReply, onLike, onDe
     {depth > 0 ? <span style={{ width: 2, height: 34, margin: '4px 10px 0 0', background: 'color-mix(in srgb, var(--ink) 12%, transparent)', borderRadius: 1, flex: 'none' }} /> : null}
     <button className="tap" onClick={() => n.push(`/@${c.username}`)} aria-label={c.name}><Avatar url={c.avatar} name={`${c.name}`} size={34} /></button>
     <div style={{ flex: 1, minWidth: 0, marginLeft: 10 }}>
-      <div className="row2" style={{ gap: 0, flexWrap: 'wrap' }}><b style={{ fontWeight: 800, fontSize: 14.5 }}>{c.name}</b>{c.verified === true ? <Icon n="verified_rounded" size={14} color="var(--blue)" style={{ marginLeft: 3 }} /> : null}
+      <div className="row2" style={{ gap: 0, flexWrap: 'wrap' }}><b style={{ fontWeight: 800, fontSize: 14.5 }}>{c.name}</b>{c.verified === true ? <Icon n="verified_rounded" size={14} color={badgeColor(`${c.username}`)} style={{ marginLeft: 3 }} /> : null}
         {isAuthor ? <span style={{ marginLeft: 6, padding: '2px 7px', borderRadius: 8, background: 'var(--ink)', color: 'var(--bg)', fontSize: 10.5, fontWeight: 800 }}>{s.t('author')}</span> : null}
         <span style={{ marginLeft: 8, color: 'var(--sub)', fontSize: 12 }}>{s.when(Number(c.created))}</span></div>
       {c.pinned ? <div className="row2" style={{ gap: 4, marginTop: 2, color: 'var(--sub)', fontSize: 11.5, fontWeight: 700 }}><Icon n="push_pin_rounded" size={12} />{s.t('pinned')}</div> : null}
