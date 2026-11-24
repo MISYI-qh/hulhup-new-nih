@@ -58,7 +58,6 @@ export function PopupBody({ a, close }: { a: A; close: () => void }) {
     {a.url ? <div style={{ marginTop: 10 }}><SpeedRow /></div> : null}
     <div style={{ height: 6 }} />
     <PostActions a={a} onComments={() => open(`/p/${postCode(a.id)}`)} />
-    <PBtn ghost icon={off ? 'offline_pin_rounded' : 'download_for_offline_outlined'} onClick={() => toggleOfflinePost(a)}>{off ? s.t('is_offline') : s.t('mk_offline')}</PBtn>
     {s.me && s.me.username !== a.owner ? <button className="tap row2" style={{ justifyContent: 'center', padding: '12px 0 2px', color: 'var(--sub)', fontSize: 13, fontWeight: 600 }} onClick={() => reportSheet({ audio: a.id })}><Icon n="flag_outlined" size={16} />{s.t('report')}</button> : null}
   </div>;
 }
@@ -73,7 +72,6 @@ function SideMenu({ open, close }: { open: boolean; close: () => void }) {
       <div style={{ padding: '0 10px 8px' }}><PBtn icon="add_rounded" onClick={() => { if (!s.needNet()) return; close(); n.push(s.me ? '/new' : '/login'); }}>{s.t('create')}</PBtn></div>
       {item('tune_rounded', 'settings', '/settings', true)}
       {s.me ? item('send_outlined', 'sent_title', '/sent') : null}
-      {item('download_done_rounded', 'offline_t', '/offline')}
       <button className="tap mi" onClick={() => setMore(!more)}><Icon n="more_horiz_rounded" size={24} /><span style={{ flex: 1 }}>{s.t('more')}</span><Icon n="expand_more_rounded" size={22} color="var(--sub)" style={{ transform: more ? "rotate(180deg)" : undefined, transition: "transform .2s" }} /></button>
       <div style={{ paddingLeft: 16, display: more ? 'block' : 'none' }}>
         {item('info_outline_rounded', 'about', '/about')}{item('help_outline_rounded', 'faq', '/faq')}{item('rule_rounded', 'policy', '/policy')}{item('lock_outline_rounded', 'privacy', '/privacy')}
@@ -137,7 +135,7 @@ export function HomeScreen({ mode0 = 0 }: { mode0?: 0 | 1 }) {
         <button className="tap fab" style={{ position: 'fixed', right: 'max(20px, calc(50vw - 240px))', bottom: 90 }} aria-label={s.t('create')} onClick={() => { if (s.needNet()) n.push(s.me ? '/new' : '/login'); }}><HIcon k="add" size={26} /></button>
       </>}
     </div>
-    <div style={{ padding: '6px 60px 12px' }}><div style={{ display: 'flex', background: 'var(--soft)', borderRadius: 26, padding: 4 }}>{seg(0, 'acak', s.t('rand_tab'))}{seg(1, 'hups', s.t('hups'))}</div></div>
+    <div style={{ padding: '6px 60px 12px' }}><div style={{ display: 'flex', background: 'var(--soft)', borderRadius: 26, padding: 4 }}>{seg(0, 'acak', s.t('rand_tab'))}{s.me?.username === 'hulhup' ? <button className="tap" onClick={() => n.push('/admin')} style={{ flex: 1, height: 44, borderRadius: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontWeight: 800, fontSize: 14 }}><Icon n="admin_panel_settings_rounded" size={18} />Admin</button> : null}{seg(1, 'hups', s.t('hups'))}</div></div>
     <SideMenu open={menu} close={() => setMenu(false)} />
   </div>;
 }

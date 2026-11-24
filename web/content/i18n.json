@@ -1683,6 +1683,30 @@
 "Brutal tanpa filter",
 "Brutal, no filter"
 ],
+"n_td_post": [
+"Postinganmu telah di-take down. Alasan: {r}",
+"Your post has been taken down. Reason: {r}"
+],
+"n_td_comment": [
+"Komentarmu telah di-take down. Alasan: {r}",
+"Your comment has been taken down. Reason: {r}"
+],
+"ai_see": [
+"AI boleh melihat post ini",
+"AI may see this post"
+],
+"ai_see_d": [
+"Kalau dimatikan, Phipop tidak bisa melihatnya walaupun publik.",
+"If off, Phipop can't see it even when it is public."
+],
+"ai_cmt": [
+"AI boleh berkomentar",
+"AI may comment"
+],
+"ai_cmt_d": [
+"Kalau dimatikan, men-tag @phipop di post ini tidak akan dijawab.",
+"If off, tagging @phipop on this post won't get a reply."
+],
 "n_badge": [
 "Selamat! Akunmu sekarang punya centang oranye di Hulhup.",
 "Congrats! Your account now has the orange check on Hulhup."

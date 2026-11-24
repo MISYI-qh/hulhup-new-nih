@@ -125,7 +125,6 @@ export function AudioRow({ a, mine, onDelete, showOwner, scope }: { a: A; mine?:
         {a.url ? <span style={{ fontSize: 13, fontWeight: 700, color: on ? 'var(--ink)' : 'var(--sub)' }}><TimeText on={on} secs={a.secs} full /></span> : null}
         <AudChip rand={a.rand} to={a.to} />
         {showOwner ? <span style={{ color: 'var(--sub)', fontSize: 13 }}>{a.ownerName}</span> : null}
-        <button className="tap" style={{ padding: 4, color: off ? 'var(--ink)' : 'var(--sub)' }} aria-label="Offline" onClick={(e) => { e.stopPropagation(); toggleOfflinePost(a); }}><Icon n={off ? 'offline_pin_rounded' : 'download_for_offline_outlined'} size={20} /></button>
       </div></div>
     {!mine && s.me && s.me.username !== a.owner ? <button className="tap" style={{ padding: 6, color: 'var(--sub)' }} aria-label={s.t('report')} onClick={(e) => { e.stopPropagation(); reportSheet({ audio: a.id }); }}><Icon n="flag_outlined" size={19} /></button> : null}
     <button className="tap row2" style={{ gap: 4, padding: 6, color: a.liked ? 'var(--ink)' : 'var(--sub)' }} aria-label="Sorot" onClick={(e) => { e.stopPropagation(); likeAudio(a); }}><HIcon k="sorot" filled={a.liked} size={22} /><span style={{ fontSize: 13, fontWeight: 700 }}>{a.likes}</span></button>

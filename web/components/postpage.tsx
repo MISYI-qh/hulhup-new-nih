@@ -203,7 +203,7 @@ function AccountPick({ init, close }: { init: Record<string, any>; close: (v?: R
 // ---------- tulis post ----------
 export function ComposeScreen() {
   const s = useStore(); const n = useNav();
-  const [text, setText] = useState(''), [clip, setClip] = useState<Clip | null>(null), [playing, setPlaying] = useState(false), [pprof, setPprof] = useState(true), [busy, setBusy] = useState(false), [bgm, setBgm] = useState(false), [media, setMedia] = useState<string[]>([]), [cq, setCq] = useState<string | null>(null);
+  const [text, setText] = useState(''), [clip, setClip] = useState<Clip | null>(null), [playing, setPlaying] = useState(false), [pprof, setPprof] = useState(true), [aiC, setAiC] = useState(true), [aiV, setAiV] = useState(true), [busy, setBusy] = useState(false), [bgm, setBgm] = useState(false), [media, setMedia] = useState<string[]>([]), [cq, setCq] = useState<string | null>(null);
   useEffect(() => { try { const u = new URLSearchParams(location.search).get('quote'); if (u && quoteRef(u)) setCq(u); } catch {} }, []);
   const onText = (v: string) => { if (!cq) { const r = pullQuote(v); if (r.quote) { setCq(r.quote); setText(r.text); return; } } setText(v); };
   const [rand, setRand] = useState('public'), [picked, setPicked] = useState<Record<string, any>>({}); const au = useRef<HTMLAudioElement | null>(null);
@@ -225,7 +225,7 @@ export function ComposeScreen() {
     if (audSplit(rand).includes('accounts') && !Object.keys(picked).length) { toast(s.t('e_need_accounts'), { bad: true }); return; }
     lock.current = true; setBusy(true); let id: number | null = null;
     try {
-      const j = await Api.req('POST', '/posts', { text: t, audios: clip ? 1 : 0, ...(clip ? { bgm } : {}), media, pprof, rand: audSplit(rand), to: Object.keys(picked) });
+      const j = await Api.req('POST', '/posts', { text: t, audios: clip ? 1 : 0, ...(clip ? { bgm } : {}), media, pprof, ai_comment: aiC && aiV, ai_view: aiV, rand: audSplit(rand), to: Object.keys(picked) });
       id = Number(j.id);
       if (clip) await Api.send(`/posts/${id}/audio?secs=${clip.secs}`, clip.blob, 'application/octet-stream');
       toast(s.t('posted')); n.back();
@@ -249,6 +249,8 @@ export function ComposeScreen() {
     <div style={{ color: 'var(--sub)', fontSize: 12.5, margin: '0 0 14px 6px' }}>{s.t('tag_hint')}</div>
     <div className="row2" style={{ alignItems: 'flex-start', gap: 10, background: 'var(--soft)', borderRadius: 18, padding: '12px 14px', margin: '0 0 16px', color: 'var(--sub)', fontSize: 13, lineHeight: 1.45 }}><Icon n="info_outline_rounded" size={18} color="var(--sub)" style={{ flex: 'none', marginTop: 1 }} /><span>{s.t('media_hint')}</span></div>
     <div className="row2" style={{ paddingBottom: 14, gap: 12 }}><div style={{ flex: 1, fontWeight: 600, fontSize: 16 }}>{s.t('pprof')}</div><Toggle v={pprof} on={setPprof} /></div>
+    <div className="row2" style={{ paddingBottom: 14, gap: 12 }}><div style={{ flex: 1, fontWeight: 600, fontSize: 16 }}>{s.t('ai_see')}<div style={{ fontWeight: 500, fontSize: 12.5, color: 'var(--sub)' }}>{s.t('ai_see_d')}</div></div><Toggle v={aiV} on={(v) => { setAiV(v); if (!v) setAiC(false); }} /></div>
+    <div className="row2" style={{ paddingBottom: 14, gap: 12, opacity: aiV ? 1 : .5 }}><div style={{ flex: 1, fontWeight: 600, fontSize: 16 }}>{s.t('ai_cmt')}<div style={{ fontWeight: 500, fontSize: 12.5, color: 'var(--sub)' }}>{s.t('ai_cmt_d')}</div></div><Toggle v={aiC && aiV} on={(v) => aiV && setAiC(v)} /></div>
     <Pick label={s.t('who_see')} value={rand} opts={withLabels(uploadAud)} on={async (v) => { setRand(v); if (audSplit(v).includes('accounts') && !Object.keys(picked).length) { const r = await sheet<Record<string, any>>((close) => <AccountPick init={picked} close={close as any} />); if (r) { setPicked(r); if (!Object.keys(r).length) { const l = audSplit(v).filter((x) => x !== 'accounts'); setRand(l.length ? l.join(',') : 'public'); } } } }} />
     {hasAcc ? <button className="tap srow" style={{ marginTop: 10, marginBottom: 0, fontSize: 15 }} onClick={pickAcc}><Icon n="person_search_outlined" size={20} /><span style={{ flex: 1 }}>{s.t('pick_acc_n').replace('{n}', `${Object.keys(picked).length}`)}</span><Icon n="edit_outlined" size={18} color="var(--sub)" /></button> : null}
     <div style={{ height: 26 }} /><PBtn loading={busy} icon="arrow_upward_rounded" onClick={submit}>{s.t('upload')}</PBtn>

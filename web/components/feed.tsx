@@ -7,6 +7,8 @@ import { HIcon } from './Icon';
 import LogoRefresh from './LogoRefresh';
 
 /** Umpan Hups: muat awal, segarkan diam-diam tiap 6 dtk, muat lagi saat menggulir, backsound otomatis untuk post yang di tengah layar. */
+/** Ingat daftar & posisi gulir: kembali dari profil/post (tombol back) mendarat di tempat terakhir, bukan dari atas. */
+const feedCache = new Map<string, { items: A[]; next: number; y: number; t: number }>();
 export function HupsFeed({ filter, base = '/hups', header }: { filter: string; base?: string; header?: React.ReactNode }) {
   const s = useStore();
   const [items, setItems] = useState<A[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null);
@@ -18,7 +20,19 @@ export function HupsFeed({ filter, base = '/hups', header }: { filter: string; b
     try { const j = await Api.req('GET', path()); setItems((j.items as any[]).map((e) => new A(e))); next.current = Number(j.next) || 0; setError(null); } catch (e) { setError(store.err(e)); }
     setLoading(false);
   }, [filter, base]);
-  useEffect(() => { alive.current = true; setLoading(true); load(); return () => { alive.current = false; store.leave(scope.current); store.leaveBgm(scope.current); }; }, [load]);
+  const ck = `${base}|${filter}|${s.me?.username ?? ''}`;
+  useEffect(() => {
+    alive.current = true;
+    const c = feedCache.get(ck);
+    if (c && Date.now() - c.t < 15 * 60000 && c.items.length) {
+      setItems(c.items); next.current = c.next; setLoading(false);
+      const go = () => window.scrollTo(0, c.y); setTimeout(go, 0); setTimeout(go, 120); setTimeout(go, 400);
+    } else { setLoading(true); load(); }
+    let y = c?.y ?? 0, tm = 0;
+    const onScroll = () => { y = window.scrollY; if (!tm) tm = window.setTimeout(() => { tm = 0; if (itemsRef.current.length) feedCache.set(ck, { items: itemsRef.current, next: next.current, y, t: Date.now() }); }, 200); };
+    addEventListener('scroll', onScroll, { passive: true });
+    return () => { removeEventListener('scroll', onScroll); if (itemsRef.current.length) feedCache.set(ck, { items: itemsRef.current, next: next.current, y, t: Date.now() }); alive.current = false; store.leave(scope.current); store.leaveBgm(scope.current); };
+  }, [load]);
 
   const silent = useCallback(async () => {
     if (document.visibilityState !== 'visible' || loading || busy.current || more.current) return;

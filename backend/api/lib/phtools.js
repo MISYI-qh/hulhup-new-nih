@@ -34,7 +34,7 @@ const like = (s) => '%' + String(s).toLowerCase().replace(/[\\%_]/g, (m) => '\\'
 export const isPub = (rand) => String(rand || 'public').split(',').includes('public');
 const day = (ms) => new Date(Number(ms)).toISOString().slice(0, 10);
 const host = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
-const PUB = `a.rand ~ '(^|,)public(,|$)' and not a.hidden and not a.pending and u.status='active' and u.pvis='public'`;
+const PUB = `a.ai_view and a.rand ~ '(^|,)public(,|$)' and not a.hidden and not a.pending and u.status='active' and u.pvis='public'`;
 
 /** Isi lengkap sebuah post (teks panjang tersimpan di penyimpanan terpisah). */
 export async function bodyOf(row) {
@@ -52,7 +52,7 @@ export function refToId(ref) {
   const n = s.match(/\/p\/(\d{1,10})(?!\d)/); return n ? Number(n[1]) : null;
 }
 
-const POSTQ = `select a.id, a.descr, a.body, a.body_key, a.rand, a.created, a.likes, a.comments, a.media, a.n_audio, a.secs, a.hidden, a.pending, u.username, u.name, u.status, u.pvis from audios a join users u on u.id=a.owner`;
+const POSTQ = `select a.id, a.descr, a.body, a.body_key, a.rand, a.created, a.likes, a.comments, a.media, a.n_audio, a.secs, a.hidden, a.pending, a.ai_view, u.username, u.name, u.status, u.pvis from audios a join users u on u.id=a.owner`;
 const card = async (r, full = false) => ({
   id: Number(r.id), url: postUrl(r.id), oleh: `@${r.username}`, tanggal: day(r.created), sorot: r.likes, komentar: r.comments,
   teks: clip(full ? await bodyOf(r) : r.descr, full ? 1800 : 240), ...(Number(r.n_audio) > 0 ? { ada_audio: true } : {}), ...((r.media || []).length ? { media: (r.media || []).slice(0, 6) } : {}),
@@ -96,7 +96,7 @@ export async function pantau(jenis) {
 export async function getPost(ref, allowId = 0) {
   const id = refToId(ref); if (!id) return { error: 'referensi post tidak valid' };
   const r = await one(`${POSTQ} where a.id=$1`, [id]);
-  const ok = r && !r.hidden && !r.pending && r.status === 'active' && ((isPub(r.rand) && r.pvis === 'public') || Number(r.id) === Number(allowId));
+  const ok = r && !r.hidden && !r.pending && r.status === 'active' && ((isPub(r.rand) && r.pvis === 'public' && r.ai_view) || Number(r.id) === Number(allowId));
   if (!ok) return { error: 'post privat atau tidak ada: kamu tidak boleh membaca atau membahasnya' };
   const cm = await many(`select c.body, u.username from comments c join users u on u.id=c.owner where c.post_id=$1 and not c.pending and c.ph_state='' and u.status='active' order by c.id asc limit 12`, [id]);
   return { post: await card(r, true), komentar: cm.map((c) => `@${c.username}: ${clip(c.body, 160)}`) };
@@ -194,8 +194,8 @@ export async function viewMedia(ref, allowId = 0) {
   const s = String(ref || '').trim();
   const pid = /hulhup\.my\.id\/p\/|^\d{1,10}$|^[0-9A-Za-z]{7}$/.test(s) && !/^https?:\/\/(?!(www\.)?hulhup\.my\.id)/i.test(s) ? refToId(s) : null;
   if (pid) {
-    const r = await one(`select a.id, a.rand, a.hidden, a.pending, a.store, a.blob_key, a.mime, a.secs, u.status, u.pvis from audios a join users u on u.id=a.owner where a.id=$1`, [pid]);
-    const ok = r && !r.hidden && !r.pending && r.status === 'active' && ((isPub(r.rand) && r.pvis === 'public') || Number(r.id) === Number(allowId));
+    const r = await one(`select a.id, a.rand, a.ai_view, a.hidden, a.pending, a.store, a.blob_key, a.mime, a.secs, u.status, u.pvis from audios a join users u on u.id=a.owner where a.id=$1`, [pid]);
+    const ok = r && !r.hidden && !r.pending && r.status === 'active' && ((isPub(r.rand) && r.pvis === 'public' && r.ai_view) || Number(r.id) === Number(allowId));
     if (!ok) return { info: { error: 'post privat atau tidak ada' }, parts: [] };
     const files = [];
     if (r.store && r.blob_key) files.push({ store: r.store, key: r.blob_key, mime: r.mime });

@@ -7,6 +7,7 @@ import { storeFor, putAudio, getAudio, delAudio } from './blobs.js';
 import { randomInt, timingSafeEqual, createHash } from 'node:crypto';
 import * as PH from './phipop.js';
 import { OFFICIAL_IMG } from './official_assets.js';
+import { refToId } from './phtools.js';
 import { pushLater, pushDiag, pushReminders } from './push.js';
 import { deksImage, deksAudio, brief } from './deks/index.js';
 import { runSelfTest } from './deks/selftest.js';
@@ -159,14 +160,14 @@ async function uv(u, me, today) {
   };
 }
 
-const AUD_SQL = `select a.id, a.descr, a.secs, a.pprof, a.rand, a.created, a.likes, a.plays, a.views, a.owner, a.body_len, a.in_rand, a.in_hups, a.n_audio, a.comments, a.bgm, a.bgm_idx, a.media, a.ai, a.ai_kind, a.ptag, a.body btext, u.username ou, u.name oname, u.av_ver oav, u.av_ai oai, u.av_ai_kind oaik, u.verified ov, u.pvis opvis,
+const AUD_SQL = `select a.id, a.descr, a.secs, a.pprof, a.rand, a.created, a.likes, a.plays, a.views, a.owner, a.body_len, a.in_rand, a.in_hups, a.n_audio, a.comments, a.bgm, a.bgm_idx, a.media, a.ai, a.ai_kind, a.ptag, a.ai_comment, a.ai_view, a.body btext, u.username ou, u.name oname, u.av_ver oav, u.av_ai oai, u.av_ai_kind oaik, u.verified ov, u.pvis opvis,
   exists(select 1 from likes l where l.audio_id=a.id and l.user_id=$1) liked, exists(select 1 from saves sv where sv.post_id=a.id and sv.user_id=$1) saved from audios a join users u on u.id=a.owner`;
 
 function av(a) {
   const na = a.n_audio ?? 1;
   const files = Array.from({ length: na }, (_, i) => ({ url: `/audios/${a.id}/file${i ? `?i=${i}` : ''}`, secs: i === 0 ? a.secs : 0 }));
   return {
-    id: Number(a.id), ptag: a.ptag === true, desc: a.descr, secs: a.secs, popup: true, vis: 'public', url: files.length ? files[0].url : '', pprof: a.pprof, rand: a.rand,
+    id: Number(a.id), ptag: a.ptag === true, ai_comment: a.ai_comment !== false, ai_view: a.ai_view !== false, desc: a.descr, secs: a.secs, popup: true, vis: 'public', url: files.length ? files[0].url : '', pprof: a.pprof, rand: a.rand,
     created: Number(a.created), likes: a.likes, plays: a.plays || 0, views: a.views || 0, liked: a.liked, owner: a.ou, owner_name: a.oname,
     owner_avatar: a.oav > 0 ? `/users/${a.ou}/avatar?v=${a.oav}` : null, owner_avatar_ai: a.oav > 0 && a.oai === true && !OFFICIAL.includes(a.ou), owner_avatar_ai_kind: a.oav > 0 && a.oai === true && !OFFICIAL.includes(a.ou) ? (a.oaik || 'made') : '', ai: a.ai === true, ai_kind: a.ai === true ? (a.ai_kind || 'made') : '', owner_verified: a.ov,
     long: Number(a.body_len || 0) > String(a.descr || '').length, in_rand: a.in_rand !== false, in_hups: a.in_hups === true,
@@ -1016,8 +1017,9 @@ route('POST', /^\/posts$/, async (c) => {
     });
   } catch (e) { if (key) await delAudio('mongo', key); throw e; }
   if (n === 0) await mentionNotify(id, u.id);
+  if (b.ai_comment === false || b.ai_view === false) await q('update audios set ai_comment=$2, ai_view=$3 where id=$1', [id, b.ai_comment !== false, b.ai_view !== false]);
   if (media.length) await PH.later(PH.watchPost(id));
-  if (PH_TAG.test(text) && await PH.accessOf(u.id)) { await q('update audios set ptag=true where id=$1', [id]); await PH.later(phipopReply(u, id, null, text)); }
+  if (b.ai_comment !== false && PH_TAG.test(text) && await PH.accessOf(u.id)) { await q('update audios set ptag=true where id=$1', [id]); await PH.later(phipopReply(u, id, null, text)); }
   return { ok: true, id };
 });
 
@@ -1059,15 +1061,21 @@ route('GET', /^\/hups$/, async (c) => {
   await hit(`hups:${c.me ? 'u' + c.me.id : c.ip}`, 240, 60);
   const f = filterOf(c.query.f);
   const vid = c.me ? c.me.id : 0, off = Math.min(2000, Math.max(0, Number(c.query.next) || 0));
-  // Peringkat Hups (bobot tetap): waktu 35%, sorot 25%, komentar 25%, pencarian 15%. Tiap komponen bernilai 0..1.
-  //  waktu     : makin baru makin tinggi (meluruh, separuh nilai tiap ~25 jam)
-  //  sorot     : log(1+sorot) dibanding post terbaik di daftar yang sama (log agar satu post viral tidak menenggelamkan yang lain)
-  //  komentar  : cara hitung sama dengan sorot
-  //  pencarian : 1 bila penulis/isi post cocok dengan salah satu dari 20 pencarian terakhir si pembaca, selain itu 0
-  const score = `(0.35 * exp(-((${now()} - a.created) / 3600000.0) / 36.0)
-    + 0.25 * (ln(1 + a.likes) / greatest(ln(1 + max(a.likes) over ()), 1))
-    + 0.25 * (ln(1 + a.comments) / greatest(ln(1 + max(a.comments) over ()), 1))
-    + 0.15 * (case when exists(select 1 from (select sq from search_log where user_id=$1 order by id desc limit 20) z where position(z.sq in lower(coalesce(a.descr,'') || ' ' || coalesce(a.body,'') || ' ' || u.username || ' ' || u.name)) > 0) then 1 else 0 end))`;
+  // Peringkat Hups (tanpa "top post"): sinyal utama interaksi 60 menit pertama (komentar & simpan > sorot),
+  // percakapan dua arah (komentar yang dibalas), keterbacaan (diputar/dibaca sampai habis), kedekatan dengan penulis,
+  // kesegaran. Dikurangi untuk: post bermedia tautan keluar, penulis yang posting >2x dalam 1 jam, dan dominasi satu penulis.
+  // Tidak ada normalisasi terhadap post terbaik, jadi satu post viral tidak menenggelamkan yang lain.
+  const T1 = 3600000;
+  const score = `((2.0 * ln(1 + 3 * (select count(*) from comments c where c.post_id=a.id and c.created - a.created < ${T1}) + (select count(*) from saves sv where sv.post_id=a.id and sv.created - a.created < ${T1}))
+    + 2.5 * ln(1 + 2 * (select count(*) from comments c where c.post_id=a.id and exists(select 1 from comments d where d.parent=c.id)))
+    + 0.8 * least(a.plays::float / greatest(a.views, 1), 1)
+    + 0.4 * ln(1 + a.likes)
+    + (case when exists(select 1 from follows fw where fw.src=$1 and fw.dst=a.owner) then 1.5 else 0 end)
+    + (case when exists(select 1 from (select sq from search_log where user_id=$1 order by id desc limit 20) z where position(z.sq in lower(coalesce(a.descr,'') || ' ' || coalesce(a.body,'') || ' ' || u.username || ' ' || coalesce(u.name,''))) > 0) then 0.8 else 0 end)
+    + 2.5 * exp(-((${now()} - a.created) / ${T1}.0) / 12.0))
+    * (case when jsonb_array_length(coalesce(a.media, '[]'::jsonb)) > 0 then 0.75 else 1 end)
+    * (case when (select count(*) from audios z where z.owner=a.owner and z.created > ${now() - T1}) > 2 then 0.6 else 1 end)
+    * power(0.8, row_number() over (partition by a.owner order by a.created desc) - 1))`;
   const rows = await many(
     `${AUD_SQL} where a.in_hups and not a.hidden and not a.pending and u.status='active' and (${audCond(f)} or (a.owner=$1 and ${HAS('public')} and '${f}'='public')) order by ${score} desc, a.id desc offset ${off} limit 21`,
     [vid]);
@@ -1171,7 +1179,8 @@ route('POST', /^\/posts\/(\d+)\/comments$/, async (c, m) => {
   } catch (e) { if (key) await delAudio('mongo', key); throw e; }
   await recount(post.id);
   await mentionNotify(post.id, u.id, mentionsOf(text), [parentOwner, Number(post.owner)].filter(Boolean), snip);
-  const tagged = PH_TAG.test(text) && await PH.accessOf(u.id);
+  const aiOk = (await one('select ai_comment from audios where id=$1', [post.id]))?.ai_comment !== false;
+  const tagged = aiOk && PH_TAG.test(text) && await PH.accessOf(u.id);
   if (tagged) await q('update comments set ptag=true where id=$1', [id]);
   // 10 komentar pertama di postingan Phipop dijawab otomatis: siapa pun, tanpa akses, tanpa tag
   let auto = false;
@@ -1429,6 +1438,40 @@ route('GET', /^\/admin\/users$/, async (c) => {
   const qs = String(c.query.q ?? '').toLowerCase().replace(/[\\%_]/g, '').slice(0, 40);
   const r = await many(`select u.username, u.name, u.badge, u.role, u.status, a.user_id is not null ai, a.exempt, a.lim, a.used, a.win_start from users u left join phipop_access a on a.user_id=u.id where ($1='' or u.username like $2 or lower(u.name) like $2) order by (u.badge is null), u.id limit 60`, [qs, `%${qs}%`]);
   return { users: r.map((x) => ({ username: x.username, name: x.name, badge: x.badge, role: x.role, status: x.status, ai: x.ai, exempt: !!x.exempt, lim: x.lim, used: x.ai ? PH.statusOf(x, null).used : 0 })) };
+});
+route('GET', /^\/admin\/reports$/, async (c) => {
+  needAdmin(c);
+  const st = c.query.status === 'all' ? '' : "and r.status='open'";
+  const r = await many(`select r.id, r.reason, r.status, r.created, r.target_audio, r.target_comment, ru.username reporter, tu.username target, a.descr post_text, a.hidden, cm.body comment_text
+    from reports r left join users ru on ru.id=r.reporter left join users tu on tu.id=r.target_user left join audios a on a.id=r.target_audio left join comments cm on cm.id=r.target_comment
+    where true ${st} order by r.id desc limit 100`);
+  return { reports: r.map((x) => ({ id: Number(x.id), reason: x.reason, status: x.status, created: Number(x.created), reporter: x.reporter, target: x.target, post: x.target_audio ? Number(x.target_audio) : null, comment: x.target_comment ? Number(x.target_comment) : null, post_text: x.post_text ? String(x.post_text).slice(0, 200) : null, comment_text: x.comment_text ? String(x.comment_text).slice(0, 200) : null, taken_down: !!x.hidden })) };
+});
+route('POST', /^\/admin\/reports\/(\d+)\/dismiss$/, async (c, m) => { needAdmin(c); await q(`update reports set status='dismissed' where id=$1`, [m[1]]); return { ok: true }; });
+/** Takedown postingan atau komentar publik: pemiliknya otomatis diberi tahu lewat notifikasi beserta alasannya. */
+route('POST', /^\/admin\/takedown$/, async (c) => {
+  const me = needAdmin(c);
+  const reason = String(c.body.reason ?? '').trim().slice(0, 200);
+  if (!reason) throw new ApiErr('bad_request');
+  let aid = Number(c.body.audio) || 0; const cid = Number(c.body.comment) || 0;
+  if (!aid && !cid && c.body.ref) aid = Number(refToId(c.body.ref)) || 0;
+  if (cid) {
+    const cm = await one('select id, owner from comments where id=$1', [cid]);
+    if (!cm) throw new ApiErr('not_found', 404);
+    await q('delete from comments where id=$1', [cid]);
+    await q(`insert into notifs(to_user, type, actor, extra, created) values ($1,'takedown_comment',$2,$3,$4)`, [cm.owner, me.id, reason, now()]);
+    pushLater(Number(cm.owner), 'takedown_comment', Number(me.id), reason);
+    await q(`update reports set status='done' where target_comment=$1`, [cid]);
+  } else if (aid) {
+    const a = await one('select id, owner from audios where id=$1', [aid]);
+    if (!a) throw new ApiErr('not_found', 404);
+    await q('update audios set hidden=true where id=$1', [aid]);
+    await q(`insert into notifs(to_user, type, actor, extra, created) values ($1,'takedown_post',$2,$3,$4)`, [a.owner, me.id, reason, now()]);
+    pushLater(Number(a.owner), 'takedown_post', Number(me.id), reason);
+    await q(`update reports set status='done' where target_audio=$1`, [aid]);
+  } else throw new ApiErr('bad_request');
+  await q('insert into admin_log(admin, action, target_audio, reason, created) values ($1,$2,$3,$4,$5)', [me.id, cid ? 'takedown_comment' : 'takedown_post', aid || null, reason, now()]).catch(() => {});
+  return { ok: true };
 });
 route('PUT', /^\/admin\/badge$/, async (c) => {
   const me = needAdmin(c);

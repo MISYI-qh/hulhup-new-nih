@@ -27,7 +27,7 @@ export async function sharePost(a: A) {
 }
 export async function savePost(a: A) {
   if (!store.me) { toast(store.t('need_login')); return; }
-  try { const j = await Api.req('POST', `/audios/${a.id}/save`); a.saved = j.saved === true; store.poke(); toast(store.t(a.saved ? 'saved_post' : 'unsaved_post')); } catch (e) { toast(store.err(e), { bad: true }); }
+  try { const j = await Api.req('POST', `/audios/${a.id}/save`); a.saved = j.saved === true; store.poke(); toast(store.t(a.saved ? 'saved_post' : 'unsaved_post')); if (a.url && a.saved !== store.isOffline(a.id)) store.toggleOffline(a).catch(() => {}); /* simpan = juga tersedia offline */ } catch (e) { toast(store.err(e), { bad: true }); }
 }
 export async function likeAudio(a: A) {
   if (!store.me) { toast(store.t('need_login')); return; }

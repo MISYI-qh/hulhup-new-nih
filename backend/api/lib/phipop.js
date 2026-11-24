@@ -75,8 +75,8 @@ async function mediaGet(u, allowId = 0) {
     const k = mkey(u);
     if (k.startsWith('p:')) { // jangan bocorkan media post privat di luar thread tempat Phipop di-tag
       const id = Number(k.slice(2));
-      const a = await one('select a.rand, a.hidden, a.pending, x.status, x.pvis from audios a join users x on x.id=a.owner where a.id=$1', [id]);
-      if (!a || a.hidden || a.pending || a.status !== 'active' || !((T.isPub(a.rand) && a.pvis === 'public') || id === Number(allowId))) return null;
+      const a = await one('select a.rand, a.ai_view, a.hidden, a.pending, x.status, x.pvis from audios a join users x on x.id=a.owner where a.id=$1', [id]);
+      if (!a || a.hidden || a.pending || a.status !== 'active' || !((T.isPub(a.rand) && a.pvis === 'public' && a.ai_view) || id === Number(allowId))) return null;
     }
     const r = await one('select descr from phipop_media where ref=$1', [k]); return r?.descr || null;
   } catch { return null; }
@@ -85,8 +85,8 @@ async function mediaSet(u, d) { try { await q('insert into phipop_media(ref, des
 const toPart = (m) => (m.fileUri ? { fileData: { mimeType: m.mimeType, fileUri: m.fileUri } } : { inlineData: m });
 /** Dipanggil di latar belakang tepat setelah post dibuat: audio post dan link media diperiksa, hasilnya disimpan. */
 export async function watchPost(id) {
-  const r = await one('select id, media, store, blob_key, n_audio from audios where id=$1', [id]);
-  if (!r) return;
+  const r = await one('select id, media, store, blob_key, n_audio, ai_view from audios where id=$1', [id]);
+  if (!r || !r.ai_view) return;
   const env = { step() {}, link() {}, sources: [] };
   const targets = [];
   if ((r.store && r.blob_key) || Number(r.n_audio) > 0) targets.push(T.postUrl(id));
@@ -467,7 +467,7 @@ export async function later(p) {
 
 // ---------- konteks aman: hanya publik (post privat hanya di thread tempat di-tag) ----------
 export const postBody = T.bodyOf;
-const POST_Q = `select a.id, a.rand, a.hidden, a.pending, a.body, a.body_key, a.descr, u.username, u.status, u.pvis from audios a join users u on u.id=a.owner`;
+const POST_Q = `select a.id, a.rand, a.ai_view, a.hidden, a.pending, a.body, a.body_key, a.descr, u.username, u.status, u.pvis from audios a join users u on u.id=a.owner`;
 
 /** Isi thread tempat Phipop di-tag: post + komentar terbaru (boleh privat, hanya untuk balasan di thread itu). */
 export async function buildThread(postId) {
@@ -486,7 +486,7 @@ export async function buildContext(text, thread = null) {
   for (const m of String(text).matchAll(/\/p\/([0-9A-Za-z]{7})(?![0-9A-Za-z])/g)) {
     const id = T.decCode(m[1]); if (!id || seen.has(id) || seen.size >= 3 || (thread && id === thread.id)) continue; seen.add(id);
     const r = await one(`${POST_Q} where a.id=$1`, [id]);
-    if (r && !r.hidden && !r.pending && r.status === 'active' && T.isPub(r.rand)) out.push(`[post publik @${r.username}] ${T.clip(await T.bodyOf(r), 500)}`);
+    if (r && !r.hidden && !r.pending && r.status === 'active' && r.ai_view && T.isPub(r.rand)) out.push(`[post publik @${r.username}] ${T.clip(await T.bodyOf(r), 500)}`);
     else out.push('[post privat atau tidak tersedia: kamu tidak boleh membaca atau membahas isinya]');
   }
   const names = [...new Set((String(text).match(/@([a-z0-9_]{3,20})/g) || []).map((x) => x.slice(1)))].filter((x) => x !== PH_USER).slice(0, 3);
@@ -495,7 +495,7 @@ export async function buildContext(text, thread = null) {
     if (!u || u.status !== 'active') continue;
     if (u.pvis !== 'public') { out.push(`[akun privat @${nm}: kamu tidak boleh membahas isinya]`); continue; }
     const rows = await many(`${POST_Q} where a.owner=$1 and not a.hidden and not a.pending order by a.id desc limit 12`, [u.id]);
-    const pub = []; for (const r of rows) { if (T.isPub(r.rand) && pub.length < 3) pub.push(T.clip(await T.bodyOf(r), 200)); }
+    const pub = []; for (const r of rows) { if (T.isPub(r.rand) && r.ai_view && pub.length < 3) pub.push(T.clip(await T.bodyOf(r), 200)); }
     out.push(`[akun publik @${nm}] nama: ${u.name}; bio: ${T.clip(u.bio, 200)}${pub.length ? '; post publik terbaru: ' + pub.map((x) => `"${x}"`).join(' | ') : ''}`);
   }
   return out.join('\n');
