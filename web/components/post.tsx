@@ -114,7 +114,8 @@ export function MediaView({ a }: { a: A }) {
   if (!src) return <div style={{ ...box, aspectRatio: '4/3' }} />;
   return <div style={box} onClick={(e) => e.stopPropagation()}>{a.kind === 'video'
     ? <video src={src} muted loop autoPlay playsInline controls={false} onClick={(e) => { const v = e.currentTarget; if (v.muted) v.muted = false; else v.paused ? v.play() : v.pause(); }} style={{ width: '100%', display: 'block', maxHeight: 520 }} />
-    : <img src={src} alt="" style={{ width: '100%', display: 'block', maxHeight: 520, objectFit: 'cover' }} />}</div>;
+    : <img src={src} alt="" style={{ width: '100%', display: 'block', maxHeight: 520, objectFit: 'cover' }} />}
+    {a.ai ? <div style={{ padding: '6px 10px' }}><AiTag label={store.t(a.aiKind === 'edited' ? 'ai_photo_edit' : 'ai_photo')} /></div> : null}</div>;
 }
 export function AudioBars({ a, scope }: { a: A; scope?: unknown }) {
   if (a.kind === 'image' || a.kind === 'video') return <MediaView a={a} />;

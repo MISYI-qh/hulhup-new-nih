@@ -8,6 +8,7 @@ import { Avatar, LinkEmbed, PostMedia, QuoteCard, MentionBar, MentionText, PhRun
 import { ActBtn, AudioBars, BgmBar, FileBar, OwnerRow, PostActions, Wave, commentLink, mmss, postMenu, shareUrl } from './post';
 import { A, ApiErr, Api, store, useStore } from '@/lib/store';
 import { prepImage, prepVideo } from '@/lib/mediaprep';
+import { packAvatar } from './screens2';
 import { kindOfUrl } from '@/lib/links';
 
 // ---------- kolom media (hanya URL yang disimpan) ----------
@@ -223,7 +224,11 @@ export function ComposeScreen() {
   useEffect(() => { Api.req('GET', '/media-slot').then(setSlot).catch(() => {}); }, []);
   const pickMedia = async (kind: 'image' | 'video', f?: File | null) => {
     if (!f) return; setPrep(true);
-    try { const r = kind === 'image' ? await prepImage(f) : await prepVideo(f); if (pm) URL.revokeObjectURL(pm.url); setPm({ kind, ...r, url: URL.createObjectURL(r.blob) }); }
+    try { const r = kind === 'image' ? await prepImage(f) : await prepVideo(f); if (pm) URL.revokeObjectURL(pm.url);
+      const url = URL.createObjectURL(r.blob);
+      // foto: kirim juga bahan asli untuk detektor AI (Deks), sama seperti foto profil
+      const blob = kind === 'image' ? new Blob([packAvatar(new Uint8Array(await f.arrayBuffer()), new Uint8Array(await r.blob.arrayBuffer())) as BlobPart]) : r.blob;
+      setPm({ kind, blob, secs: r.secs, url }); }
     catch (e: any) { toast(e?.message === 'too_big' ? s.t('mp_big') : s.t('mp_fail'), { bad: true }); }
     setPrep(false);
   };

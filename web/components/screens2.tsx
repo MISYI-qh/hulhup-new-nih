@@ -181,7 +181,7 @@ function sidecar(b: Uint8Array): Uint8Array {
   return cat(...out);
 }
 /** Paket untuk server: 'DKS1' + jenis(0=berkas asli, 1=sidecar) + panjang(4) + bahan Deks + foto yang disimpan. */
-function packAvatar(orig: Uint8Array, stored: Uint8Array): Uint8Array {
+export function packAvatar(orig: Uint8Array, stored: Uint8Array): Uint8Array {
   const whole = orig.length <= 3000000; const meta = whole ? orig : sidecar(orig); const h = new Uint8Array(9);
   h.set([0x44, 0x4b, 0x53, 0x31, whole ? 0 : 1]); new DataView(h.buffer).setUint32(5, meta.length, false);
   return cat(h, meta, stored);
