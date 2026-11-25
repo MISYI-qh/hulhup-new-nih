@@ -394,7 +394,7 @@ object Store {
     fun leaveBgm(s: Any) { if (bgScope == s && bgmKey != null) scope.launch { stopBgm() } }
     fun setBgmMuted(v: Boolean) { bgmMuted = v; try { bg.volume = if (v) 0f else 1f } catch (_: Exception) {}; sp.edit().putBoolean("bgm_muted", v).apply(); poke() }
 
-    suspend fun play(a: A, force: Boolean = false, loop: Boolean = true, scope: Any? = null) { countPlay(a); playUrl(a.id, a.url, force, loop, scope) }
+    suspend fun play(a: A, force: Boolean = false, loop: Boolean = true, scope: Any? = null) { if (a.kind != "audio") { countPlay(a); return }; countPlay(a); playUrl(a.id, a.url, force, loop, scope) }
 
     /** Putar satu berkas audio; [key] membedakan pemutar (audio post, audio ke-n, audio komentar). */
     suspend fun playUrl(key: Int, url: String, force: Boolean = false, loop: Boolean = true, scope: Any? = null) {

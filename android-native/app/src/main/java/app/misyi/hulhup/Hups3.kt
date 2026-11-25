@@ -267,6 +267,8 @@ import org.json.JSONObject
     var picked by remember { mutableStateOf<Map<String, JSONObject>>(emptyMap()) }
     val media = remember { mutableStateListOf<String>() }
     var quote by remember { mutableStateOf(quote0) }
+    var mclip by remember { mutableStateOf<MediaClip?>(null) }; var slot by remember { mutableStateOf<JSONObject?>(null) }; var prep by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { if (Store.me != null) try { slot = Api.req("GET", "/media-slot") } catch (_: Exception) {} }
     var aiV by remember { mutableStateOf(true) }; var aiC by remember { mutableStateOf(true) }
     DisposableEffect(Unit) { onDispose { Store.stop() } }
 
@@ -283,22 +285,34 @@ import org.json.JSONObject
         if (r.isEmpty()) { val l = audSplit(rand).toMutableList().also { it.remove("accounts") }; rand = if (l.isEmpty()) "public" else l.joinToString(",") }
     }
     suspend fun send() {
-        val t = withQuote(text.trim(), quote); val c = clip
-        if (c == null && t.isEmpty() && media.isEmpty()) { toast(s.t("e_empty"), true); return }
+        val t = withQuote(text.trim(), quote); val c = clip; val mc = mclip
+        if (c == null && mc == null && t.isEmpty() && media.isEmpty()) { toast(s.t("e_empty"), true); return }
         if (audSplit(rand).contains("accounts") && picked.isEmpty()) { toast(s.t("e_need_accounts"), true); return }
         busy = true
         var id: Int? = null
         try {
-            val b = JSONObject().put("text", t).put("audios", if (c == null) 0 else 1).put("pprof", pprof).put("ai_view", aiV).put("ai_comment", aiC && aiV).put("rand", JSONArray(audSplit(rand))).put("to", JSONArray(picked.keys.toList()))
+            val b = JSONObject().put("text", t).put("audios", if (c == null && mc == null) 0 else 1).put("pprof", pprof).put("ai_view", aiV).put("ai_comment", aiC && aiV).put("rand", JSONArray(audSplit(rand))).put("to", JSONArray(picked.keys.toList()))
             if (c != null) b.put("bgm", bgm)
+            if (mc != null) b.put("media_kind", mc.kind)
             if (media.isNotEmpty()) b.put("media", JSONArray(media.toList()))
             val j = Api.req("POST", "/posts", b); id = j.optInt("id")
             if (c != null) Api.multi("/posts/$id/audio", c.bytes, mapOf("secs" to "${c.secs}"))
+            if (mc != null) Api.multi("/posts/$id/audio", mc.bytes, mapOf("secs" to "${mc.secs}"))
             Nav.back(); toast(s.t("posted"))
         } catch (e: Exception) {
             if (id != null) { try { Api.req("DELETE", "/audios/$id") } catch (_: Exception) {} }
             toast(s.err(e), true); busy = false
+            if (e is ApiErr && e.code == "media_slot_taken") { mclip = null; try { slot = Api.req("GET", "/media-slot") } catch (_: Exception) {} }
         }
+    }
+    suspend fun pickMedia(kind: String) {
+        val u = Plat.pickUri(arrayOf(if (kind == "image") "image/*" else "video/*")) ?: return
+        prep = true
+        try {
+            val cm = if (kind == "image") MediaPrep.image(Store.app, u) else MediaPrep.video(Store.app, u)
+            if (cm == null) toast(s.t("media_fail"), true) else { Store.stop(); clip = null; playing = false; bgm = false; mclip = cm }
+        } catch (e: ApiErr) { toast(if (e.code == "media_big") s.t("media_big") else s.err(e), true) }
+        prep = false
     }
     @Composable fun Row2(label: String, v: Boolean, on: ((Boolean) -> Unit)?, note: String? = null) {
         Row(Modifier.padding(bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -310,7 +324,8 @@ import org.json.JSONObject
     Column(Modifier.fillMaxSize().imePadding()) {
         TopBar(back = true, title = s.t("new_post"))
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(22.dp, 4.dp, 22.dp, 40.dp)) {
-            AudioSlot(clip, playing, { sc.launch { play() } }, if (busy) null else ({ sc.launch { add() } })) { Store.stop(); clip = null; playing = false; bgm = false }
+            if (mclip == null) AudioSlot(clip, playing, { sc.launch { play() } }, if (busy) null else ({ sc.launch { add() } })) { Store.stop(); clip = null; playing = false; bgm = false }
+            if (clip == null) { Spacer(Modifier.height(10.dp)); MediaPickRow(mclip, prep, slot, { k -> sc.launch { pickMedia(k) } }) { mclip = null } }
             if (clip != null) Box(Modifier.padding(top = 14.dp)) { Row2(s.t("bgm_label"), bgm, { bgm = it }, s.t("bgm_note")) }
             Spacer(Modifier.height(14.dp))
             Box(Modifier.fillMaxWidth().background(soft(), RoundedCornerShape(22.dp)).padding(18.dp, 14.dp)) {

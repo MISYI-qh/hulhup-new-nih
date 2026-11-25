@@ -237,7 +237,7 @@ val kBuild get() = BuildConfig.BUILD
         if (qr != null) QuoteCard(qr.id)
         MediaStrip(postMedia(d, a.media))
         Spacer(Modifier.height(if (a.pprof || d.isNotEmpty()) 14.dp else 4.dp))
-        if (a.url.isNotEmpty()) {
+        if (a.kind != "audio") PostMediaFile(a) else if (a.url.isNotEmpty()) {
             val on = s.playing == a.id
             Row(Modifier.fillMaxWidth().background(soft(), RoundedCornerShape(26.dp)).padding(8.dp, 8.dp, 6.dp, 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 val bg by animateColorAsState(if (on) Brand else btnBg(), tween(250), label = "pb")

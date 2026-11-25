@@ -131,10 +131,10 @@ fun fileKey(a: A, i: Int) = if (i == 0) a.id else -(a.id * 20 + i)
 fun bgmUrl(a: A) = a.files[a.bgmIdx.coerceIn(0, a.files.size - 1)].optString("url")
 
 /** Audio sebuah post, dengan tanda bila terdeteksi buatan AI. */
-@Composable fun AudioBars(a: A, scope: Any?) = Column {
+@Composable fun AudioBars(a: A, scope: Any?) { if (a.kind != "audio") { PostMediaFile(a); return }; Column {
     a.files.forEachIndexed { i, f -> FileBar(fileKey(a, i), f.optString("url"), f.optInt("secs"), scope) { Store.countPlay(a) } }
     if (a.ai) AiTag(Store.t(if (a.aiKind == "edited") "ai_audio_edit" else "ai_audio"))
-}
+} }
 
 /** Gelombang suara khas Hulhup: tinggi batang diturunkan dari kunci audio, jadi tiap post punya bentuknya sendiri. */
 fun waveShape(seed: Int, n: Int): List<Double> {

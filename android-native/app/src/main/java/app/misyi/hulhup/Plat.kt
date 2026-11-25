@@ -56,6 +56,12 @@ object Plat {
         } catch (_: Exception) { null }
     }
 
+    /** Pilih satu berkas dan kembalikan Uri-nya (untuk foto/video yang dikompres sebelum diunggah). */
+    suspend fun pickUri(types: Array<String>): Uri? {
+        val d = CompletableDeferred<Uri?>(); pick = d; pickL?.launch(types)
+        return d.await()
+    }
+
     /** Durasi audio dalam detik (dibulatkan ke atas), atau null bila bukan audio yang bisa dibaca. */
     fun audioSecs(b: ByteArray, ext: String): Int? {
         val f = File(Store.app.cacheDir, "probe.${ext.ifEmpty { "bin" }}")

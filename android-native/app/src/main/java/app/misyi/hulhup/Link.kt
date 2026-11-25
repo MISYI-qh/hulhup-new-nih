@@ -187,7 +187,9 @@ private suspend fun fetchPreview(url: String): JSONObject? {
 }
 
 /** Video dari URL: tidak diunduh sampai diketuk (hemat kuota), lalu diputar di tempat dengan kontrol buatan sendiri. Kotak mengikuti rasio asli video. */
-@Composable private fun VideoEmbed(url: String, poster: String? = null, tall: Boolean = false, orig: String? = null) {
+@Composable fun PostVideo(fileUri: String) = VideoEmbed(fileUri, silent = true)
+
+@Composable private fun VideoEmbed(url: String, poster: String? = null, tall: Boolean = false, orig: String? = null, silent: Boolean = false) {
     var started by remember { mutableStateOf(false) }; var failed by remember { mutableStateOf(false) }
     val host = (try { Uri.parse(orig ?: url).host ?: "" } catch (_: Exception) { "" }).removePrefix("www.")
     val ctx = androidx.compose.ui.platform.LocalContext.current
@@ -195,7 +197,7 @@ private suspend fun fetchPreview(url: String): JSONObject? {
     DisposableEffect(player) { onDispose { player?.release() } }
     var ratio by remember { mutableStateOf<Float?>(null) }
     var playing by remember { mutableStateOf(false) }; var buffering by remember { mutableStateOf(true) }
-    var muted by remember { mutableStateOf(false) }; var speed by remember { mutableStateOf(1f) }
+    var muted by remember { mutableStateOf(silent) }; var speed by remember { mutableStateOf(1f) }
     var pos by remember { mutableStateOf(0L) }; var dur by remember { mutableStateOf(0L) }
     var show by remember { mutableStateOf(true) }; var tick by remember { mutableStateOf(0) }
     var fs by remember { mutableStateOf(false) }
@@ -241,7 +243,7 @@ private suspend fun fetchPreview(url: String): JSONObject? {
                 AndroidView(factory = { PlayerView(it).apply { this.player = player; useController = false; resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM; setShutterBackgroundColor(android.graphics.Color.TRANSPARENT) } },
                     modifier = Modifier.fillMaxSize(), update = { it.player = if (fs) null else player })
                 LaunchedEffect(player) {
-                    try { Store.stop(); player.setMediaItem(MediaItem.fromUri(url)); player.repeatMode = androidx.media3.common.Player.REPEAT_MODE_ONE; player.prepare(); player.play() } catch (_: Exception) { failed = true }
+                    try { Store.stop(); player.volume = if (silent) 0f else 1f; player.setMediaItem(MediaItem.fromUri(url)); player.repeatMode = androidx.media3.common.Player.REPEAT_MODE_ONE; player.prepare(); player.play() } catch (_: Exception) { failed = true }
                 }
                 LaunchedEffect(player) { while (true) { pos = player.currentPosition; dur = player.duration.coerceAtLeast(0L); kotlinx.coroutines.delay(250) } }
                 DisposableEffect(player) {
@@ -256,7 +258,7 @@ private suspend fun fetchPreview(url: String): JSONObject? {
                 LaunchedEffect(show, playing, tick) { if (show && playing) { kotlinx.coroutines.delay(2600); show = false } }
                 if (!fs) Ctl(player, false)
             } else {
-                if (!failed) HText(Store.t("ext_note").replace("{h}", host), 11.5f, color = Color.White.copy(alpha = .75f), align = TextAlign.Center, modifier = Modifier.align(Alignment.BottomCenter).padding(14.dp, 0.dp, 14.dp, 10.dp))
+                if (!failed && host.isNotEmpty()) HText(Store.t("ext_note").replace("{h}", host), 11.5f, color = Color.White.copy(alpha = .75f), align = TextAlign.Center, modifier = Modifier.align(Alignment.BottomCenter).padding(14.dp, 0.dp, 14.dp, 10.dp))
                 if (failed) Tap(onTap = { openLink(orig ?: url) }) { Icon(Icons.Rounded.OpenInNew, null, Modifier.size(34.dp), tint = if (poster != null) Color.White else sub()) }
                 else Tap(onTap = { started = true }) { Box(Modifier.size(58.dp).background(Color.Black.copy(alpha = .45f), CircleShape), contentAlignment = Alignment.Center) { Icon(Icons.Rounded.PlayArrow, null, Modifier.size(38.dp), tint = Color.White) } }
             }

@@ -34,7 +34,7 @@ private val badgeCol = mapOf("purple" to Color(0xFF8B5CF6), "blue" to Blue, "ora
             }
         }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(22.dp, 0.dp, 22.dp, 40.dp)) {
-            when (tab) { 0 -> AdminOverview(); 1 -> AdminReports(); 2 -> AdminBadges(); else -> PhipopAdminBody() }
+            when (tab) { 0 -> AdminOverview(); 1 -> { AdminReports(); ContentFinder() }; 2 -> AdminBadges(); else -> PhipopAdminBody() }
         }
     }
 }
@@ -54,7 +54,8 @@ private val badgeCol = mapOf("purple" to Color(0xFF8B5CF6), "blue" to Blue, "ora
         row(s.t("adm_users"), "${o.optInt("users")}"); row(s.t("adm_posts"), "${o.optInt("posts")}")
         row(s.t("adm_badges"), "${b.optInt("purple")} / ${b.optInt("blue")} / ${b.optInt("orange")}")
         row(s.t("adm_holders"), "${o.optInt("ai_holders")}"); row(s.t("adm_pending"), "${o.optInt("ai_pending")}")
-        row(s.t("adm_pposts"), "${o.optInt("ai_posts_today")} / 2")
+        row(s.t("adm_last_post"), if (o.optLong("ai_last_post") > 0) s.ago(o.optLong("ai_last_post")) else s.t("adm_never"))
+        HText(s.t("adm_ph_rule"), 12.5f, color = sub(), modifier = Modifier.padding(top = 4.dp))
         row(s.t("adm_quota"), "${fmtH(o.optDouble("ai_default_limit"))} ${s.t("adm_hours")} / ${fmtH(o.optDouble("ai_window_hours"))} ${s.t("adm_hours")}")
     }
 }
@@ -128,6 +129,44 @@ private suspend fun takedown(body: JSONObject, done: suspend () -> Unit) {
                     }
                 }
             }
+            val banned = u.optBoolean("banned")
+            Box(Modifier.padding(top = 10.dp)) {
+                PBtn(s.t(if (banned) "adm_unban" else "adm_ban"), { sc.launch {
+                    val uname = u.optString("username")
+                    if (banned) { try { Api.req("POST", "/admin/ban", JSONObject().put("username", uname).put("unban", true)); toast(s.t("adm_unban_done")); load() } catch (e: Exception) { toast(s.err(e), true) }; return@launch }
+                    val reason = sheet<String> { fin -> var r by remember { mutableStateOf("") }; Column {
+                        HText(s.t("adm_ban") + " @" + uname, 18f, FontWeight.ExtraBold, modifier = Modifier.padding(bottom = 12.dp))
+                        PField(r, { r = it.take(300) }, s.t("adm_ban_reason"), min = 2, max = 5); Spacer(Modifier.height(14.dp))
+                        PBtn(s.t("adm_ban"), if (r.isBlank()) null else ({ fin(r.trim()) }), color = Heart)
+                    } }?.trim().orEmpty()
+                    if (reason.isEmpty()) return@launch
+                    try { Api.req("POST", "/admin/ban", JSONObject().put("username", uname).put("reason", reason)); toast(s.t("adm_ban_done")); load() } catch (e: Exception) { toast(s.err(e), true) }
+                } }, ghost = true, fgc = if (banned) null else Heart)
+            }
+        }
+    }
+}
+
+/** Cari konten (post/komentar) untuk take down. */
+@Composable private fun ContentFinder() {
+    val s = Store; val sc = rememberCoroutineScope()
+    var kind by remember { mutableStateOf("post") }; var q by remember { mutableStateOf("") }; var items by remember { mutableStateOf<List<JSONObject>?>(null) }
+    suspend fun load() { try { val j = Api.req("GET", "/admin/content?kind=$kind&q=${java.net.URLEncoder.encode(q, "UTF-8")}"); items = (j.optJSONArray("items") ?: JSONArray()).let { a -> (0 until a.length()).map { a.getJSONObject(it) } } } catch (e: Exception) { toast(s.err(e), true) } }
+    LaunchedEffect(kind, q) { kotlinx.coroutines.delay(250); load() }
+    HText(s.t("adm_find"), 18f, FontWeight.ExtraBold, modifier = Modifier.padding(top = 18.dp, bottom = 10.dp))
+    Row(Modifier.padding(bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        for ((k, l) in listOf("post" to "adm_k_post", "comment" to "adm_k_cmt")) Tap(onTap = { kind = k }) {
+            Box(Modifier.background(if (kind == k) ink() else ink().copy(alpha = .08f), RoundedCornerShape(50)).padding(14.dp, 8.dp)) { HText(s.t(l), 13f, FontWeight.ExtraBold, if (kind == k) bgOf() else ink()) }
+        }
+    }
+    PField(q, { q = it }, s.t("adm_find_ph")); Spacer(Modifier.height(10.dp))
+    val list = items ?: run { Spin(); return }
+    list.forEach { it0 ->
+        Card {
+            HText("@${it0.optString("user")}", 13.5f, FontWeight.ExtraBold)
+            HText(it0.optString("text"), 14.5f, modifier = Modifier.padding(top = 4.dp, bottom = 10.dp), maxLines = 5, lh = 20f)
+            if (it0.optBoolean("taken_down")) HText(s.t("adm_taken"), 12.5f, color = sub())
+            else PBtn(s.t("adm_td"), { sc.launch { takedown(JSONObject().put(if (kind == "post") "audio" else "comment", it0.optInt("id"))) { load() } } })
         }
     }
 }

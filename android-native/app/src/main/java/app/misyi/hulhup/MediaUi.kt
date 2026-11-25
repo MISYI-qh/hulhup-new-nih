@@ -1,0 +1,82 @@
+package app.misyi.hulhup
+
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.*
+import androidx.compose.material3.Icon
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import org.json.JSONObject
+
+/** Pilihan foto/video di penulis post: aktif hanya bila slot global terbuka. */
+@Composable fun MediaPickRow(mclip: MediaClip?, prep: Boolean, slot: JSONObject?, onPick: (String) -> Unit, onClear: () -> Unit) {
+    val s = Store
+    if (mclip != null) {
+        Row(Modifier.fillMaxWidth().border(1.4.dp, ink().copy(alpha = .5f), RoundedCornerShape(20.dp)).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (mclip.bmp != null) Image(mclip.bmp.asImageBitmap(), null, Modifier.size(64.dp).clip(RoundedCornerShape(14.dp)), contentScale = ContentScale.Crop)
+            else Box(Modifier.size(64.dp).background(soft(), RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Videocam, null, Modifier.size(28.dp), tint = ink()) }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                HText(s.t(if (mclip.kind == "image") "media_photo" else "media_video"), 15f, FontWeight.ExtraBold)
+                HText((if (mclip.kind == "video") "${mclip.secs} dtk · " else "") + "${mclip.bytes.size / 1024} KB", 12.5f, color = sub())
+            }
+            IconBtn(Icons.Rounded.Close, color = sub()) { onClear() }
+        }
+        return
+    }
+    val open = slot?.optBoolean("open") == true
+    Column(Modifier.fillMaxWidth()) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            for ((k, icon, label) in listOf(Triple("image", Icons.Rounded.Image, "media_photo"), Triple("video", Icons.Rounded.Videocam, "media_video"))) {
+                Tap(Modifier.weight(1f), .97f, onTap = if (open && !prep) ({ onPick(k) }) else null) {
+                    Row(Modifier.fillMaxWidth().alpha(if (open) 1f else .45f).border(1.4.dp, ink().copy(alpha = .25f), RoundedCornerShape(20.dp)).padding(vertical = 16.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                        if (prep) androidx.compose.material3.CircularProgressIndicator(Modifier.size(20.dp), color = ink(), strokeWidth = 2.dp) else Icon(icon, null, Modifier.size(22.dp), tint = ink())
+                        Spacer(Modifier.width(8.dp)); HText(s.t(label), 14.5f, FontWeight.ExtraBold)
+                    }
+                }
+            }
+        }
+        if (slot != null) {
+            val msg = if (open) s.t("media_slot_open") else {
+                val d = java.text.SimpleDateFormat("d MMM yyyy", java.util.Locale(if (s.lang == "id") "id" else "en")).format(java.util.Date(slot.optLong("reset_at")))
+                s.t("media_slot_taken").replace("{u}", slot.optString("holder")).replace("{d}", d)
+            }
+            HText(msg, 12.5f, color = sub(), modifier = Modifier.padding(start = 6.dp, top = 8.dp), lh = 17f)
+        }
+    }
+}
+
+/** Gambar/video sebuah post (kind image|video): gambar rounded selebar kolom, video dengan pemutar sendiri (ketuk putar, ulang tanpa suara). */
+@Composable fun PostMediaFile(a: A) {
+    val url = a.files.firstOrNull()?.optString("url") ?: return
+    var bmp by remember(a.id) { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var vfile by remember(a.id) { mutableStateOf<String?>(null) }
+    var failed by remember(a.id) { mutableStateOf(false) }
+    LaunchedEffect(a.id) {
+        try {
+            val b = Api.bytes(url) ?: run { failed = true; return@LaunchedEffect }
+            if (a.kind == "image") bmp = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { android.graphics.BitmapFactory.decodeByteArray(b, 0, b.size) }
+            else vfile = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { val f = java.io.File(Store.app.cacheDir, "pv${a.id}.mp4"); if (!f.exists() || f.length() != b.size.toLong()) f.writeBytes(b); "file://" + f.absolutePath }
+        } catch (_: Exception) { failed = true }
+    }
+    val shape = RoundedCornerShape(20.dp)
+    val bm = bmp; val vf = vfile
+    when {
+        bm != null -> Image(bm.asImageBitmap(), null, Modifier.padding(top = 10.dp, end = 8.dp).fillMaxWidth().clip(shape).border(1.dp, ink().copy(alpha = .08f), shape), contentScale = ContentScale.FillWidth)
+        vf != null -> PostVideo(vf)
+        else -> Box(Modifier.padding(top = 10.dp, end = 8.dp).fillMaxWidth().aspectRatio(4f / 3f).clip(shape).background(soft()), contentAlignment = Alignment.Center) {
+            if (failed) Icon(Icons.Rounded.BrokenImage, null, Modifier.size(30.dp), tint = sub()) else androidx.compose.material3.CircularProgressIndicator(Modifier.size(24.dp), color = ink(), strokeWidth = 2.dp)
+        }
+    }
+}
