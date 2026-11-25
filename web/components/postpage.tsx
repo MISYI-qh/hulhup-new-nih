@@ -7,6 +7,7 @@ import { Pick, askLabel, reportSheet, uploadAud, audSplit, withLabels } from './
 import { Avatar, LinkEmbed, PostMedia, QuoteCard, MentionBar, MentionText, PhRun, QuoteSlot, pullQuote, firstUrl, quoteRef, badgeColor } from './rich';
 import { ActBtn, AudioBars, BgmBar, FileBar, OwnerRow, PostActions, Wave, commentLink, mmss, postMenu, shareUrl } from './post';
 import { A, ApiErr, Api, store, useStore } from '@/lib/store';
+import { prepImage, prepVideo } from '@/lib/mediaprep';
 import { kindOfUrl } from '@/lib/links';
 
 // ---------- kolom media (hanya URL yang disimpan) ----------
@@ -203,7 +204,7 @@ function AccountPick({ init, close }: { init: Record<string, any>; close: (v?: R
 // ---------- tulis post ----------
 export function ComposeScreen() {
   const s = useStore(); const n = useNav();
-  const [text, setText] = useState(''), [clip, setClip] = useState<Clip | null>(null), [playing, setPlaying] = useState(false), [pprof, setPprof] = useState(true), [aiC, setAiC] = useState(true), [aiV, setAiV] = useState(true), [busy, setBusy] = useState(false), [bgm, setBgm] = useState(false), [media, setMedia] = useState<string[]>([]), [cq, setCq] = useState<string | null>(null);
+  const [text, setText] = useState(''), [clip, setClip] = useState<Clip | null>(null), [playing, setPlaying] = useState(false), [pprof, setPprof] = useState(true), [pm, setPm] = useState<{ kind: 'image' | 'video'; blob: Blob; secs: number; url: string } | null>(null), [slot, setSlot] = useState<{ open: boolean; reset_at: number; holder: string | null } | null>(null), [prep, setPrep] = useState(false), [aiC, setAiC] = useState(true), [aiV, setAiV] = useState(true), [busy, setBusy] = useState(false), [bgm, setBgm] = useState(false), [media, setMedia] = useState<string[]>([]), [cq, setCq] = useState<string | null>(null);
   useEffect(() => { try { const u = new URLSearchParams(location.search).get('quote'); if (u && quoteRef(u)) setCq(u); } catch {} }, []);
   const onText = (v: string) => { if (!cq) { const r = pullQuote(v); if (r.quote) { setCq(r.quote); setText(r.text); return; } } setText(v); };
   const [rand, setRand] = useState('public'), [picked, setPicked] = useState<Record<string, any>>({}); const au = useRef<HTMLAudioElement | null>(null);
@@ -219,28 +220,48 @@ export function ComposeScreen() {
     const r = await sheet<Record<string, any>>((close) => <AccountPick init={picked} close={close as any} />); if (!r) return;
     setPicked(r); if (!Object.keys(r).length) { const l = audSplit(rand).filter((x) => x !== 'accounts'); setRand(l.length ? l.join(',') : 'public'); }
   };
+  useEffect(() => { Api.req('GET', '/media-slot').then(setSlot).catch(() => {}); }, []);
+  const pickMedia = async (kind: 'image' | 'video', f?: File | null) => {
+    if (!f) return; setPrep(true);
+    try { const r = kind === 'image' ? await prepImage(f) : await prepVideo(f); if (pm) URL.revokeObjectURL(pm.url); setPm({ kind, ...r, url: URL.createObjectURL(r.blob) }); }
+    catch (e: any) { toast(e?.message === 'too_big' ? s.t('mp_big') : s.t('mp_fail'), { bad: true }); }
+    setPrep(false);
+  };
   const submit = async () => {
     if (lock.current) return; const t = (text.trim() + (cq ? `${text.trim() ? '\n' : ''}${cq}` : '')).trim();
-    if (!clip && !t && !media.length) { toast(s.t('e_empty'), { bad: true }); return; }
+    if (!clip && !pm && !t && !media.length) { toast(s.t('e_empty'), { bad: true }); return; }
     if (audSplit(rand).includes('accounts') && !Object.keys(picked).length) { toast(s.t('e_need_accounts'), { bad: true }); return; }
     lock.current = true; setBusy(true); let id: number | null = null;
     try {
-      const j = await Api.req('POST', '/posts', { text: t, audios: clip ? 1 : 0, ...(clip ? { bgm } : {}), media, pprof, ai_comment: aiC && aiV, ai_view: aiV, rand: audSplit(rand), to: Object.keys(picked) });
+      const j = await Api.req('POST', '/posts', { text: t, audios: clip || pm ? 1 : 0, ...(clip ? { bgm } : {}), ...(pm ? { media_kind: pm.kind } : {}), media, pprof, ai_comment: aiC && aiV, ai_view: aiV, rand: audSplit(rand), to: Object.keys(picked) });
       id = Number(j.id);
       if (clip) await Api.send(`/posts/${id}/audio?secs=${clip.secs}`, clip.blob, 'application/octet-stream');
+      else if (pm) await Api.send(`/posts/${id}/audio?secs=${pm.secs}`, pm.blob, 'application/octet-stream');
       toast(s.t('posted')); n.back();
     } catch (e) { if (id != null) { try { await Api.req('DELETE', `/audios/${id}`); } catch {} } toast(s.err(e), { bad: true }); lock.current = false; setBusy(false); }
   };
   const hasAcc = audSplit(rand).includes('accounts');
   return <Screen title={s.t('new_post')}><div style={{ padding: '4px 22px 40px' }}>
-    {!clip ? <button className="tap" onClick={busy ? undefined : add} style={{ width: '100%', padding: '26px 18px', borderRadius: 20, border: '1.4px solid color-mix(in srgb, var(--ink) 25%, transparent)', textAlign: 'center' }}>
+    {!clip ? (pm ? null : <button className="tap" onClick={busy ? undefined : add} style={{ width: '100%', padding: '26px 18px', borderRadius: 20, border: '1.4px solid color-mix(in srgb, var(--ink) 25%, transparent)', textAlign: 'center' }}>
       <span style={{ width: 54, height: 54, borderRadius: '50%', background: 'var(--btn)', color: 'var(--cream)', display: 'inline-grid', placeItems: 'center' }}><Icon n="mic_rounded" size={26} /></span>
-      <div style={{ fontWeight: 800, fontSize: 16, marginTop: 12 }}>{s.t('add_audio')}</div><div style={{ color: 'var(--sub)', fontSize: 12.5, marginTop: 3 }}>{s.t('audio_req')}</div></button>
+      <div style={{ fontWeight: 800, fontSize: 16, marginTop: 12 }}>{s.t('add_audio')}</div><div style={{ color: 'var(--sub)', fontSize: 12.5, marginTop: 3 }}>{s.t('audio_req')}</div></button>)
       : <div className="row2" style={{ padding: '10px 6px 10px 10px', borderRadius: 20, border: '1.4px solid color-mix(in srgb, var(--ink) 50%, transparent)', gap: 12 }}>
         <button className="tap" aria-label={playing ? 'Jeda' : 'Putar'} onClick={play} style={{ width: 44, height: 44, borderRadius: playing ? 13 : 22, background: playing ? 'var(--brand)' : 'var(--btn)', color: playing ? '#fff' : 'var(--cream)', display: 'grid', placeItems: 'center', flex: 'none' }}><Icon n={playing ? 'pause_rounded' : 'play_arrow_rounded'} size={24} /></button>
         <div style={{ flex: 1, minWidth: 0 }}><Wave seed={clip.blob.size} height={34} /></div>
         <b style={{ fontSize: 13.5 }}>{mmss(clip.secs)}</b><IconBtn n="refresh_rounded" color="var(--sub)" onClick={add} /><IconBtn n="close_rounded" color="var(--sub)" onClick={() => { au.current?.pause(); setClip(null); setPlaying(false); setBgm(false); }} /></div>}
     {clip ? <div className="row2" style={{ paddingTop: 14, gap: 12 }}><div style={{ flex: 1 }}><div style={{ fontWeight: 600, fontSize: 16 }}>{s.t('bgm_label')}</div><div style={{ color: 'var(--sub)', fontSize: 12.5 }}>{s.t('bgm_note')}</div></div><Toggle v={bgm} on={setBgm} /></div> : null}
+    {!clip ? <div style={{ marginTop: 12 }}>
+      {pm ? <div style={{ position: 'relative', borderRadius: 20, overflow: 'hidden', background: 'var(--soft)' }}>
+        {pm.kind === 'image' ? <img src={pm.url} alt="" style={{ width: '100%', display: 'block', maxHeight: 360, objectFit: 'cover' }} /> : <video src={pm.url} muted loop autoPlay playsInline style={{ width: '100%', display: 'block', maxHeight: 360 }} />}
+        <button className="tap" aria-label="Hapus" onClick={() => { URL.revokeObjectURL(pm.url); setPm(null); }} style={{ position: 'absolute', top: 8, right: 8, width: 36, height: 36, borderRadius: 18, background: 'rgba(0,0,0,.55)', color: '#fff', display: 'grid', placeItems: 'center' }}><Icon n="close_rounded" size={20} /></button>
+      </div> : slot && !slot.open ? <div style={{ color: 'var(--sub)', fontSize: 13, lineHeight: 1.4, padding: '4px 2px' }}>{s.t('mp_taken').replace('{u}', slot.holder ? `@${slot.holder}` : '').replace('{d}', new Date(slot.reset_at).toLocaleDateString())}</div>
+        : <div className="row2" style={{ gap: 10 }}>
+          {(['image', 'video'] as const).map((k) => <label key={k} className="tap" style={{ flex: 1, height: 46, borderRadius: 23, background: 'var(--soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontWeight: 800, fontSize: 14.5, opacity: prep || busy ? .5 : 1 }}>
+            <Icon n={k === 'image' ? 'image_outlined' : 'videocam_outlined'} size={20} />{prep ? '…' : s.t(k === 'image' ? 'mp_photo' : 'mp_video')}
+            <input type="file" accept={k === 'image' ? 'image/*' : 'video/*'} hidden disabled={prep || busy} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; pickMedia(k, f); }} /></label>)}
+        </div>}
+      {slot?.open && !pm ? <div style={{ color: 'var(--sub)', fontSize: 12, marginTop: 6 }}>{s.t('mp_note')}</div> : null}
+    </div> : null}
     <div style={{ height: 14 }} />
     <div className="sheetfield"><textarea rows={4} value={text} placeholder={s.t('write_hups')} onChange={(e) => onText(e.target.value)} /></div>
     {cq ? <QuoteSlot url={cq} onClear={() => setCq(null)} /> : null}

@@ -105,7 +105,19 @@ export function FileBar({ keyId, url, secs, scope, onStart }: { keyId: number; u
 }
 export const fileKey = (a: A, i: number) => (i === 0 ? a.id : -(a.id * 20 + i));
 export const bgmUrl = (a: A) => a.files[Math.min(a.files.length - 1, Math.max(0, a.bgmIdx))].url;
+/** Foto/video post: berkas diambil dengan sesi login, video senyap berulang, ketuk untuk bunyi/jeda. */
+export function MediaView({ a }: { a: A }) {
+  const [src, setSrc] = useState<string | null>(null); const [err, setErr] = useState(false);
+  useEffect(() => { let u = ''; let live = true; Api.bytes(a.files[0]?.url ?? a.url).then((b) => { if (!live) return; if (b) { u = URL.createObjectURL(b); setSrc(u); } else setErr(true); }).catch(() => live && setErr(true)); return () => { live = false; if (u) URL.revokeObjectURL(u); }; }, [a.id]);
+  const box = { borderRadius: 18, overflow: 'hidden', background: 'var(--soft)', minHeight: 120, marginTop: 6 } as const;
+  if (err) return <div style={{ ...box, display: 'grid', placeItems: 'center', color: 'var(--sub)' }}><Icon n="broken_image_outlined" size={28} /></div>;
+  if (!src) return <div style={{ ...box, aspectRatio: '4/3' }} />;
+  return <div style={box} onClick={(e) => e.stopPropagation()}>{a.kind === 'video'
+    ? <video src={src} muted loop autoPlay playsInline controls={false} onClick={(e) => { const v = e.currentTarget; if (v.muted) v.muted = false; else v.paused ? v.play() : v.pause(); }} style={{ width: '100%', display: 'block', maxHeight: 520 }} />
+    : <img src={src} alt="" style={{ width: '100%', display: 'block', maxHeight: 520, objectFit: 'cover' }} />}</div>;
+}
 export function AudioBars({ a, scope }: { a: A; scope?: unknown }) {
+  if (a.kind === 'image' || a.kind === 'video') return <MediaView a={a} />;
   return <div>{a.files.map((f, i) => <FileBar key={i} keyId={fileKey(a, i)} url={f.url} secs={f.secs ?? 0} scope={scope} onStart={() => store.countPlay(a)} />)}
     {a.ai ? <AiTag label={store.t(a.aiKind === 'edited' ? 'ai_audio_edit' : 'ai_audio')} /> : null}</div>;
 }

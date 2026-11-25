@@ -2,7 +2,7 @@
 // Semua izin ditegakkan di sini. Tidak ada endpoint admin: moderasi hanya lewat database.
 import { preview, imgUrlOf, fetchImage } from './preview.js';
 import { q, one, many, tx } from './db.js';
-import { ApiErr, now, sha, token, hashPw, checkPw, dayStr, okBirth, ageOf, imageMime, audioMime, readBody } from './util.js';
+import { ApiErr, now, sha, token, hashPw, checkPw, dayStr, okBirth, ageOf, imageMime, audioMime, videoMime, readBody } from './util.js';
 import { storeFor, putAudio, getAudio, delAudio } from './blobs.js';
 import { randomInt, timingSafeEqual, createHash } from 'node:crypto';
 import * as PH from './phipop.js';
@@ -12,6 +12,7 @@ import { pushLater, pushDiag, pushReminders } from './push.js';
 import { deksImage, deksAudio, brief } from './deks/index.js';
 import { runSelfTest } from './deks/selftest.js';
 
+const MEDIA_WINDOW = 14 * 86400e3, MAX_MEDIA = 4 * 1024 * 1024; // foto/video: 1 jatah per 2 minggu untuk seluruh akun, file sudah dikompres klien
 const MAX_IMG = 3 * 1024 * 1024, MAX_AUDIO = 1024 * 1024; // semua audio maks 1 MB; foto profil maks 3 MB
 const MAX_PACK = 4 * 1024 * 1024 + 200 * 1024; // paket foto profil + berkas asli untuk Deks (batas badan Vercel 4,5 MB)
 
@@ -160,14 +161,14 @@ async function uv(u, me, today) {
   };
 }
 
-const AUD_SQL = `select a.id, a.descr, a.secs, a.pprof, a.rand, a.created, a.likes, a.plays, a.views, a.owner, a.body_len, a.in_rand, a.in_hups, a.n_audio, a.comments, a.bgm, a.bgm_idx, a.media, a.ai, a.ai_kind, a.ptag, a.ai_comment, a.ai_view, a.body btext, u.username ou, u.name oname, u.av_ver oav, u.av_ai oai, u.av_ai_kind oaik, u.verified ov, u.pvis opvis,
+const AUD_SQL = `select a.id, a.descr, a.secs, a.pprof, a.rand, a.created, a.likes, a.plays, a.views, a.owner, a.body_len, a.in_rand, a.in_hups, a.n_audio, a.comments, a.bgm, a.bgm_idx, a.media, a.ai, a.ai_kind, a.ptag, a.kind, a.ai_comment, a.ai_view, a.body btext, u.username ou, u.name oname, u.av_ver oav, u.av_ai oai, u.av_ai_kind oaik, u.verified ov, u.pvis opvis,
   exists(select 1 from likes l where l.audio_id=a.id and l.user_id=$1) liked, exists(select 1 from saves sv where sv.post_id=a.id and sv.user_id=$1) saved from audios a join users u on u.id=a.owner`;
 
 function av(a) {
   const na = a.n_audio ?? 1;
   const files = Array.from({ length: na }, (_, i) => ({ url: `/audios/${a.id}/file${i ? `?i=${i}` : ''}`, secs: i === 0 ? a.secs : 0 }));
   return {
-    id: Number(a.id), ptag: a.ptag === true, ai_comment: a.ai_comment !== false, ai_view: a.ai_view !== false, desc: a.descr, secs: a.secs, popup: true, vis: 'public', url: files.length ? files[0].url : '', pprof: a.pprof, rand: a.rand,
+    id: Number(a.id), kind: a.kind || 'audio', ptag: a.ptag === true, ai_comment: a.ai_comment !== false, ai_view: a.ai_view !== false, desc: a.descr, secs: a.secs, popup: true, vis: 'public', url: files.length ? files[0].url : '', pprof: a.pprof, rand: a.rand,
     created: Number(a.created), likes: a.likes, plays: a.plays || 0, views: a.views || 0, liked: a.liked, owner: a.ou, owner_name: a.oname,
     owner_avatar: a.oav > 0 ? `/users/${a.ou}/avatar?v=${a.oav}` : null, owner_avatar_ai: a.oav > 0 && a.oai === true && !OFFICIAL.includes(a.ou), owner_avatar_ai_kind: a.oav > 0 && a.oai === true && !OFFICIAL.includes(a.ou) ? (a.oaik || 'made') : '', ai: a.ai === true, ai_kind: a.ai === true ? (a.ai_kind || 'made') : '', owner_verified: a.ov,
     long: Number(a.body_len || 0) > String(a.descr || '').length, in_rand: a.in_rand !== false, in_hups: a.in_hups === true,
@@ -601,6 +602,7 @@ route('DELETE', /^\/audios\/(\d+)$/, async (c, m) => {
   if (!own) throw new ApiErr('not_found', 404);
   const bl = await blobsOf('a.id=$1', 'c.post_id=$1', [own.id]);
   await q('delete from audios where id=$1', [own.id]);
+  await q('update media_slot set started=0, owner=null, post=null where id=1 and post=$1', [own.id]);
   await Promise.all(bl.map((b) => delAudio(b.store, b.key)));
   return { ok: true };
 });
@@ -986,6 +988,13 @@ function okMedia(v) {
   return out;
 }
 
+async function slotInfo() {
+  const r = await one('select s.started, s.owner, u.username from media_slot s left join users u on u.id=s.owner where s.id=1');
+  const started = Number(r?.started || 0), open = !started || now() - started >= MEDIA_WINDOW;
+  return { open, reset_at: open ? 0 : started + MEDIA_WINDOW, holder: open ? null : r.username ?? null };
+}
+route('GET', /^\/media-slot$/, async () => slotInfo());
+
 route('POST', /^\/posts$/, async (c) => {
   const u = c.need();
   await hit(`post:${u.id}`, 40, 3600);
@@ -995,7 +1004,9 @@ route('POST', /^\/posts$/, async (c) => {
   if (n !== 0 && n !== 1) throw new ApiErr('need_audio');
   const media = okMedia(b.media);
   if (n === 0 && !text && !media.length) throw new ApiErr('empty');
-  const bgm = n === 1 && b.bgm === true, bgmIdx = 0, inRand = true, inHups = true; // satu post tampil di Acak dan di Hups
+  const mk = n === 1 && (b.media_kind === 'image' || b.media_kind === 'video') ? b.media_kind : null;
+  if (mk && !(await slotInfo()).open) throw new ApiErr('media_slot_taken', 409);
+  const bgm = n === 1 && !mk && b.bgm === true, bgmIdx = 0, inRand = true, inHups = true; // satu post tampil di Acak dan di Hups
   const rnd = parseAud(b.rand, false, true) ?? 'public';
   await ownLabels(u.id, rnd);
   const mentions = [...new Set((text.match(/@([a-z0-9_]{3,20})/g) || []).map((x) => x.slice(1)))].slice(0, 10);
@@ -1017,6 +1028,11 @@ route('POST', /^\/posts$/, async (c) => {
     });
   } catch (e) { if (key) await delAudio('mongo', key); throw e; }
   if (n === 0) await mentionNotify(id, u.id);
+  if (mk) {
+    const got = await one('update media_slot set started=$1, owner=$2, post=$3 where id=1 and (started=0 or $1 - started >= $4) returning id', [now(), u.id, id, MEDIA_WINDOW]);
+    if (!got) { await q('delete from audios where id=$1', [id]); throw new ApiErr('media_slot_taken', 409); }
+    await q('update audios set kind=$2 where id=$1', [id, mk]);
+  }
   if (b.ai_comment === false || b.ai_view === false) await q('update audios set ai_comment=$2, ai_view=$3 where id=$1', [id, b.ai_comment !== false, b.ai_view !== false]);
   if (media.length) await PH.later(PH.watchPost(id));
   if (b.ai_comment !== false && PH_TAG.test(text) && await PH.accessOf(u.id)) { await q('update audios set ptag=true where id=$1', [id]); await PH.later(phipopReply(u, id, null, text)); }
@@ -1026,19 +1042,21 @@ route('POST', /^\/posts$/, async (c) => {
 route('POST', /^\/posts\/(\d+)\/audio$/, async (c, m) => {
   const u = c.need();
   await hit(`pa:${u.id}`, 150, 3600);
-  const a = await one('select id, owner, n_audio, store from audios where id=$1', [m[1]]);
+  const a = await one('select id, owner, n_audio, store, kind from audios where id=$1', [m[1]]);
   if (!a || Number(a.owner) !== Number(u.id)) throw new ApiErr('not_found', 404);
   const have = (a.store ? 1 : 0) + Number((await one('select count(*)::int n from post_audios where post_id=$1', [a.id])).n);
   if (have >= a.n_audio) throw new ApiErr('bad_request');
-  const body = await readBody(c.req, MAX_AUDIO + 1024);
-  if (!body.length || body.length > MAX_AUDIO) throw new ApiErr('too_big', 413);
-  const mime = audioMime(body);
+  const kind = a.kind === 'image' || a.kind === 'video' ? a.kind : null;
+  const cap = kind ? MAX_MEDIA : MAX_AUDIO;
+  const body = await readBody(c.req, cap + 1024);
+  if (!body.length || body.length > cap) throw new ApiErr('too_big', 413);
+  const mime = kind === 'image' ? imageMime(body) : kind === 'video' ? videoMime(body) : audioMime(body);
   if (!mime) throw new ApiErr('bad_file');
-  const secs = Math.min(15, Math.max(1, parseInt(c.query.secs, 10) || 15));
+  const secs = Math.min(kind === 'video' ? 10 : 15, Math.max(1, parseInt(c.query.secs, 10) || (kind === 'video' ? 10 : 15)));
   const store = storeFor(secs), key = await putAudio(store, body, mime);
-  const dk = have === 0 ? deksAudio(body) : null; if (dk) logDeks(`u${u.id} post-audio`, dk);
+  const dk = have === 0 && !kind ? deksAudio(body) : null; if (dk) logDeks(`u${u.id} post-audio`, dk);
   try {
-    if (have === 0) await q('update audios set store=$2, blob_key=$3, mime=$4, secs=$5, ai=$6, ai_kind=$7, deks=$8 where id=$1', [a.id, store, key, mime, secs, dk.ai, dk.kind, brief(dk)]);
+    if (have === 0) await q('update audios set store=$2, blob_key=$3, mime=$4, secs=$5, ai=$6, ai_kind=$7, deks=$8 where id=$1', [a.id, store, key, mime, secs, dk?.ai ?? false, dk?.kind ?? null, dk ? brief(dk) : null]);
     else await q('insert into post_audios(post_id, idx, store, blob_key, mime, secs) values ($1,$2,$3,$4,$5,$6)', [a.id, have, store, key, mime, secs]);
     if (have + 1 >= a.n_audio) await q('update audios set pending=false where id=$1', [a.id]);
   } catch (e) { await delAudio(store, key); throw e; }
@@ -1368,6 +1386,7 @@ async function phipopAutoPost(slot, hint = '', log = true) {
   const ph = await PH.phipopUser(); if (!ph) throw new ApiErr('not_found', 404);
   const wib = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
   let logId = null;
+  if (log && (await one('select 1 x from phipop_posts where created > $1', [now() - 44 * 3600e3]))) return { ok: true, skipped: true }; // otomatis: 1x per 2 hari
   if (log) { const r = await one('insert into phipop_posts(day, slot, created) values ($1,$2,$3) on conflict do nothing returning id', [wib, slot, now()]); if (!r) return { ok: true, skipped: true }; logId = r.id; }
   let draft = null;
   try { draft = await PH.composePost(slot, hint); } catch (e) { console.error('phipop post', e?.message); }
@@ -1430,14 +1449,14 @@ route('GET', /^\/admin\/overview$/, async (c) => {
     one(`select count(*)::int n from users where status='active'`), one(`select count(*)::int n from audios`),
     many(`select badge, count(*)::int n from users where badge is not null group by badge`),
     one(`select count(*)::int n from phipop_access`), one(`select count(*)::int n from phipop_requests where status='pending'`),
-    one(`select count(*)::int n from phipop_posts where day=$1`, [d0.toISOString().slice(0, 10)])]);
-  return { users: us.n, posts: ps.n, badges: Object.fromEntries(bd.map((x) => [x.badge, x.n])), ai_holders: ac.n, ai_pending: rq.n, ai_posts_today: pp.n, ai_window_hours: PH.PH_WINDOW / 3600000, ai_default_limit: PH.PH_LIMIT };
+    one(`select coalesce(max(created),0)::bigint n from phipop_posts`)]);
+  return { users: us.n, posts: ps.n, badges: Object.fromEntries(bd.map((x) => [x.badge, x.n])), ai_holders: ac.n, ai_pending: rq.n, ai_last_post: Number(pp.n), ai_window_hours: PH.PH_WINDOW / 3600000, ai_default_limit: PH.PH_LIMIT };
 });
 route('GET', /^\/admin\/users$/, async (c) => {
   needAdmin(c);
   const qs = String(c.query.q ?? '').toLowerCase().replace(/[\\%_]/g, '').slice(0, 40);
   const r = await many(`select u.username, u.name, u.badge, u.role, u.status, a.user_id is not null ai, a.exempt, a.lim, a.used, a.win_start from users u left join phipop_access a on a.user_id=u.id where ($1='' or u.username like $2 or lower(u.name) like $2) order by (u.badge is null), u.id limit 60`, [qs, `%${qs}%`]);
-  return { users: r.map((x) => ({ username: x.username, name: x.name, badge: x.badge, role: x.role, status: x.status, ai: x.ai, exempt: !!x.exempt, lim: x.lim, used: x.ai ? PH.statusOf(x, null).used : 0 })) };
+  return { users: r.map((x) => ({ username: x.username, name: x.name, badge: x.badge, role: x.role, status: x.status, banned: x.status === 'banned', ai: x.ai, exempt: !!x.exempt, lim: x.lim, used: x.ai ? PH.statusOf(x, null).used : 0 })) };
 });
 route('GET', /^\/admin\/reports$/, async (c) => {
   needAdmin(c);
@@ -1472,6 +1491,27 @@ route('POST', /^\/admin\/takedown$/, async (c) => {
   } else throw new ApiErr('bad_request');
   await q('insert into admin_log(admin, action, target_audio, reason, created) values ($1,$2,$3,$4,$5)', [me.id, cid ? 'takedown_comment' : 'takedown_post', aid || null, reason, now()]).catch(() => {});
   return { ok: true };
+});
+route('POST', /^\/admin\/ban$/, async (c) => {
+  const me = needAdmin(c);
+  const o = await one('select id, username, role from users where username=$1', [String(c.body.username ?? '').toLowerCase()]);
+  if (!o) throw new ApiErr('not_found', 404);
+  if (Number(o.id) === Number(me.id) || o.role === 'admin') throw new ApiErr('forbidden', 403);
+  const unban = c.body.unban === true;
+  await q('update users set status=$2 where id=$1', [o.id, unban ? 'active' : 'banned']);
+  if (!unban) await q('delete from sessions where user_id=$1', [o.id]).catch(() => {});
+  await q('insert into admin_log(admin, action, reason, created) values ($1,$2,$3,$4)', [me.id, unban ? 'unban' : 'ban', `@${o.username}: ${String(c.body.reason ?? '').slice(0, 160)}`, now()]).catch(() => {});
+  return { ok: true };
+});
+route('GET', /^\/admin\/content$/, async (c) => {
+  needAdmin(c);
+  const qs = String(c.query.q ?? '').toLowerCase().replace(/[\\%_]/g, '').slice(0, 40);
+  if (c.query.kind === 'comment') {
+    const r = await many(`select c.id, c.body, u.username from comments c join users u on u.id=c.owner where ($1='' or lower(c.body) like $2 or u.username like $2) order by c.id desc limit 40`, [qs, `%${qs}%`]);
+    return { items: r.map((x) => ({ id: Number(x.id), user: x.username, text: String(x.body ?? '').slice(0, 160) })) };
+  }
+  const r = await many(`select a.id, a.descr, a.hidden, u.username from audios a join users u on u.id=a.owner where ($1='' or lower(a.descr) like $2 or u.username like $2) order by a.id desc limit 40`, [qs, `%${qs}%`]);
+  return { items: r.map((x) => ({ id: Number(x.id), user: x.username, text: String(x.descr ?? '').slice(0, 160), taken_down: !!x.hidden })) };
 });
 route('PUT', /^\/admin\/badge$/, async (c) => {
   const me = needAdmin(c);

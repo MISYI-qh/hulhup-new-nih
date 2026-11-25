@@ -35,7 +35,7 @@ export type File = { url: string; secs: number };
 export class A {
   id: number; secs: number; created: number; comments: number; desc: string; url: string; vis: string; rand: string; owner: string; ownerName: string; to: string[];
   ownerAvatar: string | null; popup: boolean; pprof: boolean; ownerVerified: boolean; long: boolean; inRand: boolean; inHups: boolean; bgm: boolean; ai: boolean; ownerAvatarAi: boolean;
-  aiKind: string; ownerAvatarAiKind: string; bgmIdx: number; text: string | null; files: File[]; likes: number; plays: number; views: number; liked: boolean; saved: boolean; media: string[]; ptag: boolean;
+  aiKind: string; ownerAvatarAiKind: string; bgmIdx: number; text: string | null; files: File[]; likes: number; plays: number; views: number; liked: boolean; saved: boolean; media: string[]; ptag: boolean; kind: string;
   constructor(j: any) {
     this.id = j.id; this.secs = j.secs ?? 0; this.created = j.created ?? 0; this.desc = j.desc ?? ''; this.url = j.url ?? ''; this.vis = j.vis ?? 'public'; this.rand = j.rand ?? 'public';
     this.owner = j.owner; this.ownerName = j.owner_name; this.ownerAvatar = j.owner_avatar ?? null; this.ownerVerified = j.owner_verified === true; this.popup = j.popup === true; this.pprof = j.pprof !== false;
@@ -43,7 +43,7 @@ export class A {
     this.comments = j.comments ?? 0; this.saved = j.saved === true; this.bgm = j.bgm === true; this.ai = j.ai === true; this.ownerAvatarAi = j.owner_avatar_ai === true;
     this.aiKind = `${j.ai_kind ?? (j.ai === true ? 'made' : '')}`; this.ownerAvatarAiKind = `${j.owner_avatar_ai_kind ?? (j.owner_avatar_ai === true ? 'made' : '')}`;
     this.bgmIdx = Number(j.bgm_idx ?? 0); this.text = j.text ?? null; this.to = ((j.to as any[]) ?? []).map((e) => `${e.username}`);
-    this.media = Array.isArray(j.media) ? j.media.map((x: any) => `${x}`) : []; this.ptag = j.ptag === true;
+    this.media = Array.isArray(j.media) ? j.media.map((x: any) => `${x}`) : []; this.ptag = j.ptag === true; this.kind = `${j.kind ?? 'audio'}`;
     this.files = Array.isArray(j.files) ? j.files.map((f: any) => ({ ...f })) : ((j.url ?? '') === '' ? [] : [{ url: j.url, secs: j.secs ?? 0 }]);
   }
   toJson() {

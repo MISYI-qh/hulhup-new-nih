@@ -1707,6 +1707,30 @@
 "Kalau dimatikan, men-tag @phipop di post ini tidak akan dijawab.",
 "If off, tagging @phipop on this post won't get a reply."
 ],
+"mp_photo": [
+"Foto",
+"Photo"
+],
+"mp_video": [
+"Video",
+"Video"
+],
+"mp_note": [
+"Foto/video: 1 jatah per 2 minggu untuk semua akun, siapa cepat dia dapat. Video maks 10 detik.",
+"Photo/video: 1 slot every 2 weeks for all accounts, first come first served. Video max 10 seconds."
+],
+"mp_taken": [
+"Jatah foto/video sudah dipakai {u}. Dibuka lagi {d}.",
+"The photo/video slot is taken by {u}. Opens again {d}."
+],
+"mp_big": [
+"Berkasnya masih terlalu besar setelah dikompres.",
+"The file is still too large after compression."
+],
+"mp_fail": [
+"Gagal menyiapkan berkas ini.",
+"Could not prepare this file."
+],
 "n_badge": [
 "Selamat! Akunmu sekarang punya centang oranye di Hulhup.",
 "Congrats! Your account now has the orange check on Hulhup."
