@@ -18,7 +18,7 @@ import java.io.File
 /** Hasil kompres foto/video: isi berkas, jenis (image|video), ekstensi, dan lama (detik, 1 untuk foto). */
 class MediaClip(val kind: String, val bytes: ByteArray, val ext: String, val secs: Int, val bmp: Bitmap? = null)
 
-/** Kompres foto (maks sisi 1280px, JPEG ~q72, target <500KB) dan video (maks 15 dtk, ~640p H.264 700kbps + AAC 64kbps, target <3MB). */
+/** Kompres foto (maks sisi 1280px, JPEG ~q72, target <500KB) dan video (maks 10 dtk, ~640p H.264 700kbps + AAC 64kbps, target <3MB). */
 object MediaPrep {
     suspend fun image(ctx: Context, uri: Uri): MediaClip? = withContext(Dispatchers.IO) {
         try {
@@ -56,7 +56,7 @@ object MediaPrep {
         val done = CompletableDeferred<Boolean>()
         withContext(Dispatchers.Main) {
             try {
-                val mi = MediaItem.Builder().setUri(uri).setClippingConfiguration(MediaItem.ClippingConfiguration.Builder().setEndPositionMs(15_000).build()).build()
+                val mi = MediaItem.Builder().setUri(uri).setClippingConfiguration(MediaItem.ClippingConfiguration.Builder().setEndPositionMs(10_000).build()).build()
                 val tall = h >= w
                 val edited = EditedMediaItem.Builder(mi).setEffects(Effects(emptyList(), listOf(Presentation.createForHeight(if (tall) 640 else 360)))).build()
                 val enc = DefaultEncoderFactory.Builder(ctx)
@@ -76,7 +76,7 @@ object MediaPrep {
                 if (!ok || !out.exists()) null else {
                     val b = out.readBytes()
                     if (b.size > 4_000_000) throw ApiErr("media_big")
-                    MediaClip("video", b, "mp4", Math.min(15, Math.ceil(durMs / 1000.0).toInt()).coerceAtLeast(1))
+                    MediaClip("video", b, "mp4", Math.min(10, Math.ceil(durMs / 1000.0).toInt()).coerceAtLeast(1))
                 }
             } finally { out.delete() }
         }

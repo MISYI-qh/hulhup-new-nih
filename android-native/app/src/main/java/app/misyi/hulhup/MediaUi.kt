@@ -52,7 +52,7 @@ import org.json.JSONObject
                 val d = java.text.SimpleDateFormat("d MMM yyyy", java.util.Locale(if (s.lang == "id") "id" else "en")).format(java.util.Date(slot.optLong("reset_at")))
                 s.t("media_slot_taken").replace("{u}", slot.optString("holder")).replace("{d}", d)
             }
-            HText(msg, 12.5f, color = sub(), modifier = Modifier.padding(start = 6.dp, top = 8.dp), lh = 17f)
+            HText(msg + if (open) "\n" + s.t("media_note") else "", 12.5f, color = sub(), modifier = Modifier.padding(start = 6.dp, top = 8.dp), lh = 17f)
         }
     }
 }

@@ -308,6 +308,7 @@ object Strings {
         "media_video" to listOf("Video", "Video"),
         "media_slot_open" to listOf("Jatah foto/video lagi kosong: 1 akun bisa pakai, lalu terkunci 2 minggu buat semua.", "The photo/video slot is open: one account can use it, then it locks for everyone for 2 weeks."),
         "media_slot_taken" to listOf("Jatah foto/video sudah dipakai @{u}, reset {d}", "The photo/video slot was used by @{u}, resets {d}"),
+        "media_note" to listOf("Video maks 10 detik", "Video max 10 seconds"),
         "media_fail" to listOf("Gagal memproses file", "Couldn't process the file"),
         "media_big" to listOf("Hasil masih terlalu besar, pilih yang lebih pendek", "Result is still too big, pick a shorter one"),
         "e_media_slot_taken" to listOf("Jatah foto/video baru saja diambil orang lain", "The photo/video slot was just taken by someone else"),
