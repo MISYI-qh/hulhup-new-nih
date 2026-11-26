@@ -123,13 +123,20 @@ export function MediaView({ a }: { a: A }) {
     return () => { io?.disconnect(); v.pause(); v.muted = true; v.removeAttribute('src'); v.load(); };
   }, [src]);
   useEffect(() => { let u = ''; let live = true; Api.bytes(a.files[0]?.url ?? a.url).then((b) => { if (!live) return; if (b) { u = URL.createObjectURL(b); setSrc(u); } else setErr(true); }).catch(() => live && setErr(true)); return () => { live = false; if (u) URL.revokeObjectURL(u); }; }, [a.id]);
-  const box = { borderRadius: 18, overflow: 'hidden', background: 'var(--soft)', minHeight: 120, marginTop: 6 } as const;
+  const [big, setBig] = useState(false);
+  useEffect(() => { if (!big) return; const k = (e: KeyboardEvent) => e.key === 'Escape' && setBig(false); addEventListener('keydown', k); const o = document.body.style.overflow; document.body.style.overflow = 'hidden'; return () => { removeEventListener('keydown', k); document.body.style.overflow = o; }; }, [big]);
+  const box = { borderRadius: 18, overflow: 'hidden', background: 'var(--soft)', minHeight: 120, marginTop: 6, position: 'relative', cursor: 'zoom-in' } as const;
   if (err) return <div style={{ ...box, display: 'grid', placeItems: 'center', color: 'var(--sub)' }}><Icon n="broken_image_outlined" size={28} /></div>;
   if (!src) return <div style={{ ...box, aspectRatio: '4/3' }} />;
-  return <div style={box} onClick={(e) => e.stopPropagation()}>{a.kind === 'video'
-    ? <video ref={vid} src={src} muted loop autoPlay playsInline controls={false} onClick={(e) => { const v = e.currentTarget; if (v.muted) v.muted = false; else v.paused ? v.play() : v.pause(); }} style={{ width: '100%', display: 'block', maxHeight: 520 }} />
+  return <div style={box} onClick={(e) => { e.stopPropagation(); setBig(true); }}>{a.kind === 'video'
+    ? <video ref={vid} src={src} muted loop autoPlay playsInline controls={false} style={{ width: '100%', display: 'block', maxHeight: 520 }} />
     : <img src={src} alt="" style={{ width: '100%', display: 'block', maxHeight: 520, objectFit: 'cover' }} />}
-    {a.ai ? <div style={{ padding: '6px 10px' }}><AiTag label={store.t(a.kind === 'video' ? (a.aiKind === 'edited' ? 'ai_video_edit' : 'ai_video') : (a.aiKind === 'edited' ? 'ai_photo_edit' : 'ai_photo'))} /></div> : null}</div>;
+    {a.kind === 'video' ? <div style={{ position: 'absolute', right: 10, bottom: 10, width: 34, height: 34, borderRadius: 17, background: 'rgba(0,0,0,.55)', color: '#fff', display: 'grid', placeItems: 'center' }}><Icon n="play_arrow_rounded" size={22} /></div> : null}
+    {a.ai ? <div style={{ padding: '6px 10px' }} onClick={(e) => e.stopPropagation()}><AiTag label={store.t(a.kind === 'video' ? (a.aiKind === 'edited' ? 'ai_video_edit' : 'ai_video') : (a.aiKind === 'edited' ? 'ai_photo_edit' : 'ai_photo'))} /></div> : null}
+    {big ? <div onClick={(e) => { e.stopPropagation(); setBig(false); }} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.94)', display: 'grid', placeItems: 'center', cursor: 'zoom-out' }}>
+      {a.kind === 'video' ? <video src={src} autoPlay loop playsInline controls onClick={(e) => e.stopPropagation()} style={{ maxWidth: '100vw', maxHeight: '100vh' }} /> : <img src={src} alt="" style={{ maxWidth: '100vw', maxHeight: '100vh', objectFit: 'contain' }} />}
+      <button className="tap" aria-label="Tutup" onClick={(e) => { e.stopPropagation(); setBig(false); }} style={{ position: 'fixed', top: 'max(14px, env(safe-area-inset-top))', right: 14, width: 42, height: 42, borderRadius: 21, background: 'rgba(255,255,255,.18)', color: '#fff', display: 'grid', placeItems: 'center' }}><Icon n="close_rounded" size={24} /></button>
+    </div> : null}</div>;
 }
 export function AudioBars({ a, scope }: { a: A; scope?: unknown }) {
   if (a.kind === 'image' || a.kind === 'video') return <MediaView a={a} />;
