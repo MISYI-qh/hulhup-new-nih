@@ -8,7 +8,7 @@ import { toast, PBtn } from './ui';
 import { useRouter } from 'next/navigation';
 import { firstUrl, kindOfUrl, linkRe, linkUri, proxied, trimLink, mediaUrl, quoteRef, mediaRef, mediaRefs, embedOf, socialHost, postCode } from '@/lib/links';
 import { A } from '@/lib/store';
-import { FileBar, fileKey } from './post';
+import { FileBar, MediaView, fileKey } from './post';
 import { VPlayer } from './vplayer';
 
 export function Avatar({ url, name, size }: { url?: string | null; name: string; size: number }) {
@@ -107,7 +107,8 @@ export function QuoteCard({ id }: { id: number }) {
       <b>{a.ownerName}</b>{a.ownerVerified ? <Verified size={14} u={a.owner} /> : null}<span className="qs">{a.owner} · {s.when(a.created)}</span></div> : null}
     {text ? <div className="qt"><MentionText text={text.replace(/\s+$/, '')} hideQuote ptag={a.ptag} /></div> : null}
     {quoteRef(text) ? <MediaStrip items={a.media ?? []} /> : <div className="qm"><PostMedia text={text} media={a.media} /></div>}
-    {a.files.length && !a.bgm ? <div style={{ padding: '4px 0 0' }}><FileBar keyId={fileKey(a, 0)} url={a.files[0].url} secs={a.files[0].secs ?? 0} onStart={() => store.countPlay(a)} /></div> : null}
+    {a.files.length && (a.kind === 'image' || a.kind === 'video') ? <MediaView a={a} /> : null}
+    {a.files.length && !a.bgm && a.kind !== 'image' && a.kind !== 'video' ? <div style={{ padding: '4px 0 0' }}><FileBar keyId={fileKey(a, 0)} url={a.files[0].url} secs={a.files[0].secs ?? 0} onStart={() => store.countPlay(a)} /></div> : null}
     <div className="qf"><span><HIcon k="sorot" size={16} />{a.likes}</span><span><HIcon k="comment" size={16} />{a.comments}</span></div>
   </div>;
 }

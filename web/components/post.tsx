@@ -160,7 +160,7 @@ export function PostActions({ a, onComments }: { a: A; onComments?: () => void }
       <ActBtn k="save" on={a.saved} onClick={() => savePost(a)} />
       <ActBtn k="share" onClick={() => sharePost(a)} />
     </div>
-    <div className="cnts">{a.files.length && !a.bgm ? `${s.fmt(a.views)} ${s.t('views')} · ${s.fmt(a.plays)} ${s.t('plays')}` : `${s.fmt(a.views)} ${s.t('views')}`}</div>
+    <div className="cnts">{a.files.length && !a.bgm && a.kind !== 'image' && a.kind !== 'video' ? `${s.fmt(a.views)} ${s.t('views')} · ${s.fmt(a.plays)} ${s.t('plays')}` : `${s.fmt(a.views)} ${s.t('views')}`}</div>
   </div>;
 }
 
