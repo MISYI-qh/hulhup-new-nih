@@ -3,6 +3,8 @@ package app.misyi.hulhup
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -105,8 +107,8 @@ import org.json.JSONObject
 /** Zoom cubit 2 jari + geser + ketuk 2x (ZoomMod) untuk penampil layar penuh. */
 fun Modifier.zoomable(): Modifier = composed {
     var sc by remember { mutableStateOf(1f) }; var off by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
-    this.pointerInput(Unit) { androidx.compose.foundation.gestures.detectTransformGestures { _, pan, z, _ ->
+    this.pointerInput(Unit) { detectTransformGestures { _, pan, z, _ ->
         sc = (sc * z).coerceIn(1f, 6f); off = if (sc <= 1f) androidx.compose.ui.geometry.Offset.Zero else off + pan * sc } }
-        .pointerInput(Unit) { androidx.compose.foundation.gestures.detectTapGestures(onDoubleTap = { if (sc > 1f) { sc = 1f; off = androidx.compose.ui.geometry.Offset.Zero } else sc = 2.5f }) }
+        .pointerInput(Unit) { detectTapGestures(onDoubleTap = { if (sc > 1f) { sc = 1f; off = androidx.compose.ui.geometry.Offset.Zero } else sc = 2.5f }) }
         .graphicsLayer { scaleX = sc; scaleY = sc; translationX = off.x; translationY = off.y }
 }
