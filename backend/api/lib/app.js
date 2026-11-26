@@ -350,13 +350,18 @@ route('GET', /^\/random$/, async (c) => {
   const f = filterOf(c.query.f);
   const vid = c.me ? c.me.id : 0, last = Number(c.query.last) || 0;
   const base = `from audios a join users u on u.id=a.owner where not a.hidden and not a.pending and a.in_rand and u.status='active' and (${audCond(f)} or (a.owner=$1 and ${HAS('public')} and '${f}'='public'))`;
-  let n = (await one(`select count(*)::int n ${base} and a.id<>$2`, [vid, last])).n;
-  let excl = true;
-  if (n === 0) { n = (await one(`select count(*)::int n ${base} and ($2=$2)`, [vid, last])).n; excl = false; }
+  // Acak sungguhan tapi tidak "itu-itu saja": hindari post yang baru saja tampil (sampai ~60% isi kolam), lalu pilih seragam dari sisanya.
+  const total = (await one(`select count(*)::int n ${base} and ($2=$2)`, [vid, last])).n;
+  const seen = [...new Set([last, ...String(c.query.seen ?? '').split(',').map(Number)].filter((x) => Number.isInteger(x) && x > 0))].slice(0, 80);
+  let avoid = seen.slice(0, Math.max(1, Math.floor(total * 0.6)));
+  let n = (await one(`select count(*)::int n ${base} and a.id <> all($2::bigint[])`, [vid, avoid])).n;
+  if (n === 0) { avoid = seen.slice(0, 1); n = (await one(`select count(*)::int n ${base} and a.id <> all($2::bigint[])`, [vid, avoid])).n; }
+  const excl = true;
+  if (n === 0) { avoid = []; n = total; }
   let taps = c.me ? Number((c.me.tapf || {})[f] || 0) : 0;
   if (n === 0) return { taps, audio: null }; // belum ada audio: angka tidak bertambah
   const off = randomInt(n); // acak sungguhan (CSPRNG), peluang sama
-  const row = await one(`select a.id ${base} and ${excl ? 'a.id<>$2' : '$2=$2'} order by a.id offset ${off} limit 1`, [vid, last]);
+  const row = await one(`select a.id ${base} and a.id <> all($2::bigint[]) order by a.id offset ${off} limit 1`, [vid, avoid]);
   const a = await one(`${AUD_SQL} where a.id=$2`, [vid, row.id]);
   if (c.me && c.query.peek !== '1') taps = await addTap(c.me.id, f);
   return { taps, audio: av(a) };

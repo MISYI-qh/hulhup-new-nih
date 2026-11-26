@@ -247,11 +247,12 @@ export class Store {
     const a = c[Math.floor(Math.random() * c.length)]; this.lastOff = a.id; return a;
   }
   /** Tanpa internet, acak diambil dari post yang sudah dijadikan offline. */
+  private seenRand: number[] = [];
   private nextRand: { f: string; me: string; p: Promise<A | null> } | null = null;
   /** Ambil Acak berikutnya di latar (tanpa menghitung ketukan) dan unduh audionya, supaya ketukan berikutnya langsung berbunyi. */
   private warm(f: string, last: number) {
     if (!navigator.onLine) return;
-    const p = Api.req('GET', `/random?f=${f}&peek=1${last ? `&last=${last}` : ''}`).then(async (j) => {
+    const p = Api.req('GET', `/random?f=${f}&peek=1${last ? `&last=${last}` : ''}&seen=${this.seenRand.join(',')}`).then(async (j) => {
       if (j.audio == null) return null; const a = new A(j.audio);
       if (a.url) await Api.bytes(a.url).catch(() => null);
       return a;
@@ -272,12 +273,12 @@ export class Store {
         if (a) { if (this.me) { const t = await Api.req('POST', '/taps', { f }); if (t.taps != null) this.tapf[f] = Number(t.taps); } }
       }
       if (!a) {
-        const j = await Api.req('GET', `/random?f=${f}`);
+        const j = await Api.req('GET', `/random?f=${f}&seen=${this.seenRand.join(',')}`);
         if (this.me && j.taps != null) this.tapf[f] = Number(j.taps);
         a = j.audio == null ? null : new A(j.audio);
       }
       this.notify();
-      if (a) this.warm(f, a.id);
+      if (a) { this.seenRand = [a.id, ...this.seenRand.filter((x) => x !== a!.id)].slice(0, 60); this.warm(f, a.id); }
       return a;
     } catch (e) { if (e instanceof ApiErr) throw e; this.fromOffline = true; return this.pickOffline(); }
   }
