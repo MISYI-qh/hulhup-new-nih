@@ -23,11 +23,21 @@ object Plat {
     private var pick: CompletableDeferred<Uri?>? = null
     private var permL: androidx.activity.result.ActivityResultLauncher<String>? = null
     private var notifL: androidx.activity.result.ActivityResultLauncher<String>? = null
+    private var cap: CompletableDeferred<Uri?>? = null
+    private var capUri: Uri? = null
+    private var capL: androidx.activity.result.ActivityResultLauncher<Pair<Uri, Boolean>>? = null
     private var pickL: androidx.activity.result.ActivityResultLauncher<Array<String>>? = null
 
     /** Dipanggil di onCreate MainActivity (sebelum STARTED). */
     fun attach(a: ComponentActivity) {
         act = a
+        capL = a.registerForActivityResult(object : androidx.activity.result.contract.ActivityResultContract<Pair<Uri, Boolean>, Boolean>() {
+            override fun createIntent(context: Context, input: Pair<Uri, Boolean>) =
+                Intent(if (input.second) android.provider.MediaStore.ACTION_VIDEO_CAPTURE else android.provider.MediaStore.ACTION_IMAGE_CAPTURE)
+                    .putExtra(android.provider.MediaStore.EXTRA_OUTPUT, input.first).apply { if (input.second) putExtra(android.provider.MediaStore.EXTRA_DURATION_LIMIT, 10) }
+                    .addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            override fun parseResult(resultCode: Int, intent: Intent?) = resultCode == android.app.Activity.RESULT_OK
+        }) { ok -> cap?.complete(if (ok) capUri else null) }
         permL = a.registerForActivityResult(ActivityResultContracts.RequestPermission()) { perm?.complete(it) }
         notifL = a.registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
         pickL = a.registerForActivityResult(ActivityResultContracts.OpenDocument()) { pick?.complete(it) }
@@ -60,6 +70,17 @@ object Plat {
     suspend fun pickUri(types: Array<String>): Uri? {
         val d = CompletableDeferred<Uri?>(); pick = d; pickL?.launch(types)
         return d.await()
+    }
+
+    /** Buka kamera sistem (foto atau rekam video maks 10 dtk); hasil Uri berkas sementara, null bila dibatalkan. */
+    suspend fun capture(video: Boolean): Uri? {
+        val a = act ?: return null
+        return try {
+            val f = File(Store.app.cacheDir, "cap_${System.currentTimeMillis()}.${if (video) "mp4" else "jpg"}")
+            val u = FileProvider.getUriForFile(a, a.packageName + ".files", f)
+            capUri = u; val d = CompletableDeferred<Uri?>(); cap = d; capL?.launch(u to video)
+            d.await()
+        } catch (_: Exception) { null }
     }
 
     /** Durasi audio dalam detik (dibulatkan ke atas), atau null bila bukan audio yang bisa dibaca. */

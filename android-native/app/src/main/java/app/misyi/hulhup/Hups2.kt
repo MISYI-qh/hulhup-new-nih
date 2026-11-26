@@ -136,7 +136,7 @@ val mentionRe = Regex("${linkRe.pattern}|@([a-z0-9_]{3,20})", RegexOption.IGNORE
             ActBtn(HK.save, a.saved) { sc.launch { savePost(a) } }
             ActBtn(HK.share) { sc.launch { sharePost(a) } }
         }
-        HText(if (a.files.isNotEmpty() && !a.bgm) "${s.fmt(a.views)} ${s.t("views")} · ${s.fmt(a.plays)} ${s.t("plays")}" else "${s.fmt(a.views)} ${s.t("views")}", 12.5f, FontWeight.Medium, sub(), Modifier.padding(8.dp, 0.dp, 8.dp, 6.dp))
+        HText(if (a.kind == "audio" && a.files.isNotEmpty() && !a.bgm) "${s.fmt(a.views)} ${s.t("views")} · ${s.fmt(a.plays)} ${s.t("plays")}" else "${s.fmt(a.views)} ${s.t("views")}", 12.5f, FontWeight.Medium, sub(), Modifier.padding(8.dp, 0.dp, 8.dp, 6.dp))
     }
 }
 

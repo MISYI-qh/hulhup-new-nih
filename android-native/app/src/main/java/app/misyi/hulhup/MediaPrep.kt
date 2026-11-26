@@ -16,7 +16,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 
 /** Hasil kompres foto/video: isi berkas, jenis (image|video), ekstensi, dan lama (detik, 1 untuk foto). */
-class MediaClip(val kind: String, val bytes: ByteArray, val ext: String, val secs: Int, val bmp: Bitmap? = null)
+class MediaClip(val kind: String, val bytes: ByteArray, val ext: String, val secs: Int, val bmp: Bitmap? = null, val orig: ByteArray? = null)
 
 /** Kompres foto (maks sisi 1280px, JPEG ~q72, target <500KB) dan video (maks 10 dtk, ~640p H.264 700kbps + AAC 64kbps, target <3MB). */
 object MediaPrep {
@@ -35,7 +35,8 @@ object MediaPrep {
             val bmp = Bitmap.createBitmap(raw, 0, 0, raw.width, raw.height, m, true)
             var q = 72; var out: ByteArray
             do { val bo = ByteArrayOutputStream(); bmp.compress(Bitmap.CompressFormat.JPEG, q, bo); out = bo.toByteArray(); q -= 8 } while (out.size > 500_000 && q >= 40)
-            MediaClip("image", out, "jpg", 1, bmp)
+            val orig = try { ctx.contentResolver.openInputStream(uri)?.use { it.readBytes() }?.takeIf { it.size <= 25_000_000 } } catch (_: Throwable) { null }
+            MediaClip("image", out, "jpg", 1, bmp, orig)
         } catch (_: Throwable) { null }
     }
 

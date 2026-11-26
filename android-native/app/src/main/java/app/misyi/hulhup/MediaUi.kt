@@ -47,6 +47,15 @@ import org.json.JSONObject
                 }
             }
         }
+        Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            for ((k, label) in listOf("cam_image" to "media_cam_photo", "cam_video" to "media_cam_video")) {
+                Tap(Modifier.weight(1f), .97f, onTap = if (open && !prep) ({ onPick(k) }) else null) {
+                    Row(Modifier.fillMaxWidth().alpha(if (open) 1f else .45f).border(1.4.dp, ink().copy(alpha = .25f), RoundedCornerShape(20.dp)).padding(vertical = 14.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.CameraAlt, null, Modifier.size(20.dp), tint = ink()); Spacer(Modifier.width(8.dp)); HText(s.t(label), 14f, FontWeight.ExtraBold)
+                    }
+                }
+            }
+        }
         if (slot != null) {
             val msg = if (open) s.t("media_slot_open") else {
                 val d = java.text.SimpleDateFormat("d MMM yyyy", java.util.Locale(if (s.lang == "id") "id" else "en")).format(java.util.Date(slot.optLong("reset_at")))
@@ -72,11 +81,13 @@ import org.json.JSONObject
     }
     val shape = RoundedCornerShape(20.dp)
     val bm = bmp; val vf = vfile
-    when {
+    Column { when {
         bm != null -> Image(bm.asImageBitmap(), null, Modifier.padding(top = 10.dp, end = 8.dp).fillMaxWidth().clip(shape).border(1.dp, ink().copy(alpha = .08f), shape), contentScale = ContentScale.FillWidth)
         vf != null -> PostVideo(vf)
         else -> Box(Modifier.padding(top = 10.dp, end = 8.dp).fillMaxWidth().aspectRatio(4f / 3f).clip(shape).background(soft()), contentAlignment = Alignment.Center) {
             if (failed) Icon(Icons.Rounded.BrokenImage, null, Modifier.size(30.dp), tint = sub()) else androidx.compose.material3.CircularProgressIndicator(Modifier.size(24.dp), color = ink(), strokeWidth = 2.dp)
         }
     }
+    if (a.ai && a.kind == "image") AiTag(Store.t(if (a.aiKind == "edited") "ai_photo_edit" else "ai_photo")) }
+} }
 }

@@ -297,7 +297,7 @@ import org.json.JSONObject
             if (media.isNotEmpty()) b.put("media", JSONArray(media.toList()))
             val j = Api.req("POST", "/posts", b); id = j.optInt("id")
             if (c != null) Api.multi("/posts/$id/audio", c.bytes, mapOf("secs" to "${c.secs}"))
-            if (mc != null) Api.multi("/posts/$id/audio", mc.bytes, mapOf("secs" to "${mc.secs}"))
+            if (mc != null) Api.multi("/posts/$id/audio", if (mc.kind == "image") packAvatar(mc.orig ?: mc.bytes, mc.bytes) else mc.bytes, mapOf("secs" to "${mc.secs}"))
             Nav.back(); toast(s.t("posted"))
         } catch (e: Exception) {
             if (id != null) { try { Api.req("DELETE", "/audios/$id") } catch (_: Exception) {} }
@@ -306,7 +306,8 @@ import org.json.JSONObject
         }
     }
     suspend fun pickMedia(kind: String) {
-        val u = Plat.pickUri(arrayOf(if (kind == "image") "image/*" else "video/*")) ?: return
+        val cam = kind.startsWith("cam_"); val kind = kind.removePrefix("cam_")
+        val u = (if (cam) Plat.capture(kind == "video") else Plat.pickUri(arrayOf(if (kind == "image") "image/*" else "video/*"))) ?: return
         prep = true
         try {
             val cm = if (kind == "image") MediaPrep.image(Store.app, u) else MediaPrep.video(Store.app, u)

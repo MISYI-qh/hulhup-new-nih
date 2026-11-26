@@ -306,6 +306,8 @@ object Strings {
         "adm_rep_why" to listOf("Alasan lapor: {r}", "Report reason: {r}"),
         "media_photo" to listOf("Foto", "Photo"),
         "media_video" to listOf("Video", "Video"),
+        "media_cam_photo" to listOf("Kamera", "Camera"),
+        "media_cam_video" to listOf("Rekam", "Record"),
         "media_slot_open" to listOf("Jatah foto/video lagi kosong: 1 akun bisa pakai, lalu terkunci 2 minggu buat semua.", "The photo/video slot is open: one account can use it, then it locks for everyone for 2 weeks."),
         "media_slot_taken" to listOf("Jatah foto/video sudah dipakai @{u}, reset {d}", "The photo/video slot was used by @{u}, resets {d}"),
         "media_note" to listOf("Video maks 10 detik", "Video max 10 seconds"),

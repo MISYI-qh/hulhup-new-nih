@@ -446,7 +446,8 @@ private suspend fun fetchQuote(id: Int): A? {
             }
             if (text.isNotEmpty()) HText(text.trimEnd(), 15f, modifier = Modifier.padding(top = 8.dp), maxLines = 6, overflow = TextOverflow.Ellipsis, lh = 21f)
             if (qMedia.isNotEmpty()) Box(Modifier.fillMaxWidth().padding(top = 8.dp).wrapContentHeight().clipToBounds()) { MediaStrip(qMedia) }
-            if (q.files.isNotEmpty() && !q.bgm) Box(Modifier.padding(top = 4.dp)) { FileBar(fileKey(q, 0), q.files[0].optString("url"), q.files[0].optInt("secs")) { Store.countPlay(q) } }
+            if (q.kind != "audio" && q.files.isNotEmpty()) Box(Modifier.fillMaxWidth().padding(top = 2.dp)) { PostMediaFile(q) }
+            if (q.kind == "audio" && q.files.isNotEmpty() && !q.bgm) Box(Modifier.padding(top = 4.dp)) { FileBar(fileKey(q, 0), q.files[0].optString("url"), q.files[0].optInt("secs")) { Store.countPlay(q) } }
             Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(18.dp), verticalAlignment = Alignment.CenterVertically) {
                 Row(verticalAlignment = Alignment.CenterVertically) { HIcon(HK.sorot, size = 16.dp, color = sub()); Spacer(Modifier.width(5.dp)); HText("${q.likes}", 13f, FontWeight.SemiBold, sub()) }
                 Row(verticalAlignment = Alignment.CenterVertically) { HIcon(HK.comment, size = 16.dp, color = sub()); Spacer(Modifier.width(5.dp)); HText("${q.comments}", 13f, FontWeight.SemiBold, sub()) }
