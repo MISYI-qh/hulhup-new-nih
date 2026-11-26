@@ -3,6 +3,7 @@ package app.misyi.hulhup
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -82,7 +83,14 @@ import org.json.JSONObject
     val shape = RoundedCornerShape(20.dp)
     val bm = bmp; val vf = vfile
     Column { when {
-        bm != null -> Image(bm.asImageBitmap(), null, Modifier.padding(top = 10.dp, end = 8.dp).fillMaxWidth().clip(shape).border(1.dp, ink().copy(alpha = .08f), shape), contentScale = ContentScale.FillWidth)
+        bm != null -> { var big by remember { mutableStateOf(false) }
+            Image(bm.asImageBitmap(), null, Modifier.padding(top = 10.dp, end = 8.dp).fillMaxWidth().clip(shape).border(1.dp, ink().copy(alpha = .08f), shape).clickable { big = true }, contentScale = ContentScale.FillWidth)
+            if (big) androidx.compose.ui.window.Dialog(onDismissRequest = { big = false }, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
+                Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black).clickable { big = false }, contentAlignment = Alignment.Center) {
+                    Image(bm.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                    Icon(Icons.Rounded.Close, null, Modifier.align(Alignment.TopEnd).padding(16.dp).size(28.dp), tint = androidx.compose.ui.graphics.Color.White)
+                }
+            } }
         vf != null -> PostVideo(vf)
         else -> Box(Modifier.padding(top = 10.dp, end = 8.dp).fillMaxWidth().aspectRatio(4f / 3f).clip(shape).background(soft()), contentAlignment = Alignment.Center) {
             if (failed) Icon(Icons.Rounded.BrokenImage, null, Modifier.size(30.dp), tint = sub()) else androidx.compose.material3.CircularProgressIndicator(Modifier.size(24.dp), color = ink(), strokeWidth = 2.dp)
