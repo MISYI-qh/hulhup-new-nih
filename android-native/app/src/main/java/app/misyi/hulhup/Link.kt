@@ -206,7 +206,7 @@ private suspend fun fetchPreview(url: String): JSONObject? {
     fun fmt(ms: Long): String { val s = (ms / 1000).toInt().coerceAtLeast(0); return "%d:%02d".format(s / 60, s % 60) }
 
     @Composable fun Ctl(p: ExoPlayer, full: Boolean) {
-        Box(Modifier.fillMaxSize()) {
+        Box(Modifier.fillMaxSize().visTrack { v -> if (!v) { p.pause(); p.volume = 0f; muted = true } else if (silent && !fs) { p.play() } }) {
             Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { show = !show; tick++ } })
             if (buffering) androidx.compose.material3.CircularProgressIndicator(Modifier.align(Alignment.Center).size(34.dp), color = Color.White, strokeWidth = 2.5.dp)
             androidx.compose.animation.AnimatedVisibility(show || !playing, Modifier.fillMaxSize(), enter = androidx.compose.animation.fadeIn(), exit = androidx.compose.animation.fadeOut()) {

@@ -1,5 +1,6 @@
 package app.misyi.hulhup
 
+import androidx.compose.ui.layout.boundsInWindow
 import android.media.MediaRecorder
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
@@ -173,12 +174,23 @@ fun waveShape(seed: Int, n: Int): List<Double> {
 }
 
 /** Pemutar satu audio: tombol putar, gelombang suara, waktu, dan kecepatan (0.5×–2×). */
+/** Melaporkan apakah elemen terlihat di layar (minimal 25%); dipakai agar audio/video berhenti saat di-scroll keluar. */
+fun Modifier.visTrack(on: (Boolean) -> Unit): Modifier = androidx.compose.ui.composed {
+    val h = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * androidx.compose.ui.platform.LocalDensity.current.density
+    var last by remember { mutableStateOf<Boolean?>(null) }
+    androidx.compose.ui.layout.onGloballyPositioned { c ->
+        val b = if (c.isAttached) c.boundsInWindow() else null
+        val vis = b != null && b.height > 0f && (minOf(b.bottom, h) - maxOf(b.top, 0f)) >= b.height * 0.25f
+        if (last != vis) { last = vis; on(vis) }
+    }
+}
 @Composable fun FileBar(keyId: Int, url: String, secs: Int, scope: Any? = null, onStart: (() -> Unit)? = null) {
     val s = Store; val sc = rememberCoroutineScope(); s.rev
     val on = s.playing == keyId
     val ms = s.posMs
     val total = (if (on && s.dur > 0) s.dur else if (secs > 0) secs * 1000 else 15000).coerceAtLeast(1)
-    Row(Modifier.padding(top = 10.dp).fillMaxWidth().border(if (on) 1.4.dp else 1.dp, ink().copy(alpha = if (on) .5f else .12f), RoundedCornerShape(16.dp)).padding(8.dp, 8.dp, 12.dp, 8.dp), verticalAlignment = Alignment.CenterVertically) {
+    DisposableEffect(keyId) { onDispose { if (Store.playing == keyId) Store.stop() } }
+    Row(Modifier.visTrack { v -> if (!v && Store.playing == keyId) Store.stop() }.padding(top = 10.dp).fillMaxWidth().border(if (on) 1.4.dp else 1.dp, ink().copy(alpha = if (on) .5f else .12f), RoundedCornerShape(16.dp)).padding(8.dp, 8.dp, 12.dp, 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Tap(onTap = { if (!on) onStart?.invoke(); sc.launch { try { s.playUrl(keyId, url, scope = scope) } catch (_: Exception) { toast(s.t("e_server"), true) } } }) {
             val r by animateDpAsState(if (on) 12.dp else 20.dp, tween(220), label = "fb")
             Box(Modifier.size(40.dp).background(if (on) Brand else btnBg(), RoundedCornerShape(r)), contentAlignment = Alignment.Center) { Icon(if (on) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, null, Modifier.size(22.dp), tint = if (on) Color.White else Cream) }

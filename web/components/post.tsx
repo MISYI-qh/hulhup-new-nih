@@ -95,8 +95,15 @@ const rateText = (r: number) => (Number.isInteger(r) ? `${r}×` : `${String(r).r
 /** Pemutar satu audio: tombol putar, gelombang suara, waktu, dan kecepatan (0.5×–2×). */
 export function FileBar({ keyId, url, secs, scope, onStart }: { keyId: number; url: string; secs: number; scope?: unknown; onStart?: () => void }) {
   const s = useStore(); const on = s.playing === keyId;
+  const box = useRef<HTMLDivElement>(null);
+  // berhenti sendiri saat bar hilang dari layar (scroll) atau komponen dilepas (popup/halaman ditutup)
+  useEffect(() => {
+    const el = box.current; let io: IntersectionObserver | null = null;
+    if (el && typeof IntersectionObserver !== 'undefined') { io = new IntersectionObserver(([e]) => { if (!e.isIntersecting && store.playing === keyId) store.stop(); }, { threshold: 0 }); io.observe(el); }
+    return () => { io?.disconnect(); if (store.playing === keyId) queueMicrotask(() => { if (store.playing === keyId) store.stop(); }); };
+  }, [keyId]);
   const total = Math.max(1, on && s.dur > 0 ? s.dur : secs > 0 ? secs * 1000 : 15000);
-  return <div className={`fbar${on ? ' on' : ''}`} onClick={(e) => e.stopPropagation()}>
+  return <div ref={box} className={`fbar${on ? ' on' : ''}`} onClick={(e) => e.stopPropagation()}>
     <button className={`tap pbtn2${on ? ' on' : ''}`} aria-label={on ? 'Jeda' : 'Putar'} onClick={() => { if (!on) onStart?.(); s.playUrl(keyId, url, { scope }).catch(() => toast(s.t('e_server'), { bad: true })); }}><Icon n={on ? 'pause_rounded' : 'play_arrow_rounded'} size={24} /></button>
     <div style={{ flex: 1, minWidth: 0 }}><Wave seed={keyId} on={on} totalMs={total} /></div>
     <span style={{ fontSize: 12.5, fontWeight: 700, color: on ? 'var(--ink)' : 'var(--sub)' }}><TimeText on={on} secs={secs} /></span>
@@ -108,12 +115,19 @@ export const bgmUrl = (a: A) => a.files[Math.min(a.files.length - 1, Math.max(0,
 /** Foto/video post: berkas diambil dengan sesi login, video senyap berulang, ketuk untuk bunyi/jeda. */
 export function MediaView({ a }: { a: A }) {
   const [src, setSrc] = useState<string | null>(null); const [err, setErr] = useState(false);
+  const vid = useRef<HTMLVideoElement>(null);
+  // video: jeda & bisukan saat keluar layar, mulai lagi (senyap) saat terlihat; dilepas = berhenti total
+  useEffect(() => {
+    const v = vid.current; if (!v) return; let io: IntersectionObserver | null = null;
+    if (typeof IntersectionObserver !== 'undefined') { io = new IntersectionObserver(([e]) => { if (e.isIntersecting) v.play().catch(() => {}); else { v.pause(); v.muted = true; } }, { threshold: 0.25 }); io.observe(v); }
+    return () => { io?.disconnect(); v.pause(); v.muted = true; v.removeAttribute('src'); v.load(); };
+  }, [src]);
   useEffect(() => { let u = ''; let live = true; Api.bytes(a.files[0]?.url ?? a.url).then((b) => { if (!live) return; if (b) { u = URL.createObjectURL(b); setSrc(u); } else setErr(true); }).catch(() => live && setErr(true)); return () => { live = false; if (u) URL.revokeObjectURL(u); }; }, [a.id]);
   const box = { borderRadius: 18, overflow: 'hidden', background: 'var(--soft)', minHeight: 120, marginTop: 6 } as const;
   if (err) return <div style={{ ...box, display: 'grid', placeItems: 'center', color: 'var(--sub)' }}><Icon n="broken_image_outlined" size={28} /></div>;
   if (!src) return <div style={{ ...box, aspectRatio: '4/3' }} />;
   return <div style={box} onClick={(e) => e.stopPropagation()}>{a.kind === 'video'
-    ? <video src={src} muted loop autoPlay playsInline controls={false} onClick={(e) => { const v = e.currentTarget; if (v.muted) v.muted = false; else v.paused ? v.play() : v.pause(); }} style={{ width: '100%', display: 'block', maxHeight: 520 }} />
+    ? <video ref={vid} src={src} muted loop autoPlay playsInline controls={false} onClick={(e) => { const v = e.currentTarget; if (v.muted) v.muted = false; else v.paused ? v.play() : v.pause(); }} style={{ width: '100%', display: 'block', maxHeight: 520 }} />
     : <img src={src} alt="" style={{ width: '100%', display: 'block', maxHeight: 520, objectFit: 'cover' }} />}
     {a.ai ? <div style={{ padding: '6px 10px' }}><AiTag label={store.t(a.aiKind === 'edited' ? 'ai_photo_edit' : 'ai_photo')} /></div> : null}</div>;
 }
