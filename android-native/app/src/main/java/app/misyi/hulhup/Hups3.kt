@@ -297,7 +297,7 @@ import org.json.JSONObject
             if (media.isNotEmpty()) b.put("media", JSONArray(media.toList()))
             val j = Api.req("POST", "/posts", b); id = j.optInt("id")
             if (c != null) Api.multi("/posts/$id/audio", c.bytes, mapOf("secs" to "${c.secs}"))
-            if (mc != null) Api.multi("/posts/$id/audio", if (mc.kind == "image") packAvatar(mc.orig ?: mc.bytes, mc.bytes) else mc.bytes, mapOf("secs" to "${mc.secs}"))
+            if (mc != null) Api.multi("/posts/$id/audio", if (mc.kind == "image") packAvatar(mc.orig ?: mc.bytes, mc.bytes) else packMeta(mc.orig ?: ByteArray(0), mc.bytes), mapOf("secs" to "${mc.secs}"))
             Nav.back(); toast(s.t("posted"))
         } catch (e: Exception) {
             if (id != null) { try { Api.req("DELETE", "/audios/$id") } catch (_: Exception) {} }
@@ -310,7 +310,8 @@ import org.json.JSONObject
         val u = (if (cam) Plat.capture(kind == "video") else Plat.pickGallery(kind == "video")) ?: return
         prep = true
         try {
-            val cm = if (kind == "image") MediaPrep.image(Store.app, u) else MediaPrep.video(Store.app, u)
+            val cm0 = if (kind == "image") MediaPrep.image(Store.app, u) else MediaPrep.video(Store.app, u)
+            val cm = if (cm0 != null && kind == "video") MediaClip(cm0.kind, cm0.bytes, cm0.ext, cm0.secs, cm0.bmp, mp4Meta(Store.app, u)) else cm0
             if (cm == null) toast(s.t("media_fail"), true) else { Store.stop(); clip = null; playing = false; bgm = false; mclip = cm }
         } catch (e: ApiErr) { toast(if (e.code == "media_big") s.t("media_big") else s.err(e), true) }
         prep = false

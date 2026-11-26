@@ -37,3 +37,26 @@ export async function prepVideo(f: File, onProgress?: (p: number) => void): Prom
     return { blob, secs };
   } finally { URL.revokeObjectURL(url); }
 }
+
+/** Ambil kotak MP4/MOV tingkat atas selain mdat (metadata asli: moov, udta, xmp, c2pa) agar server (Deks) bisa memeriksanya;
+ *  video dikompres ulang di perangkat sehingga metadata aslinya hilang di berkas yang diunggah. */
+export async function mp4Meta(f: Blob): Promise<Uint8Array> {
+  const out: Uint8Array[] = []; let total = 0, off = 0;
+  try {
+    while (off + 8 <= f.size && total < 900_000) {
+      const h = new DataView(await f.slice(off, off + 16).arrayBuffer());
+      let size = h.getUint32(0); const type = String.fromCharCode(h.getUint8(4), h.getUint8(5), h.getUint8(6), h.getUint8(7));
+      if (size === 1 && h.byteLength >= 16) size = Number(h.getBigUint64(8)); else if (size === 0) size = f.size - off;
+      if (size < 8 || off + size > f.size) break;
+      if (type !== 'mdat' && size <= 600_000) { const b = new Uint8Array(await f.slice(off, off + size).arrayBuffer()); out.push(b); total += b.length; }
+      off += size;
+    }
+  } catch { /* berkas bukan MP4 */ }
+  const r = new Uint8Array(total); let p = 0; for (const b of out) { r.set(b, p); p += b.length; }
+  return r;
+}
+/** Paket untuk server: 'DKS1' + 1 (sidecar) + panjang(4, BE) + metadata + berkas yang disimpan. */
+export function packMeta(meta: Uint8Array, stored: Uint8Array): Uint8Array {
+  const h = new Uint8Array(9); h.set([0x44, 0x4b, 0x53, 0x31, 1]); new DataView(h.buffer).setUint32(5, meta.length, false);
+  const r = new Uint8Array(9 + meta.length + stored.length); r.set(h); r.set(meta, 9); r.set(stored, 9 + meta.length); return r;
+}

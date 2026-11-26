@@ -16,6 +16,32 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 
 /** Hasil kompres foto/video: isi berkas, jenis (image|video), ekstensi, dan lama (detik, 1 untuk foto). */
+/** Kotak MP4/MOV tingkat atas selain mdat (metadata asli) untuk detektor Deks di server; video dikompres ulang sehingga metadatanya hilang. */
+fun mp4Meta(ctx: Context, uri: Uri): ByteArray {
+    val out = java.io.ByteArrayOutputStream()
+    try {
+        ctx.contentResolver.openInputStream(uri)?.use { ins ->
+            val inp = java.io.DataInputStream(java.io.BufferedInputStream(ins)); var total = 0L
+            while (out.size() < 900_000) {
+                val hd = ByteArray(8); try { inp.readFully(hd) } catch (_: Exception) { break }
+                var size = java.nio.ByteBuffer.wrap(hd, 0, 4).int.toLong() and 0xffffffffL
+                val type = String(hd, 4, 4, Charsets.ISO_8859_1); var hdr = 8
+                if (size == 1L) { val e = ByteArray(8); inp.readFully(e); size = java.nio.ByteBuffer.wrap(e).long; hdr = 16 }
+                if (size < hdr) break
+                val body = size - hdr
+                if (type != "mdat" && size <= 600_000 && hdr == 8) { val b = ByteArray(body.toInt()); inp.readFully(b); out.write(hd); out.write(b) }
+                else { var left = body; while (left > 0) { val n = inp.skip(left); if (n <= 0) { if (inp.read() < 0) return@use else left-- } else left -= n } }
+                total += size
+            }
+        }
+    } catch (_: Throwable) { }
+    return out.toByteArray()
+}
+fun packMeta(meta: ByteArray, stored: ByteArray): ByteArray {
+    val h = java.nio.ByteBuffer.allocate(9).order(java.nio.ByteOrder.BIG_ENDIAN)
+    h.put(0x44).put(0x4b).put(0x53).put(0x31).put(1).putInt(meta.size)
+    return h.array() + meta + stored
+}
 class MediaClip(val kind: String, val bytes: ByteArray, val ext: String, val secs: Int, val bmp: Bitmap? = null, val orig: ByteArray? = null)
 
 /** Kompres foto (maks sisi 1280px, JPEG ~q72, target <500KB) dan video (maks 10 dtk, ~640p H.264 700kbps + AAC 64kbps, target <3MB). */

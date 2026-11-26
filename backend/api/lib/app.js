@@ -9,7 +9,7 @@ import * as PH from './phipop.js';
 import { OFFICIAL_IMG } from './official_assets.js';
 import { refToId } from './phtools.js';
 import { pushLater, pushDiag, pushReminders } from './push.js';
-import { deksImage, deksAudio, brief } from './deks/index.js';
+import { deksImage, deksAudio, deksVideo, brief } from './deks/index.js';
 import { runSelfTest } from './deks/selftest.js';
 
 const MEDIA_WINDOW = 14 * 86400e3, MAX_MEDIA = 4 * 1024 * 1024; // foto/video: 1 jatah per 2 minggu untuk seluruh akun, file sudah dikompres klien
@@ -1053,15 +1053,15 @@ route('POST', /^\/posts\/(\d+)\/audio$/, async (c, m) => {
   if (have >= a.n_audio) throw new ApiErr('bad_request');
   const kind = a.kind === 'image' || a.kind === 'video' ? a.kind : null;
   const cap = kind ? MAX_MEDIA : MAX_AUDIO;
-  const raw = await readBody(c.req, (kind === 'image' ? MAX_PACK : cap) + 1024);
-  const { meta, img } = kind === 'image' ? unpack(raw) : { meta: null, img: raw };
+  const raw = await readBody(c.req, (kind ? MAX_PACK : cap) + 1024);
+  const { meta, img } = kind ? unpack(raw) : { meta: null, img: raw };
   const body = img;
   if (!body.length || body.length > cap) throw new ApiErr('too_big', 413);
   const mime = kind === 'image' ? imageMime(body) : kind === 'video' ? videoMime(body) : audioMime(body);
   if (!mime) throw new ApiErr('bad_file');
   const secs = Math.min(kind === 'video' ? 10 : 15, Math.max(1, parseInt(c.query.secs, 10) || (kind === 'video' ? 10 : 15)));
   const store = storeFor(secs), key = await putAudio(store, body, mime);
-  const dk = have === 0 ? (kind === 'image' ? deksImage(meta || body, meta ? body : null) : kind === 'video' ? null : deksAudio(body)) : null; if (dk) logDeks(`u${u.id} post-audio`, dk);
+  const dk = have === 0 ? (kind === 'image' ? deksImage(meta || body, meta ? body : null) : kind === 'video' ? deksVideo(body, meta) : deksAudio(body)) : null; if (dk) logDeks(`u${u.id} post-audio`, dk);
   try {
     if (have === 0) await q('update audios set store=$2, blob_key=$3, mime=$4, secs=$5, ai=$6, ai_kind=$7, deks=$8 where id=$1', [a.id, store, key, mime, secs, dk?.ai ?? false, dk?.kind ?? null, dk ? brief(dk) : null]);
     else await q('insert into post_audios(post_id, idx, store, blob_key, mime, secs) values ($1,$2,$3,$4,$5,$6)', [a.id, have, store, key, mime, secs]);

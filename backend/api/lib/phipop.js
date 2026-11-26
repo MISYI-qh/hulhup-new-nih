@@ -86,10 +86,29 @@ async function mediaGet(u, allowId = 0) {
 }
 async function mediaSet(u, d) { try { await q('insert into phipop_media(ref, descr, created) values ($1,$2,$3) on conflict (ref) do update set descr=excluded.descr, created=excluded.created', [mkey(u), d, now()]); } catch {} }
 const toPart = (m) => (m.fileUri ? { fileData: { mimeType: m.mimeType, fileUri: m.fileUri } } : { inlineData: m });
+const JUDGE = 'Kamu pemeriksa keaslian media untuk platform sosial. Deteksi berbasis metadata sudah dijalankan dan tidak menemukan bukti. Nilai apakah media terlampir (foto/video/audio) DIBUAT atau DIUBAH oleh AI generatif. Cari bukti NYATA: watermark/logo generator yang terlihat (Sora, Veo, Gemini, Kling, dll), tulisan rusak/tak terbaca, jari/tangan/gigi/mata janggal, tekstur terlalu halus, fisika/gerak mustahil, bayangan tak konsisten, suara robotik dengan napas/jeda tak wajar. Foto atau suara biasa yang tampak asli = BUKAN AI. Jangan menuduh tanpa bukti jelas; ragu berarti bukan. Jawab HANYA JSON satu baris: {"ai":true|false,"keyakinan":0..1,"bukti_kuat":true|false,"bukti":"satu kalimat"}';
+async function judge(parts, label) {
+  try {
+    const j = await gcall({ contents: [{ role: 'user', parts: [{ text: JUDGE }, ...parts] }], generationConfig: { maxOutputTokens: 200, temperature: 0, thinkingConfig: { thinkingBudget: 0 } }, safetySettings: SAFETY, __media: true, __tier: 'easy' }, Date.now() + 28000, 20000);
+    const m = /\{[\s\S]*\}/.exec(textOf(j)); if (!m) return null;
+    const o = JSON.parse(m[0]); return { ai: o.ai === true, conf: Number(o.keyakinan) || 0, strong: o.bukti_kuat === true, why: String(o.bukti || '').slice(0, 160) };
+  } catch (e) { console.error('judge gagal', e?.status || '', String(e?.message || '').slice(0, 80)); return null; }
+}
+/** Deks (metadata) menyerah -> AI multimodal ikut menilai. Hanya menandai bila sangat yakin DAN ada bukti kuat. */
+async function judgePost(id) {
+  const r = await one('select id, ai, kind, store, blob_key from audios where id=$1', [id]);
+  if (!r || r.ai || !r.store || !r.blob_key) return;
+  const m = await T.viewMedia(T.postUrl(id), id);
+  if (!m.parts?.length) return;
+  const v = await judge(m.parts.map(toPart), 'judge:' + id);
+  console.log('deks-mm', id, JSON.stringify(v));
+  if (v && v.ai && v.strong && v.conf >= 0.9) await q("update audios set ai=true, ai_kind='made', deks=$2 where id=$1", [id, JSON.stringify({ v: 2, t: r.kind || 'audio', ai: true, k: 'made', h: [{ layer: 'multimodal', kind: 'made', why: v.why }], n: ['Deks tidak menemukan bukti metadata; AI multimodal membantu'], r: ['mm'] })]);
+}
 /** Dipanggil di latar belakang tepat setelah post dibuat: audio post dan link media diperiksa, hasilnya disimpan. */
 export async function watchPost(id) {
   const r = await one('select id, media, store, blob_key, n_audio, ai_view from audios where id=$1', [id]);
   if (!r || !r.ai_view) return;
+  await judgePost(id).catch(() => {});
   const env = { step() {}, link() {}, sources: [] };
   const targets = [];
   if ((r.store && r.blob_key) || Number(r.n_audio) > 0) targets.push(T.postUrl(id));

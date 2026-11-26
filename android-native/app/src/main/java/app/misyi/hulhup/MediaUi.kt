@@ -88,5 +88,5 @@ import org.json.JSONObject
             if (failed) Icon(Icons.Rounded.BrokenImage, null, Modifier.size(30.dp), tint = sub()) else androidx.compose.material3.CircularProgressIndicator(Modifier.size(24.dp), color = ink(), strokeWidth = 2.dp)
         }
     }
-    if (a.ai && a.kind == "image") AiTag(Store.t(if (a.aiKind == "edited") "ai_photo_edit" else "ai_photo")) }
+    if (a.ai && (a.kind == "image" || a.kind == "video")) AiTag(Store.t(if (a.kind == "video") (if (a.aiKind == "edited") "ai_video_edit" else "ai_video") else if (a.aiKind == "edited") "ai_photo_edit" else "ai_photo")) }
 }

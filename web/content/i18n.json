@@ -739,6 +739,14 @@
 "Audio diedit dengan AI",
 "Audio edited with AI"
 ],
+"ai_video": [
+"Video dibuat oleh AI",
+"Video made by AI"
+],
+"ai_video_edit": [
+"Video diedit dengan AI",
+"Video edited with AI"
+],
 "ai_photo_edit": [
 "Foto diedit dengan AI",
 "Photo edited with AI"

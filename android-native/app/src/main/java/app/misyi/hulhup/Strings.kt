@@ -333,6 +333,8 @@ object Strings {
         "ai_audio" to listOf("Audio oleh AI", "Audio by AI"),
         "ai_photo" to listOf("Foto dibuat oleh AI", "Photo made by AI"),
         "ai_audio_edit" to listOf("Audio diedit dengan AI", "Audio edited with AI"),
+        "ai_video" to listOf("Video dibuat oleh AI", "Video made by AI"),
+        "ai_video_edit" to listOf("Video diedit dengan AI", "Video edited with AI"),
         "ai_photo_edit" to listOf("Foto diedit dengan AI", "Photo edited with AI"),
         "cmt_hint" to listOf("Tulis komentar…", "Write a comment…"),
         "add_audio" to listOf("Tambah audio", "Add audio"),
