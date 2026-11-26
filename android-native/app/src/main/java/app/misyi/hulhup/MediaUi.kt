@@ -89,5 +89,4 @@ import org.json.JSONObject
         }
     }
     if (a.ai && a.kind == "image") AiTag(Store.t(if (a.aiKind == "edited") "ai_photo_edit" else "ai_photo")) }
-} }
 }
