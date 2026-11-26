@@ -1707,6 +1707,22 @@
 "Kalau dimatikan, men-tag @phipop di post ini tidak akan dijawab.",
 "If off, tagging @phipop on this post won't get a reply."
 ],
+"mp_photo_cam": [
+"Foto kamera",
+"Camera photo"
+],
+"mp_photo_gal": [
+"Foto galeri",
+"Gallery photo"
+],
+"mp_video_cam": [
+"Video kamera",
+"Camera video"
+],
+"mp_video_gal": [
+"Video galeri",
+"Gallery video"
+],
 "mp_photo": [
 "Foto",
 "Photo"

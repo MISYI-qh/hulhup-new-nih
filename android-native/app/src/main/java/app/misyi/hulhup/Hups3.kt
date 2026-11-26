@@ -307,7 +307,7 @@ import org.json.JSONObject
     }
     suspend fun pickMedia(kind: String) {
         val cam = kind.startsWith("cam_"); val kind = kind.removePrefix("cam_")
-        val u = (if (cam) Plat.capture(kind == "video") else Plat.pickUri(arrayOf(if (kind == "image") "image/*" else "video/*"))) ?: return
+        val u = (if (cam) Plat.capture(kind == "video") else Plat.pickGallery(kind == "video")) ?: return
         prep = true
         try {
             val cm = if (kind == "image") MediaPrep.image(Store.app, u) else MediaPrep.video(Store.app, u)

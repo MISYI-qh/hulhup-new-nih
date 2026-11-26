@@ -260,10 +260,10 @@ export function ComposeScreen() {
         {pm.kind === 'image' ? <img src={pm.url} alt="" style={{ width: '100%', display: 'block', maxHeight: 360, objectFit: 'cover' }} /> : <video src={pm.url} muted loop autoPlay playsInline style={{ width: '100%', display: 'block', maxHeight: 360 }} />}
         <button className="tap" aria-label="Hapus" onClick={() => { URL.revokeObjectURL(pm.url); setPm(null); }} style={{ position: 'absolute', top: 8, right: 8, width: 36, height: 36, borderRadius: 18, background: 'rgba(0,0,0,.55)', color: '#fff', display: 'grid', placeItems: 'center' }}><Icon n="close_rounded" size={20} /></button>
       </div> : slot && !slot.open ? <div style={{ color: 'var(--sub)', fontSize: 13, lineHeight: 1.4, padding: '4px 2px' }}>{s.t('mp_taken').replace('{u}', slot.holder ? `@${slot.holder}` : '').replace('{d}', new Date(slot.reset_at).toLocaleDateString())}</div>
-        : <div className="row2" style={{ gap: 10 }}>
-          {(['image', 'video'] as const).map((k) => <label key={k} className="tap" style={{ flex: 1, height: 46, borderRadius: 23, background: 'var(--soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontWeight: 800, fontSize: 14.5, opacity: prep || busy ? .5 : 1 }}>
-            <Icon n={k === 'image' ? 'image_outlined' : 'videocam_outlined'} size={20} />{prep ? '…' : s.t(k === 'image' ? 'mp_photo' : 'mp_video')}
-            <input type="file" accept={k === 'image' ? 'image/*' : 'video/*'} hidden disabled={prep || busy} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; pickMedia(k, f); }} /></label>)}
+        : <div className="row2" style={{ gap: 6, flexWrap: 'wrap' }}>
+          {([['image', true], ['image', false], ['video', true], ['video', false]] as const).map(([k, cam]) => <label key={k + cam} className="tap" style={{ flex: '1 1 44%', height: 46, borderRadius: 23, background: 'var(--soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontWeight: 800, fontSize: 13, opacity: prep || busy ? .5 : 1 }}>
+            <Icon n={cam ? (k === 'image' ? 'photo_camera_rounded' : 'videocam_outlined') : (k === 'image' ? 'image_outlined' : 'video_library_rounded')} size={19} />{prep ? '…' : s.t(`mp_${k === 'image' ? 'photo' : 'video'}${cam ? '_cam' : '_gal'}`)}
+            <input type="file" accept={k === 'image' ? 'image/*' : 'video/*'} {...(cam ? { capture: 'environment' } : {})} hidden disabled={prep || busy} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; pickMedia(k, f); }} /></label>)}
         </div>}
       {slot?.open && !pm ? <div style={{ color: 'var(--sub)', fontSize: 12, marginTop: 6 }}>{s.t('mp_note')}</div> : null}
     </div> : null}

@@ -27,6 +27,7 @@ object Plat {
     private var capUri: Uri? = null
     private var capL: androidx.activity.result.ActivityResultLauncher<Pair<Uri, Boolean>>? = null
     private var pickL: androidx.activity.result.ActivityResultLauncher<Array<String>>? = null
+    private var galL: androidx.activity.result.ActivityResultLauncher<androidx.activity.result.PickVisualMediaRequest>? = null
 
     /** Dipanggil di onCreate MainActivity (sebelum STARTED). */
     fun attach(a: ComponentActivity) {
@@ -41,6 +42,7 @@ object Plat {
         permL = a.registerForActivityResult(ActivityResultContracts.RequestPermission()) { perm?.complete(it) }
         notifL = a.registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
         pickL = a.registerForActivityResult(ActivityResultContracts.OpenDocument()) { pick?.complete(it) }
+        galL = a.registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { pick?.complete(it) }
     }
 
     fun askNotif() { if (android.os.Build.VERSION.SDK_INT >= 33) notifL?.launch(Manifest.permission.POST_NOTIFICATIONS) }
@@ -69,6 +71,13 @@ object Plat {
     /** Pilih satu berkas dan kembalikan Uri-nya (untuk foto/video yang dikompres sebelum diunggah). */
     suspend fun pickUri(types: Array<String>): Uri? {
         val d = CompletableDeferred<Uri?>(); pick = d; pickL?.launch(types)
+        return d.await()
+    }
+
+    /** Pilih foto/video dari galeri (pemilih foto sistem), bukan pemilih berkas. */
+    suspend fun pickGallery(video: Boolean): Uri? {
+        val d = CompletableDeferred<Uri?>(); pick = d
+        galL?.launch(androidx.activity.result.PickVisualMediaRequest(if (video) ActivityResultContracts.PickVisualMedia.VideoOnly else ActivityResultContracts.PickVisualMedia.ImageOnly))
         return d.await()
     }
 
