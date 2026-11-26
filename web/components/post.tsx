@@ -134,9 +134,25 @@ export function MediaView({ a }: { a: A }) {
     {a.kind === 'video' ? <div style={{ position: 'absolute', right: 10, bottom: 10, width: 34, height: 34, borderRadius: 17, background: 'rgba(0,0,0,.55)', color: '#fff', display: 'grid', placeItems: 'center' }}><Icon n="play_arrow_rounded" size={22} /></div> : null}
     {a.ai ? <div style={{ padding: '6px 10px' }} onClick={(e) => e.stopPropagation()}><AiTag label={store.t(a.kind === 'video' ? (a.aiKind === 'edited' ? 'ai_video_edit' : 'ai_video') : (a.aiKind === 'edited' ? 'ai_photo_edit' : 'ai_photo'))} /></div> : null}
     {big ? <div onClick={(e) => { e.stopPropagation(); setBig(false); }} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.94)', display: 'grid', placeItems: 'center', cursor: 'zoom-out' }}>
-      {a.kind === 'video' ? <video src={src} autoPlay loop playsInline controls onClick={(e) => e.stopPropagation()} style={{ maxWidth: '100vw', maxHeight: '100vh' }} /> : <img src={src} alt="" style={{ maxWidth: '100vw', maxHeight: '100vh', objectFit: 'contain' }} />}
+      <ZoomBox>{a.kind === 'video' ? <video src={src} autoPlay loop playsInline controls style={{ maxWidth: '100vw', maxHeight: '100vh', display: 'block' }} /> : <img src={src} alt="" draggable={false} style={{ maxWidth: '100vw', maxHeight: '100vh', objectFit: 'contain', display: 'block' }} />}</ZoomBox>
       <button className="tap" aria-label="Tutup" onClick={(e) => { e.stopPropagation(); setBig(false); }} style={{ position: 'fixed', top: 'max(14px, env(safe-area-inset-top))', right: 14, width: 42, height: 42, borderRadius: 21, background: 'rgba(255,255,255,.18)', color: '#fff', display: 'grid', placeItems: 'center' }}><Icon n="close_rounded" size={24} /></button>
     </div> : null}</div>;
+}
+/** Zoom: cubit 2 jari, roda mouse, ketuk 2x; geser saat diperbesar. */
+function ZoomBox({ children }: { children: React.ReactNode }) {
+  const [t, setT] = useState({ s: 1, x: 0, y: 0 }); const T = useRef(t); T.current = t;
+  const pts = useRef(new Map<number, { x: number; y: number }>()); const last = useRef({ d: 0, x: 0, y: 0, tap: 0 });
+  const set = (n: { s: number; x: number; y: number }) => { const s = Math.min(6, Math.max(1, n.s)); setT(s === 1 ? { s: 1, x: 0, y: 0 } : { s, x: n.x, y: n.y }); };
+  const dist = () => { const p = [...pts.current.values()]; return p.length > 1 ? Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) : 0; };
+  return <div onClick={(e) => e.stopPropagation()}
+    onWheel={(e) => set({ ...T.current, s: T.current.s * (e.deltaY < 0 ? 1.15 : 1 / 1.15) })}
+    onDoubleClick={() => set(T.current.s > 1 ? { s: 1, x: 0, y: 0 } : { s: 2.5, x: 0, y: 0 })}
+    onPointerDown={(e) => { pts.current.set(e.pointerId, { x: e.clientX, y: e.clientY }); last.current.d = dist(); last.current.x = e.clientX; last.current.y = e.clientY; }}
+    onPointerMove={(e) => { if (!pts.current.has(e.pointerId)) return; pts.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pts.current.size > 1) { const d = dist(); if (last.current.d) set({ ...T.current, s: T.current.s * d / last.current.d }); last.current.d = d; }
+      else if (T.current.s > 1) { set({ ...T.current, x: T.current.x + e.clientX - last.current.x, y: T.current.y + e.clientY - last.current.y }); last.current.x = e.clientX; last.current.y = e.clientY; } }}
+    onPointerUp={(e) => { pts.current.delete(e.pointerId); last.current.d = 0; }} onPointerCancel={(e) => { pts.current.delete(e.pointerId); last.current.d = 0; }}
+    style={{ touchAction: 'none', transform: `translate(${t.x}px,${t.y}px) scale(${t.s})`, transition: pts.current.size ? 'none' : 'transform .15s', cursor: t.s > 1 ? 'grab' : 'zoom-in' }}>{children}</div>;
 }
 export function AudioBars({ a, scope }: { a: A; scope?: unknown }) {
   if (a.kind === 'image' || a.kind === 'video') return <MediaView a={a} />;

@@ -14,6 +14,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.composed
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -86,9 +89,9 @@ import org.json.JSONObject
         bm != null -> { var big by remember { mutableStateOf(false) }
             Image(bm.asImageBitmap(), null, Modifier.padding(top = 10.dp, end = 8.dp).fillMaxWidth().clip(shape).border(1.dp, ink().copy(alpha = .08f), shape).clickable { big = true }, contentScale = ContentScale.FillWidth)
             if (big) androidx.compose.ui.window.Dialog(onDismissRequest = { big = false }, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
-                Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black).clickable { big = false }, contentAlignment = Alignment.Center) {
-                    Image(bm.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-                    Icon(Icons.Rounded.Close, null, Modifier.align(Alignment.TopEnd).padding(16.dp).size(28.dp), tint = androidx.compose.ui.graphics.Color.White)
+                Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black), contentAlignment = Alignment.Center) {
+                    Image(bm.asImageBitmap(), null, Modifier.fillMaxSize().zoomable(), contentScale = ContentScale.Fit)
+                    Icon(Icons.Rounded.Close, null, Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(16.dp).size(28.dp).clickable { big = false }, tint = androidx.compose.ui.graphics.Color.White)
                 }
             } }
         vf != null -> PostVideo(vf)
@@ -97,4 +100,13 @@ import org.json.JSONObject
         }
     }
     if (a.ai && (a.kind == "image" || a.kind == "video")) AiTag(Store.t(if (a.kind == "video") (if (a.aiKind == "edited") "ai_video_edit" else "ai_video") else if (a.aiKind == "edited") "ai_photo_edit" else "ai_photo")) }
+}
+
+/** Zoom cubit 2 jari + geser + ketuk 2x (ZoomMod) untuk penampil layar penuh. */
+fun Modifier.zoomable(): Modifier = composed {
+    var sc by remember { mutableStateOf(1f) }; var off by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+    this.pointerInput(Unit) { androidx.compose.foundation.gestures.detectTransformGestures { _, pan, z, _ ->
+        sc = (sc * z).coerceIn(1f, 6f); off = if (sc <= 1f) androidx.compose.ui.geometry.Offset.Zero else off + pan * sc } }
+        .pointerInput(Unit) { androidx.compose.foundation.gestures.detectTapGestures(onDoubleTap = { if (sc > 1f) { sc = 1f; off = androidx.compose.ui.geometry.Offset.Zero } else sc = 2.5f }) }
+        .graphicsLayer { scaleX = sc; scaleY = sc; translationX = off.x; translationY = off.y }
 }
