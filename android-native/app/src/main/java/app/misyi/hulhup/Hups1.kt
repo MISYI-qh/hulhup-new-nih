@@ -1,6 +1,8 @@
 package app.misyi.hulhup
 
+import androidx.compose.ui.composed
 import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import android.media.MediaRecorder
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
@@ -175,10 +177,10 @@ fun waveShape(seed: Int, n: Int): List<Double> {
 
 /** Pemutar satu audio: tombol putar, gelombang suara, waktu, dan kecepatan (0.5×–2×). */
 /** Melaporkan apakah elemen terlihat di layar (minimal 25%); dipakai agar audio/video berhenti saat di-scroll keluar. */
-fun Modifier.visTrack(on: (Boolean) -> Unit): Modifier = androidx.compose.ui.composed {
+fun Modifier.visTrack(on: (Boolean) -> Unit): Modifier = composed {
     val h = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * androidx.compose.ui.platform.LocalDensity.current.density
     var last by remember { mutableStateOf<Boolean?>(null) }
-    androidx.compose.ui.layout.onGloballyPositioned { c ->
+    this.onGloballyPositioned { c ->
         val b = if (c.isAttached) c.boundsInWindow() else null
         val vis = b != null && b.height > 0f && (minOf(b.bottom, h) - maxOf(b.top, 0f)) >= b.height * 0.25f
         if (last != vis) { last = vis; on(vis) }
