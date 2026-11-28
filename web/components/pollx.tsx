@@ -28,9 +28,10 @@ export function PollView({ a }: { a: A }) {
   const [mode, setMode] = useState<'pct' | 'cnt'>('pct');
   const [sel, setSel] = useState<number[]>([]); const [editing, setEditing] = useState(false); const [busy, setBusy] = useState(false);
   if (!p) return null;
+  const ended = !!p.ended || (!!p.ends_at && p.ends_at <= Date.now());
   const showRes = p.reveal && !editing;
   const send = async (ids: number[]) => {
-    if (busy) return; if (!s.me) { toast(s.t('need_login')); return; }
+    if (busy || ended) return; if (!s.me) { toast(s.t('need_login')); return; }
     setBusy(true);
     try { const j = await Api.req('POST', `/posts/${a.id}/vote`, { options: ids }); a.poll = j.poll; setEditing(false); setSel([]); store.poke(); }
     catch (e) { toast(s.err(e), { bad: true }); }
@@ -55,7 +56,7 @@ export function PollView({ a }: { a: A }) {
         const mine = p.mine.includes(o.id), on = sel.includes(o.id), v = o.votes ?? 0;
         if (showRes) {
           const w = mode === 'pct' ? pct(v) : top ? Math.round((v / top) * 100) : 0;
-          return <button key={o.id} className={`tap po res${mine ? ' mine' : ''}${v === top && v > 0 ? ' lead' : ''}`} onClick={() => { if (p.mine.length === 0) toggle(o.id); }} disabled={busy} aria-label={o.label}>
+          return <button key={o.id} className={`tap po res${mine ? ' mine' : ''}${v === top && v > 0 ? ' lead' : ''}`} onClick={() => { if (p.mine.length === 0 && !ended) toggle(o.id); }} disabled={busy} aria-label={o.label}>
             <i style={{ width: `${w}%` }} /><span className="pl">{mine ? <Icon n="check_circle_rounded" size={17} /> : null}<span>{o.label}</span></span>
             <b className="pv">{mode === 'pct' ? `${pct(v)}%` : v}</b></button>;
         }
@@ -67,7 +68,9 @@ export function PollView({ a }: { a: A }) {
       {showRes ? <span>{total > 0 ? s.t('poll_total').replace('{n}', store.fmt(total)) : s.t('poll_none')}</span>
         : !p.reveal ? <span><Icon n="lock_outline_rounded" size={13} style={{ verticalAlign: -2, marginRight: 4 }} />{s.t('poll_hidden')}</span> : <span>{total > 0 ? s.t('poll_total').replace('{n}', store.fmt(total)) : s.t('poll_none')}</span>}
       <span style={{ flex: 1 }} />
-      {showRes && p.voted ? <button className="tap poll-link" onClick={startEdit}>{s.t('poll_change')}</button> : null}
+      {p.ends_at && !ended ? <span className="poll-end"><Icon n="schedule_rounded" size={13} style={{ verticalAlign: -2, marginRight: 3 }} />{s.t('poll_left').replace('{t}', leftText(p.ends_at - Date.now()))}</span> : null}
+      {ended ? <b className="poll-end">{s.t('poll_ended')}</b> : null}
+      {showRes && p.voted && !ended ? <button className="tap poll-link" onClick={startEdit}>{s.t('poll_change')}</button> : null}
       {!showRes && (multi || editing) ? <button className="tap poll-send" disabled={busy || !sel.length} onClick={() => send(sel)}>{busy ? '…' : s.t('poll_submit')}</button> : null}
       {editing ? <button className="tap poll-link" onClick={() => setEditing(false)}>{s.t('cancel')}</button> : null}
     </div>
@@ -75,8 +78,8 @@ export function PollView({ a }: { a: A }) {
 }
 
 /* ───────── penyusun voting (composer) ───────── */
-export type PollDraft = { title: string; opts: string[]; max: number; showFirst: boolean };
-export const newPoll = (): PollDraft => ({ title: '', opts: ['', ''], max: 1, showFirst: true });
+export type PollDraft = { title: string; opts: string[]; max: number; showFirst: boolean; ends: ExpDraft };
+export const newPoll = (): PollDraft => ({ title: '', opts: ['', ''], max: 1, showFirst: true, ends: newExp() });
 export function pollError(p: PollDraft): boolean {
   const o = p.opts.map((x) => x.trim()).filter(Boolean);
   return o.length < 2 || new Set(o.map((x) => x.toLowerCase())).size !== o.length;
@@ -100,6 +103,9 @@ export function PollEditor({ v, set, onClose }: { v: PollDraft; set: (p: PollDra
     <div className="cx-row"><div style={{ flex: 1, fontWeight: 700 }}>{s.t('poll_max_l')}</div>
       <div className="cx-step"><button className="tap" aria-label="-" disabled={v.max <= 1} onClick={() => set({ ...v, max: Math.max(1, v.max - 1) })}><Icon n="remove_rounded" size={18} /></button><b>{Math.min(v.max, maxCap)}</b><button className="tap" aria-label="+" disabled={v.max >= maxCap} onClick={() => set({ ...v, max: Math.min(maxCap, v.max + 1) })}><Icon n="add_rounded" size={18} /></button></div></div>
     <div className="cx-row"><div style={{ flex: 1 }}><div style={{ fontWeight: 700 }}>{s.t('poll_show_l')}</div><div className="cx-sub">{s.t('poll_show_d')}</div></div><Toggle v={v.showFirst} on={(x) => set({ ...v, showFirst: x })} /></div>
+    <div className="cx-row" style={{ display: 'block' }}><div style={{ fontWeight: 700, marginBottom: 8 }}>{s.t('poll_end')}</div>
+      <div className="seg" role="tablist" style={{ marginBottom: 8 }}>{([[false, s.t('poll_end_none')], [true, s.t('poll_end_set')]] as const).map(([k, l]) => <b key={String(k)} role="tab" aria-selected={v.ends.custom === k} className={v.ends.custom === k ? 'on' : ''} onClick={() => set({ ...v, ends: { ...v.ends, custom: k } })}>{l}</b>)}</div>
+      {v.ends.custom ? <DurPick v={v.ends} set={(e) => set({ ...v, ends: e })} /> : <div className="cx-sub">{s.t('poll_end_d')}</div>}</div>
     {filled < 2 ? <div className="cx-sub" style={{ color: 'var(--heart)' }}>{s.t('poll_need')}</div> : null}
   </div>;
 }
@@ -110,6 +116,16 @@ export const newExp = (): ExpDraft => ({ custom: false, n: '1', unit: 'day' });
 export const UNIT_MS = { min: 60000, hour: 3600000, day: 86400000 } as const;
 export function expMs(e: ExpDraft): number | null { if (!e.custom) return null; const n = Number(e.n.replace(',', '.')); return Number.isFinite(n) && n > 0 ? Math.round(n * UNIT_MS[e.unit]) : 0; }
 const PRESETS: [string, ExpDraft['unit'], string][] = [['1', 'hour', '1 jam'], ['6', 'hour', '6 jam'], ['1', 'day', '1 hari'], ['3', 'day', '3 hari'], ['7', 'day', '7 hari']];
+function DurPick({ v, set }: { v: ExpDraft; set: (e: ExpDraft) => void }) {
+  const s = useStore(); const ms = expMs(v);
+  return <>
+      <div className="cx-chips">{PRESETS.map(([n, u, l]) => <button key={l} className={`tap cx-chip${v.n === n && v.unit === u ? ' on' : ''}`} onClick={() => set({ ...v, n, unit: u })}>{l}</button>)}</div>
+      <div className="cx-row" style={{ gap: 8 }}>
+        <input className="cx-in num" inputMode="decimal" value={v.n} onChange={(e) => set({ ...v, n: e.target.value.replace(/[^0-9.,]/g, '').slice(0, 7) })} aria-label="Lama" />
+        <div className="seg" role="tablist" style={{ flex: 1 }}>{(['min', 'hour', 'day'] as const).map((u) => <b key={u} role="tab" aria-selected={v.unit === u} className={v.unit === u ? 'on' : ''} onClick={() => set({ ...v, unit: u })}>{s.t(`exp_${u}`)}</b>)}</div></div>
+      <div className="cx-sub" style={{ marginTop: 8, color: ms ? 'var(--sub)' : 'var(--heart)' }}>{ms ? s.t('exp_set').replace('{t}', leftText(ms)) : s.t('exp_bad')}</div>
+  </>;
+}
 export function ExpiryEditor({ v, set, onClose }: { v: ExpDraft; set: (e: ExpDraft) => void; onClose: () => void }) {
   const s = useStore();
   const ms = expMs(v);
@@ -118,13 +134,7 @@ export function ExpiryEditor({ v, set, onClose }: { v: ExpDraft; set: (e: ExpDra
       <button className="tap cx-x" aria-label="Tutup" onClick={onClose}><Icon n="close_rounded" size={18} /></button></div>
     <div className="seg" role="tablist" style={{ marginBottom: 10 }}>{([[false, s.t('exp_normal')], [true, s.t('exp_custom')]] as const).map(([k, l]) => <b key={String(k)} role="tab" aria-selected={v.custom === k} className={v.custom === k ? 'on' : ''} onClick={() => set({ ...v, custom: k })}>{l}</b>)}</div>
     <div className="cx-sub" style={{ marginBottom: v.custom ? 12 : 0 }}>{v.custom ? s.t('exp_custom_d') : s.t('exp_normal_d')}</div>
-    {v.custom ? <>
-      <div className="cx-chips">{PRESETS.map(([n, u, l]) => <button key={l} className={`tap cx-chip${v.n === n && v.unit === u ? ' on' : ''}`} onClick={() => set({ ...v, n, unit: u })}>{l}</button>)}</div>
-      <div className="cx-row" style={{ gap: 8 }}>
-        <input className="cx-in num" inputMode="decimal" value={v.n} onChange={(e) => set({ ...v, n: e.target.value.replace(/[^0-9.,]/g, '').slice(0, 7) })} aria-label="Lama" />
-        <div className="seg" role="tablist" style={{ flex: 1 }}>{(['min', 'hour', 'day'] as const).map((u) => <b key={u} role="tab" aria-selected={v.unit === u} className={v.unit === u ? 'on' : ''} onClick={() => set({ ...v, unit: u })}>{s.t(`exp_${u}`)}</b>)}</div></div>
-      <div className="cx-sub" style={{ marginTop: 8, color: ms ? 'var(--sub)' : 'var(--heart)' }}>{ms ? s.t('exp_set').replace('{t}', leftText(ms)) : s.t('exp_bad')}</div>
-    </> : null}
+    {v.custom ? <DurPick v={v} set={set} /> : null}
   </div>;
 }
 

@@ -509,6 +509,12 @@ test('voting, masa aktif, dan pin admin', async () => {
   assert.equal(r1.poll.reveal, true); assert.equal(r1.poll.total, 1); assert.deepEqual(r1.poll.options.map((o) => o.votes), [1, 0, 1]);
   const r2 = await call('POST', `/posts/${p.id}/vote`, { token: b, body: { options: [ids[1]] } }); // ganti pilihan
   assert.deepEqual(r2.poll.options.map((o) => o.votes), [0, 1, 0]);
+  // voting dengan waktu selesai: setelah selesai hasil terbuka & tidak bisa memilih
+  const p2 = await call('POST', '/posts', { token: a, body: { audios: 0, poll: { options: ['x', 'y'], show_first: false, ends_in: 3600000 } } });
+  await q('update polls set ends_at=$2 where post_id=$1', [p2.id, Date.now() - 1000]);
+  const v2 = (await call('GET', `/posts/${p2.id}`, { token: b })).post;
+  assert.equal(v2.poll.ended, true); assert.equal(v2.poll.reveal, true); assert.equal(v2.poll.options[0].votes, 0);
+  assert.equal((await call('POST', `/posts/${p2.id}/vote`, { token: b, body: { options: [v2.poll.options[0].id] } })).error, 'poll_ended');
   // pin: hanya admin, hanya publik
   assert.equal((await call('POST', '/admin/pin', { token: a, body: { audio: p.id, minutes: 60 } })).status, 403);
   assert.ok((await call('POST', '/admin/pin', { token: adm, body: { audio: p.id, minutes: 60 } })).pinned);

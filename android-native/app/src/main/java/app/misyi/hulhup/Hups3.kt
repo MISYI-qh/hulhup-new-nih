@@ -154,7 +154,9 @@ import org.json.JSONObject
                             val qr = quoteRef(text)
                             if (qr != null) QuoteCard(qr.id)
                             MediaStrip(postMedia(text, p.media))
+                            PollView(p)
                             if (p.files.isNotEmpty()) Box(Modifier.padding(top = 6.dp)) { if (p.bgm) BgmBar(p) else AudioBars(p, owner) }
+                            if (p.pinned || p.expiresAt > 0) Row { if (p.pinned) PinTag(); ExpiryChip(p) }
                             Spacer(Modifier.height(10.dp))
                             PostActions(p) { try { focus.requestFocus() } catch (_: Exception) {} }
                             Box(Modifier.padding(vertical = 12.dp).fillMaxWidth().height(1.dp).background(ink().copy(alpha = .08f)))
@@ -270,9 +272,11 @@ import org.json.JSONObject
     var mclip by remember { mutableStateOf<MediaClip?>(null) }; var slot by remember { mutableStateOf<JSONObject?>(null) }; var prep by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { if (Store.me != null) try { slot = Api.req("GET", "/media-slot") } catch (_: Exception) {} }
     var aiV by remember { mutableStateOf(true) }; var aiC by remember { mutableStateOf(true) }
+    var mediaOpen by remember { mutableStateOf(false) }; var linkOpen by remember { mutableStateOf(false) }; var more by remember { mutableStateOf(false) }
+    var poll by remember { mutableStateOf<PollDraft?>(null) }; val exp = remember { ExpDraft() }; var expOpen by remember { mutableStateOf(false) }
     DisposableEffect(Unit) { onDispose { Store.stop() } }
 
-    suspend fun add() { val c = sheet<AudioClip> { done -> RecordSheet { done(it) } } ?: return; Store.stop(); clip = c; playing = false }
+    suspend fun add() { val c = sheet<AudioClip> { done -> RecordSheet { done(it) } } ?: return; Store.stop(); clip = c; playing = false; mediaOpen = false }
     suspend fun play() {
         val c = clip ?: return
         if (playing) { Store.stop(); playing = false; return }
@@ -286,7 +290,11 @@ import org.json.JSONObject
     }
     suspend fun send() {
         val t = withQuote(text.trim(), quote); val c = clip; val mc = mclip
-        if (c == null && mc == null && t.isEmpty() && media.isEmpty()) { toast(s.t("e_empty"), true); return }
+        val pd = poll
+        if (c == null && mc == null && t.isEmpty() && media.isEmpty() && pd == null) { toast(s.t("e_empty"), true); return }
+        if (pd != null && pd.bad()) { toast(s.t("poll_need"), true); return }
+        if (pd != null && pd.ends.custom && pd.ends.ms() <= 0) { toast(s.t("exp_bad"), true); return }
+        if (exp.custom && exp.ms() <= 0) { toast(s.t("exp_bad"), true); expOpen = true; return }
         if (audSplit(rand).contains("accounts") && picked.isEmpty()) { toast(s.t("e_need_accounts"), true); return }
         busy = true
         var id: Int? = null
@@ -295,6 +303,8 @@ import org.json.JSONObject
             if (c != null) b.put("bgm", bgm)
             if (mc != null) b.put("media_kind", mc.kind)
             if (media.isNotEmpty()) b.put("media", JSONArray(media.toList()))
+            if (pd != null) b.put("poll", pd.json())
+            if (exp.custom && exp.ms() > 0) b.put("expires_in", exp.ms())
             val j = Api.req("POST", "/posts", b); id = j.optInt("id")
             if (c != null) Api.multi("/posts/$id/audio", c.bytes, mapOf("secs" to "${c.secs}"))
             if (mc != null) Api.multi("/posts/$id/audio", if (mc.kind == "image") packAvatar(mc.orig ?: mc.bytes, mc.bytes) else packMeta(mc.orig ?: ByteArray(0), mc.bytes), mapOf("secs" to "${mc.secs}"))
@@ -312,7 +322,7 @@ import org.json.JSONObject
         try {
             val cm0 = if (kind == "image") MediaPrep.image(Store.app, u) else MediaPrep.video(Store.app, u)
             val cm = if (cm0 != null && kind == "video") MediaClip(cm0.kind, cm0.bytes, cm0.ext, cm0.secs, cm0.bmp, mp4Meta(Store.app, u)) else cm0
-            if (cm == null) toast(s.t("media_fail"), true) else { Store.stop(); clip = null; playing = false; bgm = false; mclip = cm }
+            if (cm == null) toast(s.t("media_fail"), true) else { Store.stop(); clip = null; playing = false; bgm = false; mclip = cm; mediaOpen = false }
         } catch (e: ApiErr) { toast(if (e.code == "media_big") s.t("media_big") else s.err(e), true) }
         prep = false
     }
@@ -323,30 +333,43 @@ import org.json.JSONObject
         }
     }
     val hasAcc = audSplit(rand).contains("accounts")
+    @Composable fun ToolBtn(icon: androidx.compose.ui.graphics.vector.ImageVector, on: Boolean, enabled: Boolean = true, click: () -> Unit) =
+        Tap(scale = .9f, onTap = if (enabled && !busy) click else null) {
+            Box(Modifier.size(46.dp).alpha(if (enabled) 1f else .35f).background(if (on) ink() else soft(), CircleShape), contentAlignment = Alignment.Center) { Icon(icon, null, Modifier.size(22.dp), tint = if (on) bgOf() else ink()) }
+        }
     Column(Modifier.fillMaxSize().imePadding()) {
         TopBar(back = true, title = s.t("new_post"))
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(22.dp, 4.dp, 22.dp, 40.dp)) {
-            if (mclip == null) AudioSlot(clip, playing, { sc.launch { play() } }, if (busy) null else ({ sc.launch { add() } })) { Store.stop(); clip = null; playing = false; bgm = false }
-            if (clip == null) { Spacer(Modifier.height(10.dp)); MediaPickRow(mclip, prep, slot, { k -> sc.launch { pickMedia(k) } }) { mclip = null } }
-            if (clip != null) Box(Modifier.padding(top = 14.dp)) { Row2(s.t("bgm_label"), bgm, { bgm = it }, s.t("bgm_note")) }
-            Spacer(Modifier.height(14.dp))
-            Box(Modifier.fillMaxWidth().background(soft(), RoundedCornerShape(22.dp)).padding(18.dp, 14.dp)) {
-                if (text.isEmpty()) HText(s.t("write_hups"), 16.5f, color = sub())
-                BasicTextField(text, { text = absorbQuote(it) { u -> quote = u } }, Modifier.fillMaxWidth(), textStyle = TextStyle(fontSize = 16.5.sp, lineHeight = (16.5 * 1.5).sp, color = ink(), fontFamily = Outfit), cursorBrush = SolidColor(ink()), minLines = 4, maxLines = 12, keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences))
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(22.dp, 0.dp, 22.dp, 40.dp)) {
+            Box(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                if (text.isEmpty()) HText(s.t("cp_ph"), 19f, color = ink().copy(alpha = .35f))
+                BasicTextField(text, { text = absorbQuote(it) { u -> quote = u } }, Modifier.fillMaxWidth(), textStyle = TextStyle(fontSize = 19.sp, lineHeight = (19 * 1.5).sp, color = ink(), fontFamily = Outfit), cursorBrush = SolidColor(ink()), minLines = 4, maxLines = 14, keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences))
             }
             quote?.let { q -> QuoteSlot(q) { quote = null } }
-            Spacer(Modifier.height(6.dp))
             MentionBar(text) { text = it }
-            HText(s.t("tag_hint"), 12.5f, color = sub(), modifier = Modifier.padding(start = 6.dp, bottom = 14.dp))
-            MediaEditor(media, !busy)
-            Row(Modifier.padding(bottom = 16.dp).fillMaxWidth().background(soft(), RoundedCornerShape(18.dp)).padding(14.dp, 12.dp), verticalAlignment = Alignment.Top) {
-                Icon(Icons.Outlined.Info, null, Modifier.padding(top = 1.dp).size(18.dp), tint = sub()); Spacer(Modifier.width(10.dp))
-                HText(s.t("media_hint"), 13f, color = sub(), lh = 19f)
+            if (clip != null) Box(Modifier.padding(top = 12.dp).fillMaxWidth().background(soft(), RoundedCornerShape(22.dp)).padding(6.dp)) {
+                Column {
+                    AudioSlot(clip, playing, { sc.launch { play() } }, if (busy) null else ({ sc.launch { add() } })) { Store.stop(); clip = null; playing = false; bgm = false }
+                    Row(Modifier.padding(10.dp, 8.dp, 6.dp, 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) { HText(s.t("bgm_label"), 15.5f, FontWeight.SemiBold); HText(s.t("bgm_note"), 12.5f, color = sub()) }
+                        Toggle(bgm) { bgm = it }
+                    }
+                }
             }
-            Row2(s.t("pprof"), pprof, { pprof = it })
-            Row2(s.t("ai_see"), aiV, { aiV = it; if (!it) aiC = false }, s.t("ai_see_d"))
-            Row2(s.t("ai_cmt"), aiC && aiV, if (aiV) ({ aiC = it }) else null, s.t("ai_cmt_d"))
-            Spacer(Modifier.height(2.dp))
+            if (mclip != null) Box(Modifier.padding(top = 12.dp)) { MediaPickRow(mclip, prep, slot, { }) { mclip = null } }
+            if (mediaOpen && mclip == null && clip == null) Box(Modifier.padding(top = 12.dp).fillMaxWidth().background(soft(), RoundedCornerShape(22.dp)).padding(12.dp)) { MediaPickRow(null, prep, slot, { k -> sc.launch { pickMedia(k) } }) { } }
+            poll?.let { PollEditor(it) { poll = null } }
+            if (expOpen) ExpiryEditor(exp) { expOpen = false }
+            else if (exp.custom && exp.ms() > 0) Tap(onTap = { expOpen = true }) { Row(Modifier.padding(top = 12.dp).background(soft(), RoundedCornerShape(12.dp)).padding(10.dp, 6.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Rounded.Schedule, null, Modifier.size(14.dp), tint = sub()); Spacer(Modifier.width(5.dp)); HText(s.t("exp_set").replace("{t}", leftText(exp.ms())), 12f, FontWeight.Bold, sub()) } }
+            if (linkOpen || media.isNotEmpty()) MediaEditor(media, !busy)
+            Row(Modifier.padding(top = 14.dp, bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ToolBtn(Icons.Rounded.Mic, clip != null, mclip == null) { sc.launch { add() } }
+                ToolBtn(Icons.Rounded.Image, mediaOpen || mclip != null, clip == null) { mediaOpen = !mediaOpen }
+                ToolBtn(Icons.Rounded.Poll, poll != null) { poll = if (poll == null) PollDraft() else null }
+                ToolBtn(Icons.Rounded.Schedule, expOpen || (exp.custom && exp.ms() > 0)) { expOpen = !expOpen }
+                ToolBtn(Icons.Rounded.Link, linkOpen || media.isNotEmpty()) { linkOpen = !linkOpen }
+            }
+            Box(Modifier.padding(top = 16.dp).fillMaxWidth().height(1.dp).background(ink().copy(alpha = .07f)))
+            Spacer(Modifier.height(12.dp))
             Pick(s.t("who_see"), rand, withLabels(uploadAud)) { v -> rand = v; if (audSplit(v).contains("accounts") && picked.isEmpty()) sc.launch { pickAcc() } }
             if (hasAcc) Box(Modifier.padding(top = 10.dp)) {
                 Tap(scale = .98f, onTap = { sc.launch { pickAcc() } }) {
@@ -356,10 +379,19 @@ import org.json.JSONObject
                     }
                 }
             }
-            Spacer(Modifier.height(26.dp))
+            Tap(Modifier.fillMaxWidth(), .99f, onTap = { more = !more }) {
+                Row(Modifier.fillMaxWidth().padding(vertical = 16.dp, horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.Tune, null, Modifier.size(20.dp), tint = ink()); Spacer(Modifier.width(10.dp)); HText(s.t("cp_more"), 15f, FontWeight.Bold, modifier = Modifier.weight(1f))
+                    Icon(if (more) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore, null, Modifier.size(22.dp), tint = ink())
+                }
+            }
+            if (more) {
+                Row2(s.t("pprof"), pprof, { pprof = it })
+                Row2(s.t("ai_see"), aiV, { aiV = it; if (!it) aiC = false }, s.t("ai_see_d"))
+                Row2(s.t("ai_cmt"), aiC && aiV, if (aiV) ({ aiC = it }) else null, s.t("ai_cmt_d"))
+            }
+            Spacer(Modifier.height(18.dp))
             PBtn(s.t("upload"), { sc.launch { send() } }, loading = busy, icon = Icons.Rounded.ArrowUpward)
-            Spacer(Modifier.height(12.dp))
-            HText(s.t("noedit"), 13f, color = sub(), align = TextAlign.Center, modifier = Modifier.fillMaxWidth())
         }
     }
 }

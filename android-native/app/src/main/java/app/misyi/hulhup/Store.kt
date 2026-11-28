@@ -247,6 +247,7 @@ object Store {
     fun notifText(type: String, extra: String): String = when (type) {
         "like" -> t("n_like"); "comment" -> t("n_comment"); "reply" -> t("n_reply"); "mention" -> t("n_mention")
         "rel_req" -> t("n_rel_req").replace("{r}", relName(extra)); "rel_ok" -> t("n_rel_ok").replace("{r}", relName(extra))
+        "expiring" -> t("n_expiring").replace("{r}", if (extra.isEmpty()) "" else ": $extra"); "expired" -> t("n_expired").replace("{r}", if (extra.isEmpty()) "" else ": $extra")
         "takedown_post" -> t("n_td_post").replace("{r}", extra); "takedown_comment" -> t("n_td_comment").replace("{r}", extra)
         "phipop_code" -> t("n_phipop_code").replace("{extra}", extra)
         else -> t("n_follow")

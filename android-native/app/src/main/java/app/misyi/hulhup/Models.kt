@@ -35,13 +35,14 @@ class A(val j: JSONObject) {
     val to: List<String> = (j.optJSONArray("to") ?: JSONArray()).objects().map { it.optString("username") }
     val kind: String = j.optString("kind", "audio").ifEmpty { "audio" }
     val ptag: Boolean = j.optBoolean("ptag")
+    var poll: JSONObject? = j.optJSONObject("poll"); val expiresAt = j.optLong("expires_at", 0L); val pinned = j.bool("pinned"); val pinUntil = j.optLong("pin_until", 0L)
     val media: List<String> = (j.optJSONArray("media") ?: JSONArray()).let { a -> (0 until a.length()).mapNotNull { a.optString(it).ifEmpty { null } } }
     val files: List<JSONObject> = j.optJSONArray("files")?.objects() ?: if (url.isEmpty()) emptyList() else listOf(JSONObject().put("url", url).put("secs", secs))
 
     fun toJson(): JSONObject = JSONObject().put("id", id).put("secs", secs).put("created", created).put("desc", desc).put("url", url).put("vis", vis)
         .put("rand", rand).put("owner", owner).put("owner_name", ownerName).put("owner_avatar", ownerAvatar).put("owner_verified", ownerVerified)
         .put("popup", popup).put("pprof", pprof).put("likes", likes).put("plays", plays).put("views", views).put("liked", liked).put("long", long)
-        .put("in_rand", inRand).put("in_hups", inHups).put("comments", comments).put("saved", saved).put("files", JSONArray(files)).put("media", JSONArray(media)).put("ptag", ptag).put("kind", kind).put("bgm", bgm)
+        .put("in_rand", inRand).put("in_hups", inHups).put("comments", comments).put("saved", saved).put("files", JSONArray(files)).put("media", JSONArray(media)).put("ptag", ptag).put("kind", kind).put("poll", poll).put("expires_at", expiresAt).put("pinned", pinned).put("pin_until", pinUntil).put("bgm", bgm)
         .put("ai", ai).put("ai_kind", aiKind).put("owner_avatar_ai", ownerAvatarAi).put("owner_avatar_ai_kind", ownerAvatarAiKind).put("text", text)
         .put("to", JSONArray(to.map { JSONObject().put("username", it) }))
 }

@@ -27,14 +27,14 @@ private val badgeCol = mapOf("purple" to Color(0xFF8B5CF6), "blue" to Blue, "ora
         TopBar(back = true, title = s.t("adm_title"))
         if (s.me?.username != "hulhup") { HText(s.t("adm_only"), 15f, color = sub(), modifier = Modifier.padding(22.dp)); return@Column }
         Row(Modifier.padding(22.dp, 0.dp, 22.dp, 12.dp).fillMaxWidth().background(soft(), RoundedCornerShape(26.dp)).padding(4.dp)) {
-            for (i in 0..3) Tap(Modifier.weight(1f), .97f, onTap = { tab = i }) {
+            for ((i, tk) in listOf("adm_t0", "adm_t1", "adm_tpin", "adm_t2", "adm_t3").withIndex()) Tap(Modifier.weight(1f), .97f, onTap = { tab = i }) {
                 Box(Modifier.fillMaxWidth().height(40.dp).background(if (tab == i) ink() else Color.Transparent, RoundedCornerShape(22.dp)), contentAlignment = Alignment.Center) {
-                    HText(s.t("adm_t$i"), 13f, FontWeight.ExtraBold, if (tab == i) bgOf() else sub(), maxLines = 1)
+                    HText(s.t(tk), 12.5f, FontWeight.ExtraBold, if (tab == i) bgOf() else sub(), maxLines = 1)
                 }
             }
         }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(22.dp, 0.dp, 22.dp, 40.dp)) {
-            when (tab) { 0 -> AdminOverview(); 1 -> { AdminReports(); ContentFinder() }; 2 -> AdminBadges(); else -> PhipopAdminBody() }
+            when (tab) { 0 -> AdminOverview(); 1 -> { AdminReports(); ContentFinder() }; 2 -> AdminPins(); 3 -> AdminBadges(); else -> PhipopAdminBody() }
         }
     }
 }
@@ -167,6 +167,34 @@ private suspend fun takedown(body: JSONObject, done: suspend () -> Unit) {
             HText(it0.optString("text"), 14.5f, modifier = Modifier.padding(top = 4.dp, bottom = 10.dp), maxLines = 5, lh = 20f)
             if (it0.optBoolean("taken_down")) HText(s.t("adm_taken"), 12.5f, color = sub())
             else PBtn(s.t("adm_td"), { sc.launch { takedown(JSONObject().put(if (kind == "post") "audio" else "comment", it0.optInt("id"))) { load() } } })
+        }
+    }
+}
+
+/** Sematkan post publik di Hups dengan lama bebas; daftar pin aktif + lepas pin. Padanan web Pins(). */
+@Composable private fun AdminPins() {
+    val sc = rememberCoroutineScope(); val s = Store
+    var ref by remember { mutableStateOf("") }; val dur = remember { ExpDraft().also { it.custom = true; it.n = "1"; it.unit = "day" } }
+    var items by remember { mutableStateOf<List<JSONObject>?>(null) }
+    suspend fun load() { try { items = (Api.req("GET", "/admin/pins").optJSONArray("items") ?: JSONArray()).objects() } catch (e: Exception) { toast(s.err(e), true) } }
+    LaunchedEffect(Unit) { load() }
+    Card {
+        HText("Sematkan post di Hups", 16f, FontWeight.ExtraBold, modifier = Modifier.padding(bottom = 8.dp))
+        PField(ref, { ref = it }, "Tempel link atau kode post publik", caps = androidx.compose.ui.text.input.KeyboardCapitalization.None); Spacer(Modifier.height(10.dp))
+        DurPick(dur); Spacer(Modifier.height(12.dp))
+        PBtn("Sematkan", { sc.launch {
+            val m = dur.ms() / 60000
+            if (ref.isBlank() || m <= 0) { toast("Isi link/kode post dan lama pin", true); return@launch }
+            try { Api.req("POST", "/admin/pin", JSONObject().put("ref", ref.trim()).put("minutes", m)); ref = ""; load(); toast("Post disematkan") } catch (e: Exception) { toast(s.err(e), true) }
+        } })
+    }
+    val list = items ?: run { Spin(); return }
+    if (list.isEmpty()) HText("Belum ada post yang disematkan.", 14f, color = sub(), modifier = Modifier.padding(vertical = 10.dp))
+    list.forEach { x ->
+        Card {
+            Row(verticalAlignment = Alignment.CenterVertically) { HText("@${x.optString("owner")}", 14.5f, FontWeight.ExtraBold, modifier = Modifier.weight(1f)); HText("sisa " + leftText(x.optLong("pin_until") - System.currentTimeMillis()), 12.5f, color = sub()) }
+            HText(x.optString("desc").ifEmpty { "(audio)" }, 14f, color = sub(), modifier = Modifier.padding(top = 6.dp, bottom = 10.dp), maxLines = 4)
+            PBtn("Lepas pin", { sc.launch { try { Api.req("POST", "/admin/pin", JSONObject().put("audio", x.optInt("id")).put("unpin", true)); load(); toast("Pin dilepas") } catch (e: Exception) { toast(s.err(e), true) } } }, ghost = true)
         }
     }
 }

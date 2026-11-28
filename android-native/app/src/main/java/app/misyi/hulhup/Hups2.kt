@@ -191,7 +191,9 @@ suspend fun postMenu(a: A, onDeleted: (() -> Unit)? = null) {
             val qr = quoteRef(text)
             if (qr != null) QuoteCard(qr.id)
             MediaStrip(postMedia(text, a.media))
+            PollView(a)
             if (a.files.isNotEmpty()) Box(Modifier.padding(end = 8.dp)) { if (a.bgm) BgmBar(a) else AudioBars(a, scope) }
+            if (a.pinned || a.expiresAt > 0) Row { if (a.pinned) PinTag(); ExpiryChip(a) }
             Spacer(Modifier.height(4.dp))
             PostActions(a)
         }
@@ -219,7 +221,7 @@ suspend fun postMenu(a: A, onDeleted: (() -> Unit)? = null) {
     suspend fun load() {
         try {
             val j = Api.req("GET", "/hups?f=$filter")
-            items.clear(); items.addAll((j.optJSONArray("items") ?: org.json.JSONArray()).objects().map { A(it) }); next = j.optInt("next"); error = null
+            items.clear(); items.addAll(((j.optJSONArray("pins") ?: org.json.JSONArray()).objects() + (j.optJSONArray("items") ?: org.json.JSONArray()).objects()).map { A(it) }); next = j.optInt("next"); error = null
         } catch (e: Exception) { error = s.err(e) }
         loading = false
     }
@@ -232,9 +234,9 @@ suspend fun postMenu(a: A, onDeleted: (() -> Unit)? = null) {
             busy = true
             try {
                 val j = Api.req("GET", "/hups?f=$filter")
-                val fresh = (j.optJSONArray("items") ?: org.json.JSONArray()).objects().map { A(it) }
+                val fresh = ((j.optJSONArray("pins") ?: org.json.JSONArray()).objects() + (j.optJSONArray("items") ?: org.json.JSONArray()).objects()).map { A(it) }
                 if (ls.firstVisibleItemIndex == 0 && ls.firstVisibleItemScrollOffset < 60) { items.clear(); items.addAll(fresh); next = j.optInt("next") }
-                else for (f in fresh) for (o in items) if (o.id == f.id) { o.likes = f.likes; o.comments = f.comments; o.liked = f.liked; o.saved = f.saved }
+                else for (f in fresh) for (o in items) if (o.id == f.id) { o.likes = f.likes; o.comments = f.comments; o.liked = f.liked; o.saved = f.saved; o.poll = f.poll }
                 s.poke()
             } catch (_: Exception) {}
             busy = false
@@ -271,10 +273,14 @@ suspend fun postMenu(a: A, onDeleted: (() -> Unit)? = null) {
     if (error != null) { Empty(Icons.Rounded.CloudOff, error!!, action = { PBtn(s.t("retry"), { loading = true; sc.launch { load() } }, modifier = Modifier.width(160.dp)) }); return }
     LogoRefresh({ load() }) {
         if (items.isEmpty()) LazyColumn(Modifier.fillMaxSize()) { item { Spacer(Modifier.height(80.dp)); Empty(Icons.Outlined.Forum, s.t("no_hups"), custom = { HIcon(HK.hups, size = 32.dp, color = sub()) }) } }
-        else LazyColumn(Modifier.fillMaxSize(), state = ls, contentPadding = PaddingValues(16.dp, 6.dp, 16.dp, 110.dp)) {
-            itemsIndexed(items, key = { _, a -> a.id }) { i, a ->
-                In(if (i < 8) i else 0) { PostCard(a, scope = owner, onDeleted = { items.removeAll { it.id == a.id }; s.poke() }) }
+        else Box(Modifier.fillMaxSize()) {
+            LazyColumn(Modifier.fillMaxSize(), state = ls, contentPadding = PaddingValues(16.dp, 6.dp, 16.dp, 110.dp)) {
+                itemsIndexed(items, key = { _, a -> a.id }) { i, a ->
+                    In(if (i < 8) i else 0) { PostCard(a, scope = owner, onDeleted = { items.removeAll { it.id == a.id }; s.poke() }) }
+                }
             }
+            val pins = items.filter { it.pinned }
+            PinPill(pins.size) { sc.launch { sheet<Unit> { done -> PinSheet(pins, owner) } } }
         }
     }
 }
@@ -283,4 +289,12 @@ suspend fun postMenu(a: A, onDeleted: (() -> Unit)? = null) {
 object HupsCache {
     class E(val at: Long, val items: List<A>, val next: Int, val idx: Int, val off: Int)
     val m = HashMap<String, E>()
+}
+
+/** Daftar post yang disematkan admin (dibuka dari tombol pin yang selalu mengikuti saat menggulir Hups). */
+@Composable fun PinSheet(pins: List<A>, owner: Any) {
+    Column(Modifier.heightIn(max = 560.dp).verticalScroll(rememberScrollState()).padding(16.dp, 0.dp, 16.dp, 16.dp)) {
+        HText(Store.t("pin_title"), 18f, FontWeight.ExtraBold, modifier = Modifier.padding(start = 6.dp, bottom = 12.dp))
+        for (a in pins) PostCard(a, scope = owner)
+    }
 }

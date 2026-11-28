@@ -182,7 +182,7 @@ function av(a) {
 async function addPolls(items, me) {
   const ids = items.map((p) => p.id);
   if (!ids.length) return items;
-  const ps = await many('select post_id, title, max_pick, show_first from polls where post_id = any($1::bigint[])', [ids]);
+  const ps = await many('select post_id, title, max_pick, show_first, ends_at from polls where post_id = any($1::bigint[])', [ids]);
   if (!ps.length) return items;
   const pids = ps.map((x) => Number(x.post_id)), vid = me ? Number(me.id) : 0;
   const opts = await many('select id, post_id, label, votes from poll_opts where post_id = any($1::bigint[]) order by post_id, pos', [pids]);
@@ -191,9 +191,10 @@ async function addPolls(items, me) {
   for (const p of items) {
     const pl = ps.find((x) => Number(x.post_id) === p.id); if (!pl) continue;
     const my = mine.filter((r) => Number(r.post_id) === p.id).map((r) => Number(r.opt_id));
-    const reveal = pl.show_first || my.length > 0 || (!!me && p.owner === me.username);
+    const endsAt = Number(pl.ends_at || 0), ended = endsAt > 0 && endsAt <= now();
+    const reveal = ended || pl.show_first || my.length > 0 || (!!me && p.owner === me.username);
     p.poll = {
-      title: pl.title, max: pl.max_pick, show_first: pl.show_first, voted: my.length > 0, mine: my, reveal,
+      title: pl.title, max: pl.max_pick, ends_at: endsAt, ended, show_first: pl.show_first, voted: my.length > 0, mine: my, reveal,
       total: reveal ? (voters.find((r) => Number(r.post_id) === p.id)?.n ?? 0) : null,
       options: opts.filter((o) => Number(o.post_id) === p.id).map((o) => ({ id: Number(o.id), label: o.label, votes: reveal ? o.votes : null })),
     };
@@ -1031,7 +1032,13 @@ function okPoll(v) {
   const opts = (Array.isArray(v.options) ? v.options : []).map((x) => String(x ?? '').trim().slice(0, 100)).filter(Boolean);
   if (opts.length < 2 || opts.length > 200) throw new ApiErr('poll_bad', 400);
   if (new Set(opts.map((x) => x.toLowerCase())).size !== opts.length) throw new ApiErr('poll_dup', 400);
-  return { title: String(v.title ?? '').trim().slice(0, 200), opts, max: Math.min(opts.length, Math.max(1, parseInt(v.max, 10) || 1)), show_first: v.show_first !== false };
+  return { title: String(v.title ?? '').trim().slice(0, 200), opts, max: Math.min(opts.length, Math.max(1, parseInt(v.max, 10) || 1)), show_first: v.show_first !== false, ends: okEnds(v.ends_in) };
+}
+function okEnds(v) {
+  if (v === undefined || v === null || v === '' || v === 0) return 0;
+  const n = Number(v);
+  if (!Number.isFinite(n) || n <= 0) throw new ApiErr('bad_request');
+  return now() + Math.min(Math.max(n, 60000), 315360000000);
 }
 /** Masa aktif post (ms dari sekarang). Kosong = biasa (tanpa batas). Custom bebas, minimal 1 menit teknis. */
 function okExpiry(v) {
@@ -1099,7 +1106,7 @@ route('POST', /^\/posts$/, async (c) => {
       const pid = Number(r.rows[0].id);
       if (expAt) await t.query('update audios set expires_at=$2 where id=$1', [pid, expAt]);
       if (poll) {
-        await t.query('insert into polls(post_id, title, max_pick, show_first) values ($1,$2,$3,$4)', [pid, poll.title, poll.max, poll.show_first]);
+        await t.query('insert into polls(post_id, title, max_pick, show_first, ends_at) values ($1,$2,$3,$4,$5)', [pid, poll.title, poll.max, poll.show_first, poll.ends]);
         for (let i = 0; i < poll.opts.length; i++) await t.query('insert into poll_opts(post_id, pos, label) values ($1,$2,$3)', [pid, i, poll.opts[i]]);
       }
       return pid;
@@ -1159,8 +1166,9 @@ route('POST', /^\/posts\/(\d+)\/vote$/, async (c, m) => {
   const u = c.need();
   await hit(`vote:${u.id}`, 60, 60);
   await openPost(m[1], c);
-  const pl = await one('select max_pick from polls where post_id=$1', [m[1]]);
+  const pl = await one('select max_pick, ends_at from polls where post_id=$1', [m[1]]);
   if (!pl) throw new ApiErr('not_found', 404);
+  if (Number(pl.ends_at || 0) > 0 && Number(pl.ends_at) <= now()) throw new ApiErr('poll_ended', 400);
   const ids = [...new Set((Array.isArray(c.body.options) ? c.body.options : []).map(Number).filter((x) => Number.isInteger(x) && x > 0))];
   if (ids.length > pl.max_pick) throw new ApiErr('poll_max', 400);
   await tx(async (t) => {

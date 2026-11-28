@@ -379,3 +379,5 @@ CREATE TABLE IF NOT EXISTS poll_votes (
   PRIMARY KEY (user_id, opt_id)
 );
 CREATE INDEX IF NOT EXISTS poll_votes_post ON poll_votes(post_id);
+
+ALTER TABLE polls ADD COLUMN IF NOT EXISTS ends_at BIGINT NOT NULL DEFAULT 0;

@@ -1914,5 +1914,29 @@
 "n_expired": [
 "Postinganmu telah habis waktunya dan dihapus{r}",
 "Your post has expired and was removed{r}"
+],
+"poll_end": [
+"Waktu selesai voting",
+"Poll end time"
+],
+"poll_end_none": [
+"Tanpa batas",
+"No end"
+],
+"poll_end_set": [
+"Atur waktu",
+"Set time"
+],
+"poll_end_d": [
+"Setelah selesai, voting ditutup dan hasil otomatis terlihat oleh semua orang.",
+"When it ends, voting closes and results are shown to everyone."
+],
+"poll_ended": [
+"Voting selesai",
+"Poll ended"
+],
+"poll_left": [
+"Selesai dalam {t}",
+"Ends in {t}"
 ]
 }
