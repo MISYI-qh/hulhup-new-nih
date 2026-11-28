@@ -1758,5 +1758,161 @@
 "n_badge": [
 "Selamat! Akunmu sekarang punya centang oranye di Hulhup.",
 "Congrats! Your account now has the orange check on Hulhup."
+],
+"poll": [
+"Voting",
+"Poll"
+],
+"poll_title_ph": [
+"Tema voting (opsional)",
+"Poll topic (optional)"
+],
+"poll_opt_n": [
+"Pilihan {n}",
+"Option {n}"
+],
+"poll_add_opt": [
+"Tambah pilihan",
+"Add option"
+],
+"poll_max_l": [
+"Maks. pilihan per orang",
+"Max choices per person"
+],
+"poll_show_l": [
+"Hasil terlihat sebelum memilih",
+"Results visible before voting"
+],
+"poll_show_d": [
+"Kalau mati, orang harus memilih dulu untuk melihat hasil.",
+"If off, people must vote first to see the results."
+],
+"poll_pct": [
+"Persen",
+"Percent"
+],
+"poll_cnt": [
+"Jumlah",
+"Votes"
+],
+"poll_total": [
+"{n} suara",
+"{n} votes"
+],
+"poll_submit": [
+"Kirim pilihan",
+"Submit vote"
+],
+"poll_change": [
+"Ubah pilihan",
+"Change vote"
+],
+"poll_hidden": [
+"Hasil terlihat setelah kamu memilih",
+"Results show after you vote"
+],
+"poll_upto": [
+"Pilih hingga {n}",
+"Choose up to {n}"
+],
+"poll_max_err": [
+"Maksimal {n} pilihan",
+"At most {n} choices"
+],
+"poll_need": [
+"Isi minimal 2 pilihan yang berbeda",
+"Add at least 2 different options"
+],
+"poll_none": [
+"Belum ada suara",
+"No votes yet"
+],
+"exp": [
+"Masa aktif",
+"Lifetime"
+],
+"exp_normal": [
+"Biasa",
+"Normal"
+],
+"exp_custom": [
+"Custom",
+"Custom"
+],
+"exp_normal_d": [
+"Post tetap ada sampai kamu hapus.",
+"The post stays until you delete it."
+],
+"exp_custom_d": [
+"Post terhapus otomatis saat waktunya habis, kamu dapat pengingat sebelum habis.",
+"The post is deleted automatically when time is up. You get a reminder before it ends."
+],
+"exp_min": [
+"menit",
+"min"
+],
+"exp_hour": [
+"jam",
+"hours"
+],
+"exp_day": [
+"hari",
+"days"
+],
+"exp_chip": [
+"Berakhir dalam {t}",
+"Ends in {t}"
+],
+"exp_set": [
+"Berakhir {t} lagi",
+"Ends in {t}"
+],
+"exp_bad": [
+"Isi lama waktu yang valid",
+"Enter a valid duration"
+],
+"pin_title": [
+"Post disematkan",
+"Pinned posts"
+],
+"pin_n": [
+"{n} disematkan",
+"{n} pinned"
+],
+"pinned_tag": [
+"Disematkan",
+"Pinned"
+],
+"cp_ph": [
+"Apa yang mau kamu bagikan?",
+"What do you want to share?"
+],
+"cp_voice": [
+"Suara",
+"Voice"
+],
+"cp_media": [
+"Foto / video",
+"Photo / video"
+],
+"cp_time": [
+"Waktu",
+"Timer"
+],
+"cp_link": [
+"Tautan",
+"Link"
+],
+"cp_more": [
+"Pengaturan lain",
+"More settings"
+],
+"n_expiring": [
+"Postinganmu sebentar lagi habis waktunya{r}",
+"Your post is about to expire{r}"
+],
+"n_expired": [
+"Postinganmu telah habis waktunya dan dihapus{r}",
+"Your post has expired and was removed{r}"
 ]
 }

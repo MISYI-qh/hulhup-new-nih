@@ -8,6 +8,7 @@ import { PBtn, IconBtn, sheet, toast, confirmDlg } from './ui';
 import { AudChip, reportSheet } from './aud';
 import { Avatar, AiTag, ImageEmbed, VideoEmbed, LinkEmbed, PostMedia, QuoteCard, MentionText, Verified, firstUrl, quoteRef } from './rich';
 import { postCode, ORIGIN_URL } from '@/lib/links';
+import { PollView, ExpiryChip, PinTag } from './pollx';
 
 export const postLink = (id: number) => `${ORIGIN_URL}/p/${postCode(id)}`;
 export const commentLink = (post: number, c: number) => `${ORIGIN_URL}/p/${postCode(post)}/c/${c}`;
@@ -202,7 +203,9 @@ export function PostCard({ a, scope, onDeleted }: { a: A; scope?: unknown; onDel
     <div style={{ padding: '8px 8px 0 0' }}><AudChip rand={a.rand} to={a.to} /></div>
     {text ? <div style={{ padding: '10px 8px 0 0' }}><MentionText text={text} hideQuote ptag={a.ptag} /></div> : null}
     <PostMedia text={text} media={a.media} />
+    <PollView a={a} />
     {a.files.length ? <div style={{ paddingRight: 8 }}>{a.bgm ? <BgmBar a={a} /> : <AudioBars a={a} scope={scope} />}</div> : null}
+    <div style={{ display: 'flex', flexWrap: 'wrap', paddingTop: 2 }}>{a.pinned ? <PinTag /> : null}<ExpiryChip a={a} /></div>
     <div style={{ height: 4 }} />
     <PostActions a={a} />
   </article>;

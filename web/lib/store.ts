@@ -32,10 +32,12 @@ export class U {
   }
 }
 export type File = { url: string; secs: number };
+export type PollOpt = { id: number; label: string; votes: number | null };
+export type Poll = { title: string; max: number; show_first: boolean; voted: boolean; mine: number[]; reveal: boolean; total: number | null; options: PollOpt[] };
 export class A {
   id: number; secs: number; created: number; comments: number; desc: string; url: string; vis: string; rand: string; owner: string; ownerName: string; to: string[];
   ownerAvatar: string | null; popup: boolean; pprof: boolean; ownerVerified: boolean; long: boolean; inRand: boolean; inHups: boolean; bgm: boolean; ai: boolean; ownerAvatarAi: boolean;
-  aiKind: string; ownerAvatarAiKind: string; bgmIdx: number; text: string | null; files: File[]; likes: number; plays: number; views: number; liked: boolean; saved: boolean; media: string[]; ptag: boolean; kind: string;
+  aiKind: string; ownerAvatarAiKind: string; bgmIdx: number; text: string | null; files: File[]; likes: number; plays: number; views: number; liked: boolean; saved: boolean; media: string[]; ptag: boolean; kind: string; poll: Poll | null; expiresAt: number; pinned: boolean; pinUntil: number;
   constructor(j: any) {
     this.id = j.id; this.secs = j.secs ?? 0; this.created = j.created ?? 0; this.desc = j.desc ?? ''; this.url = j.url ?? ''; this.vis = j.vis ?? 'public'; this.rand = j.rand ?? 'public';
     this.owner = j.owner; this.ownerName = j.owner_name; this.ownerAvatar = j.owner_avatar ?? null; this.ownerVerified = j.owner_verified === true; this.popup = j.popup === true; this.pprof = j.pprof !== false;
@@ -43,11 +45,11 @@ export class A {
     this.comments = j.comments ?? 0; this.saved = j.saved === true; this.bgm = j.bgm === true; this.ai = j.ai === true; this.ownerAvatarAi = j.owner_avatar_ai === true;
     this.aiKind = `${j.ai_kind ?? (j.ai === true ? 'made' : '')}`; this.ownerAvatarAiKind = `${j.owner_avatar_ai_kind ?? (j.owner_avatar_ai === true ? 'made' : '')}`;
     this.bgmIdx = Number(j.bgm_idx ?? 0); this.text = j.text ?? null; this.to = ((j.to as any[]) ?? []).map((e) => `${e.username}`);
-    this.media = Array.isArray(j.media) ? j.media.map((x: any) => `${x}`) : []; this.ptag = j.ptag === true; this.kind = `${j.kind ?? 'audio'}`;
+    this.media = Array.isArray(j.media) ? j.media.map((x: any) => `${x}`) : []; this.ptag = j.ptag === true; this.kind = `${j.kind ?? 'audio'}`; this.poll = j.poll ?? null; this.expiresAt = Number(j.expires_at ?? 0); this.pinned = j.pinned === true; this.pinUntil = Number(j.pin_until ?? 0);
     this.files = Array.isArray(j.files) ? j.files.map((f: any) => ({ ...f })) : ((j.url ?? '') === '' ? [] : [{ url: j.url, secs: j.secs ?? 0 }]);
   }
   toJson() {
-    return { media: this.media, id: this.id, secs: this.secs, created: this.created, desc: this.desc, url: this.url, vis: this.vis, rand: this.rand, owner: this.owner, owner_name: this.ownerName, owner_avatar: this.ownerAvatar, owner_verified: this.ownerVerified, popup: this.popup, pprof: this.pprof, likes: this.likes, plays: this.plays, views: this.views, liked: this.liked, long: this.long, in_rand: this.inRand, in_hups: this.inHups, comments: this.comments, saved: this.saved, files: this.files, bgm: this.bgm, ai: this.ai, ai_kind: this.aiKind, owner_avatar_ai: this.ownerAvatarAi, owner_avatar_ai_kind: this.ownerAvatarAiKind, bgm_idx: this.bgmIdx, text: this.text, to: this.to.map((u) => ({ username: u })) };
+    return { media: this.media, id: this.id, secs: this.secs, created: this.created, desc: this.desc, url: this.url, vis: this.vis, rand: this.rand, owner: this.owner, owner_name: this.ownerName, owner_avatar: this.ownerAvatar, owner_verified: this.ownerVerified, popup: this.popup, pprof: this.pprof, likes: this.likes, plays: this.plays, views: this.views, liked: this.liked, long: this.long, in_rand: this.inRand, in_hups: this.inHups, comments: this.comments, saved: this.saved, files: this.files, bgm: this.bgm, ai: this.ai, ai_kind: this.aiKind, owner_avatar_ai: this.ownerAvatarAi, owner_avatar_ai_kind: this.ownerAvatarAiKind, bgm_idx: this.bgmIdx, text: this.text, poll: this.poll, expires_at: this.expiresAt, pinned: this.pinned, pin_until: this.pinUntil, kind: this.kind, to: this.to.map((u) => ({ username: u })) };
   }
 }
 export const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -229,6 +231,7 @@ export class Store {
       case 'rel_req': return this.t('n_rel_req').replace('{r}', this.relName(extra)); case 'rel_ok': return this.t('n_rel_ok').replace('{r}', this.relName(extra));
       case 'phipop_code': return this.t('n_phipop_code').replace('{c}', extra);
       case 'takedown_post': return this.t('n_td_post').replace('{r}', extra); case 'takedown_comment': return this.t('n_td_comment').replace('{r}', extra);
+      case 'expiring': return this.t('n_expiring').replace('{r}', extra ? `: ${extra}` : ''); case 'expired': return this.t('n_expired').replace('{r}', extra ? `: ${extra}` : '');
       default: return this.t('n_follow');
     }
   }

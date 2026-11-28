@@ -10,6 +10,7 @@ import { A, ApiErr, Api, store, useStore } from '@/lib/store';
 import { mp4Meta, packMeta, prepImage, prepVideo } from '@/lib/mediaprep';
 import { packAvatar } from './screens2';
 import { kindOfUrl } from '@/lib/links';
+import { ExpiryEditor, PollEditor, expMs, newExp, newPoll, pollError, leftText, ExpiryChip, PollView, PinTag, type ExpDraft, type PollDraft } from './pollx';
 
 // ---------- kolom media (hanya URL yang disimpan) ----------
 function MediaEditor({ items, set }: { items: string[]; set: (v: string[]) => void }) {
@@ -128,7 +129,9 @@ export function PostScreen({ id, comment, seed }: { id: number; comment?: number
       <OwnerRow a={p} />
       {text ? <div style={{ paddingTop: 14, userSelect: 'text' }}><MentionText text={text} hideQuote ptag={p.ptag} style={{ fontSize: 17, lineHeight: 1.55 }} /></div> : null}
       <PostMedia text={text} media={p.media} />
+      <PollView a={p} />
       {p.files.length ? <div style={{ paddingTop: 6 }}>{p.bgm ? <BgmBar a={p} /> : <AudioBars a={p} scope={scope.current} />}</div> : null}
+      <div style={{ display: 'flex', flexWrap: 'wrap' }}>{p.pinned ? <PinTag /> : null}<ExpiryChip a={p} /></div>
       <div style={{ height: 10 }} /><PostActions a={p} onComments={() => ta.current?.focus()} />
       <hr style={{ border: 0, borderTop: '1px solid var(--hair)', margin: '12px 0' }} />
       <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 10 }}>{s.t('comments')} ({p.comments})</div>
@@ -206,13 +209,14 @@ function AccountPick({ init, close }: { init: Record<string, any>; close: (v?: R
 export function ComposeScreen() {
   const s = useStore(); const n = useNav();
   const [text, setText] = useState(''), [clip, setClip] = useState<Clip | null>(null), [playing, setPlaying] = useState(false), [pprof, setPprof] = useState(true), [pm, setPm] = useState<{ kind: 'image' | 'video'; blob: Blob; secs: number; url: string } | null>(null), [slot, setSlot] = useState<{ open: boolean; reset_at: number; holder: string | null } | null>(null), [prep, setPrep] = useState(false), [aiC, setAiC] = useState(true), [aiV, setAiV] = useState(true), [busy, setBusy] = useState(false), [bgm, setBgm] = useState(false), [media, setMedia] = useState<string[]>([]), [cq, setCq] = useState<string | null>(null);
+  const [mediaOpen, setMediaOpen] = useState(false), [linkOpen, setLinkOpen] = useState(false), [more, setMore] = useState(false), [poll, setPoll] = useState<PollDraft | null>(null), [exp, setExp] = useState<ExpDraft>(newExp()), [expOpen, setExpOpen] = useState(false);
   useEffect(() => { try { const u = new URLSearchParams(location.search).get('quote'); if (u && quoteRef(u)) setCq(u); } catch {} }, []);
   const onText = (v: string) => { if (!cq) { const r = pullQuote(v); if (r.quote) { setCq(r.quote); setText(r.text); return; } } setText(v); };
   const [rand, setRand] = useState('public'), [picked, setPicked] = useState<Record<string, any>>({}); const au = useRef<HTMLAudioElement | null>(null);
   useEffect(() => () => { au.current?.pause(); }, []);
   const lock = useRef(false);
   if (!s.me) return <Screen title={s.t('new_post')}>{s.ready ? <NeedLogin /> : <Loader k="form" />}</Screen>;
-  const add = async () => { const c = await sheet<Clip>((close) => <RecordSheet close={close as any} />); if (!c) return; au.current?.pause(); setPlaying(false); setClip(c); };
+  const add = async () => { const c = await sheet<Clip>((close) => <RecordSheet close={close as any} />); if (!c) return; au.current?.pause(); setPlaying(false); setClip(c); setMediaOpen(false); };
   const play = () => {
     if (!clip) return; if (playing) { au.current?.pause(); setPlaying(false); return; }
     const a = au.current ?? (au.current = new Audio()); a.src = URL.createObjectURL(clip.blob); a.onended = () => setPlaying(false); a.play().catch(() => {}); setPlaying(true);
@@ -228,17 +232,20 @@ export function ComposeScreen() {
       const url = URL.createObjectURL(r.blob);
       // foto: kirim juga bahan asli untuk detektor AI (Deks), sama seperti foto profil
       const blob = kind === 'image' ? new Blob([packAvatar(new Uint8Array(await f.arrayBuffer()), new Uint8Array(await r.blob.arrayBuffer())) as BlobPart]) : new Blob([packMeta(await mp4Meta(f), new Uint8Array(await r.blob.arrayBuffer())) as BlobPart]);
-      setPm({ kind, blob, secs: r.secs, url }); }
+      setPm({ kind, blob, secs: r.secs, url }); setMediaOpen(false); }
     catch (e: any) { toast(e?.message === 'too_big' ? s.t('mp_big') : s.t('mp_fail'), { bad: true }); }
     setPrep(false);
   };
   const submit = async () => {
     if (lock.current) return; const t = (text.trim() + (cq ? `${text.trim() ? '\n' : ''}${cq}` : '')).trim();
-    if (!clip && !pm && !t && !media.length) { toast(s.t('e_empty'), { bad: true }); return; }
+    if (!clip && !pm && !t && !media.length && !poll) { toast(s.t('e_empty'), { bad: true }); return; }
+    if (poll && pollError(poll)) { toast(s.t('poll_need'), { bad: true }); return; }
+    const em = expMs(exp); if (exp.custom && !em) { toast(s.t('exp_bad'), { bad: true }); setExpOpen(true); return; }
     if (audSplit(rand).includes('accounts') && !Object.keys(picked).length) { toast(s.t('e_need_accounts'), { bad: true }); return; }
     lock.current = true; setBusy(true); let id: number | null = null;
     try {
-      const j = await Api.req('POST', '/posts', { text: t, audios: clip || pm ? 1 : 0, ...(clip ? { bgm } : {}), ...(pm ? { media_kind: pm.kind } : {}), media, pprof, ai_comment: aiC && aiV, ai_view: aiV, rand: audSplit(rand), to: Object.keys(picked) });
+      const pl = poll ? { title: poll.title.trim(), options: poll.opts.map((x) => x.trim()).filter(Boolean), max: poll.max, show_first: poll.showFirst } : undefined;
+      const j = await Api.req('POST', '/posts', { text: t, audios: clip || pm ? 1 : 0, ...(clip ? { bgm } : {}), ...(pm ? { media_kind: pm.kind } : {}), media, pprof, ai_comment: aiC && aiV, ai_view: aiV, rand: audSplit(rand), to: Object.keys(picked), ...(pl ? { poll: pl } : {}), ...(em ? { expires_in: em } : {}) });
       id = Number(j.id);
       if (clip) await Api.send(`/posts/${id}/audio?secs=${clip.secs}`, clip.blob, 'application/octet-stream');
       else if (pm) await Api.send(`/posts/${id}/audio?secs=${pm.secs}`, pm.blob, 'application/octet-stream');
@@ -246,39 +253,47 @@ export function ComposeScreen() {
     } catch (e) { if (id != null) { try { await Api.req('DELETE', `/audios/${id}`); } catch {} } toast(s.err(e), { bad: true }); lock.current = false; setBusy(false); }
   };
   const hasAcc = audSplit(rand).includes('accounts');
-  return <Screen title={s.t('new_post')}><div style={{ padding: '4px 22px 40px' }}>
-    {!clip ? (pm ? null : <button className="tap" onClick={busy ? undefined : add} style={{ width: '100%', padding: '26px 18px', borderRadius: 20, border: '1.4px solid color-mix(in srgb, var(--ink) 25%, transparent)', textAlign: 'center' }}>
-      <span style={{ width: 54, height: 54, borderRadius: '50%', background: 'var(--btn)', color: 'var(--cream)', display: 'inline-grid', placeItems: 'center' }}><Icon n="mic_rounded" size={26} /></span>
-      <div style={{ fontWeight: 800, fontSize: 16, marginTop: 12 }}>{s.t('add_audio')}</div><div style={{ color: 'var(--sub)', fontSize: 12.5, marginTop: 3 }}>{s.t('audio_req')}</div></button>)
-      : <div className="row2" style={{ padding: '10px 6px 10px 10px', borderRadius: 20, border: '1.4px solid color-mix(in srgb, var(--ink) 50%, transparent)', gap: 12 }}>
-        <button className="tap" aria-label={playing ? 'Jeda' : 'Putar'} onClick={play} style={{ width: 44, height: 44, borderRadius: playing ? 13 : 22, background: playing ? 'var(--brand)' : 'var(--btn)', color: playing ? '#fff' : 'var(--cream)', display: 'grid', placeItems: 'center', flex: 'none' }}><Icon n={playing ? 'pause_rounded' : 'play_arrow_rounded'} size={24} /></button>
-        <div style={{ flex: 1, minWidth: 0 }}><Wave seed={clip.blob.size} height={34} /></div>
-        <b style={{ fontSize: 13.5 }}>{mmss(clip.secs)}</b><IconBtn n="refresh_rounded" color="var(--sub)" onClick={add} /><IconBtn n="close_rounded" color="var(--sub)" onClick={() => { au.current?.pause(); setClip(null); setPlaying(false); setBgm(false); }} /></div>}
-    {clip ? <div className="row2" style={{ paddingTop: 14, gap: 12 }}><div style={{ flex: 1 }}><div style={{ fontWeight: 600, fontSize: 16 }}>{s.t('bgm_label')}</div><div style={{ color: 'var(--sub)', fontSize: 12.5 }}>{s.t('bgm_note')}</div></div><Toggle v={bgm} on={setBgm} /></div> : null}
-    {!clip ? <div style={{ marginTop: 12 }}>
-      {pm ? <div style={{ position: 'relative', borderRadius: 20, overflow: 'hidden', background: 'var(--soft)' }}>
-        {pm.kind === 'image' ? <img src={pm.url} alt="" style={{ width: '100%', display: 'block', maxHeight: 360, objectFit: 'cover' }} /> : <video src={pm.url} muted loop autoPlay playsInline style={{ width: '100%', display: 'block', maxHeight: 360 }} />}
-        <button className="tap" aria-label="Hapus" onClick={() => { URL.revokeObjectURL(pm.url); setPm(null); }} style={{ position: 'absolute', top: 8, right: 8, width: 36, height: 36, borderRadius: 18, background: 'rgba(0,0,0,.55)', color: '#fff', display: 'grid', placeItems: 'center' }}><Icon n="close_rounded" size={20} /></button>
-      </div> : slot && !slot.open ? <div style={{ color: 'var(--sub)', fontSize: 13, lineHeight: 1.4, padding: '4px 2px' }}>{s.t('mp_taken').replace('{u}', slot.holder ? `@${slot.holder}` : '').replace('{d}', new Date(slot.reset_at).toLocaleDateString())}</div>
-        : <div className="row2" style={{ gap: 6, flexWrap: 'wrap' }}>
-          {([['image', true], ['image', false], ['video', true], ['video', false]] as const).map(([k, cam]) => <label key={k + cam} className="tap" style={{ flex: '1 1 44%', height: 46, borderRadius: 23, background: 'var(--soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontWeight: 800, fontSize: 13, opacity: prep || busy ? .5 : 1 }}>
+  const slotTaken = !!slot && !slot.open;
+  const tool = (icon: string, label: string, on: boolean, click: () => void, off = false) => <button key={icon} className={`tap cp-t${on ? ' on' : ''}`} aria-label={label} title={label} disabled={off || busy} onClick={click}><Icon n={icon} size={22} /></button>;
+  const setRow = (title: string, sub: string | null, el: React.ReactNode, dim = false) => <div className="cp-set" style={{ opacity: dim ? .5 : 1 }}><div className="tt">{title}{sub ? <small>{sub}</small> : null}</div>{el}</div>;
+  return <Screen title={s.t('new_post')}><div className="cp">
+    <textarea className="cp-ta" rows={4} value={text} autoFocus placeholder={s.t('cp_ph')} onChange={(e) => onText(e.target.value)} />
+    <MentionBar value={text} onPick={onText} />
+    {cq ? <QuoteSlot url={cq} onClear={() => setCq(null)} /> : null}
+    {clip ? <div className="cp-att"><div className="row2" style={{ gap: 12 }}>
+      <button className="tap" aria-label={playing ? 'Jeda' : 'Putar'} onClick={play} style={{ width: 44, height: 44, borderRadius: playing ? 13 : 22, background: playing ? 'var(--brand)' : 'var(--btn)', color: playing ? '#fff' : 'var(--cream)', display: 'grid', placeItems: 'center', flex: 'none' }}><Icon n={playing ? 'pause_rounded' : 'play_arrow_rounded'} size={24} /></button>
+      <div style={{ flex: 1, minWidth: 0 }}><Wave seed={clip.blob.size} height={34} /></div>
+      <b style={{ fontSize: 13.5 }}>{mmss(clip.secs)}</b><IconBtn n="refresh_rounded" color="var(--sub)" onClick={add} /><IconBtn n="close_rounded" color="var(--sub)" onClick={() => { au.current?.pause(); setClip(null); setPlaying(false); setBgm(false); }} /></div>
+      <div className="cp-set" style={{ paddingBottom: 0 }}><div className="tt">{s.t('bgm_label')}<small>{s.t('bgm_note')}</small></div><Toggle v={bgm} on={setBgm} /></div></div> : null}
+    {pm ? <div style={{ position: 'relative', borderRadius: 22, overflow: 'hidden', background: 'var(--soft)', marginTop: 12 }}>
+      {pm.kind === 'image' ? <img src={pm.url} alt="" style={{ width: '100%', display: 'block', maxHeight: 380, objectFit: 'cover' }} /> : <video src={pm.url} muted loop autoPlay playsInline style={{ width: '100%', display: 'block', maxHeight: 380 }} />}
+      <button className="tap" aria-label="Hapus" onClick={() => { URL.revokeObjectURL(pm.url); setPm(null); }} style={{ position: 'absolute', top: 10, right: 10, width: 34, height: 34, borderRadius: 17, background: 'rgba(0,0,0,.55)', color: '#fff', display: 'grid', placeItems: 'center' }}><Icon n="close_rounded" size={19} /></button></div> : null}
+    {mediaOpen && !pm && !clip ? <div className="cp-att">
+      {slotTaken ? <div style={{ color: 'var(--sub)', fontSize: 13, lineHeight: 1.45 }}>{s.t('mp_taken').replace('{u}', slot!.holder ? `@${slot!.holder}` : '').replace('{d}', new Date(slot!.reset_at).toLocaleDateString())}</div>
+        : <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          {([['image', true], ['image', false], ['video', true], ['video', false]] as const).map(([k, cam]) => <label key={k + cam} className="tap" style={{ height: 46, borderRadius: 23, background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, fontWeight: 700, fontSize: 13.5, opacity: prep || busy ? .5 : 1 }}>
             <Icon n={cam ? (k === 'image' ? 'photo_camera_rounded' : 'videocam_outlined') : (k === 'image' ? 'image_outlined' : 'video_library_rounded')} size={19} />{prep ? '…' : s.t(`mp_${k === 'image' ? 'photo' : 'video'}${cam ? '_cam' : '_gal'}`)}
             <input type="file" accept={k === 'image' ? 'image/*' : 'video/*'} {...(cam ? { capture: 'environment' } : {})} hidden disabled={prep || busy} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; pickMedia(k, f); }} /></label>)}
-        </div>}
-      {slot?.open && !pm ? <div style={{ color: 'var(--sub)', fontSize: 12, marginTop: 6 }}>{s.t('mp_note')}</div> : null}
-    </div> : null}
-    <div style={{ height: 14 }} />
-    <div className="sheetfield"><textarea rows={4} value={text} placeholder={s.t('write_hups')} onChange={(e) => onText(e.target.value)} /></div>
-    {cq ? <QuoteSlot url={cq} onClear={() => setCq(null)} /> : null}
-    <MediaEditor items={media} set={setMedia} />
-    <div style={{ height: 6 }} /><MentionBar value={text} onPick={onText} />
-    <div style={{ color: 'var(--sub)', fontSize: 12.5, margin: '0 0 14px 6px' }}>{s.t('tag_hint')}</div>
-    <div className="row2" style={{ alignItems: 'flex-start', gap: 10, background: 'var(--soft)', borderRadius: 18, padding: '12px 14px', margin: '0 0 16px', color: 'var(--sub)', fontSize: 13, lineHeight: 1.45 }}><Icon n="info_outline_rounded" size={18} color="var(--sub)" style={{ flex: 'none', marginTop: 1 }} /><span>{s.t('media_hint')}</span></div>
-    <div className="row2" style={{ paddingBottom: 14, gap: 12 }}><div style={{ flex: 1, fontWeight: 600, fontSize: 16 }}>{s.t('pprof')}</div><Toggle v={pprof} on={setPprof} /></div>
-    <div className="row2" style={{ paddingBottom: 14, gap: 12 }}><div style={{ flex: 1, fontWeight: 600, fontSize: 16 }}>{s.t('ai_see')}<div style={{ fontWeight: 500, fontSize: 12.5, color: 'var(--sub)' }}>{s.t('ai_see_d')}</div></div><Toggle v={aiV} on={(v) => { setAiV(v); if (!v) setAiC(false); }} /></div>
-    <div className="row2" style={{ paddingBottom: 14, gap: 12, opacity: aiV ? 1 : .5 }}><div style={{ flex: 1, fontWeight: 600, fontSize: 16 }}>{s.t('ai_cmt')}<div style={{ fontWeight: 500, fontSize: 12.5, color: 'var(--sub)' }}>{s.t('ai_cmt_d')}</div></div><Toggle v={aiC && aiV} on={(v) => aiV && setAiC(v)} /></div>
-    <Pick label={s.t('who_see')} value={rand} opts={withLabels(uploadAud)} on={async (v) => { setRand(v); if (audSplit(v).includes('accounts') && !Object.keys(picked).length) { const r = await sheet<Record<string, any>>((close) => <AccountPick init={picked} close={close as any} />); if (r) { setPicked(r); if (!Object.keys(r).length) { const l = audSplit(v).filter((x) => x !== 'accounts'); setRand(l.length ? l.join(',') : 'public'); } } } }} />
-    {hasAcc ? <button className="tap srow" style={{ marginTop: 10, marginBottom: 0, fontSize: 15 }} onClick={pickAcc}><Icon n="person_search_outlined" size={20} /><span style={{ flex: 1 }}>{s.t('pick_acc_n').replace('{n}', `${Object.keys(picked).length}`)}</span><Icon n="edit_outlined" size={18} color="var(--sub)" /></button> : null}
-    <div style={{ height: 26 }} /><PBtn loading={busy} icon="arrow_upward_rounded" onClick={submit}>{s.t('upload')}</PBtn>
-    <div style={{ textAlign: 'center', color: 'var(--sub)', fontSize: 13, marginTop: 12 }}>{s.t('noedit')}</div></div></Screen>;
+        </div>}</div> : null}
+    {poll ? <PollEditor v={poll} set={setPoll} onClose={() => setPoll(null)} /> : null}
+    {expOpen ? <ExpiryEditor v={exp} set={setExp} onClose={() => setExpOpen(false)} /> : exp.custom && expMs(exp) ? <button className="tap pxchip" style={{ marginTop: 12 }} onClick={() => setExpOpen(true)}><Icon n="schedule_rounded" size={14} />{s.t('exp_set').replace('{t}', leftText(expMs(exp)!))}</button> : null}
+    {linkOpen || media.length ? <MediaEditor items={media} set={(v) => { setMedia(v); if (!v.length) setLinkOpen(false); }} /> : null}
+    <div className="cp-tools">
+      {tool('mic_rounded', s.t('cp_voice'), !!clip, add, !!pm)}
+      {tool('image_outlined', s.t('cp_media'), mediaOpen || !!pm, () => setMediaOpen((v) => !v), !!clip)}
+      {tool('poll_rounded', s.t('poll'), !!poll, () => setPoll((p) => (p ? null : newPoll())))}
+      {tool('schedule_rounded', s.t('cp_time'), expOpen || (exp.custom && !!expMs(exp)), () => setExpOpen((v) => !v))}
+      {tool('link_rounded', s.t('cp_link'), linkOpen || media.length > 0, () => setLinkOpen((v) => !v))}
+    </div>
+    <div className="cp-sec">
+      <Pick label={s.t('who_see')} value={rand} opts={withLabels(uploadAud)} on={async (v) => { setRand(v); if (audSplit(v).includes('accounts') && !Object.keys(picked).length) { const r = await sheet<Record<string, any>>((close) => <AccountPick init={picked} close={close as any} />); if (r) { setPicked(r); if (!Object.keys(r).length) { const l = audSplit(v).filter((x) => x !== 'accounts'); setRand(l.length ? l.join(',') : 'public'); } } } }} />
+      {hasAcc ? <button className="tap srow" style={{ marginTop: 10, marginBottom: 0, fontSize: 15 }} onClick={pickAcc}><Icon n="person_search_outlined" size={20} /><span style={{ flex: 1 }}>{s.t('pick_acc_n').replace('{n}', `${Object.keys(picked).length}`)}</span><Icon n="edit_outlined" size={18} color="var(--sub)" /></button> : null}
+      <button className="tap cp-more" onClick={() => setMore((v) => !v)}><Icon n="tune_rounded" size={20} /><span style={{ flex: 1 }}>{s.t('cp_more')}</span><Icon n="expand_more_rounded" size={22} style={{ transform: more ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} /></button>
+      {more ? <div>
+        {setRow(s.t('pprof'), null, <Toggle v={pprof} on={setPprof} />)}
+        {setRow(s.t('ai_see'), s.t('ai_see_d'), <Toggle v={aiV} on={(v) => { setAiV(v); if (!v) setAiC(false); }} />)}
+        {setRow(s.t('ai_cmt'), s.t('ai_cmt_d'), <Toggle v={aiC && aiV} on={(v) => aiV && setAiC(v)} />, !aiV)}
+      </div> : null}
+    </div>
+    <div style={{ height: 22 }} /><PBtn loading={busy} icon="arrow_upward_rounded" onClick={submit}>{s.t('upload')}</PBtn></div></Screen>;
 }

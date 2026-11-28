@@ -5,6 +5,8 @@ import { Empty, Loader, PBtn } from './ui';
 import { PostCard, bgmUrl } from './post';
 import { HIcon } from './Icon';
 import LogoRefresh from './LogoRefresh';
+import { PinPill } from './pollx';
+import { sheet } from './ui';
 
 /** Umpan Hups: muat awal, segarkan diam-diam tiap 6 dtk, muat lagi saat menggulir, backsound otomatis untuk post yang di tengah layar. */
 /** Ingat daftar & posisi gulir: kembali dari profil/post (tombol back) mendarat di tempat terakhir, bukan dari atas. */
@@ -17,7 +19,7 @@ export function HupsFeed({ filter, base = '/hups', header }: { filter: string; b
   const path = (extra = '') => `${base}?f=${encodeURIComponent(filter)}${extra}`;
 
   const load = useCallback(async () => {
-    try { const j = await Api.req('GET', path()); setItems((j.items as any[]).map((e) => new A(e))); next.current = Number(j.next) || 0; setError(null); } catch (e) { setError(store.err(e)); }
+    try { const j = await Api.req('GET', path()); setItems([...((j.pins ?? []) as any[]), ...(j.items as any[])].map((e) => new A(e))); next.current = Number(j.next) || 0; setError(null); } catch (e) { setError(store.err(e)); }
     setLoading(false);
   }, [filter, base]);
   const ck = `${base}|${filter}|${s.me?.username ?? ''}`;
@@ -38,10 +40,10 @@ export function HupsFeed({ filter, base = '/hups', header }: { filter: string; b
     if (document.visibilityState !== 'visible' || loading || busy.current || more.current) return;
     busy.current = true;
     try {
-      const j = await Api.req('GET', path()); const fresh = (j.items as any[]).map((e) => new A(e)); if (!alive.current) return;
+      const j = await Api.req('GET', path()); const fresh = [...((j.pins ?? []) as any[]), ...(j.items as any[])].map((e) => new A(e)); if (!alive.current) return;
       const atTop = window.scrollY < 60;
       if (atTop) { setItems(fresh); next.current = Number(j.next) || 0; }
-      else { for (const f of fresh) for (const o of itemsRef.current) if (o.id === f.id) { o.likes = f.likes; o.comments = f.comments; o.liked = f.liked; o.saved = f.saved; } store.poke(); }
+      else { for (const f of fresh) for (const o of itemsRef.current) if (o.id === f.id) { o.likes = f.likes; o.comments = f.comments; o.liked = f.liked; o.saved = f.saved; o.poll = f.poll; } store.poke(); }
     } catch {}
     busy.current = false;
   }, [filter, base, loading]);
@@ -75,7 +77,11 @@ export function HupsFeed({ filter, base = '/hups', header }: { filter: string; b
 
   if (loading) return <Loader />;
   if (error) return <Empty icon="cloud_off_rounded" text={error} action={<div style={{ width: 160 }}><PBtn onClick={() => { setLoading(true); load(); }}>{s.t('retry')}</PBtn></div>} />;
+  const pins = items.filter((a) => a.pinned);
+  const openPins = () => sheet<void>((close) => <div style={{ padding: '0 4px 12px', maxHeight: '70vh', overflowY: 'auto' }}><div style={{ fontWeight: 800, fontSize: 18, padding: '2px 12px 10px' }}>{s.t('pin_title')}</div>
+    {pins.map((a) => <PostCard key={a.id} a={a} scope={scope.current} onDeleted={() => { setItems((c) => c.filter((e) => e.id !== a.id)); close(undefined as any); }} />)}</div>);
   return <LogoRefresh onRefresh={load}><div ref={sc} style={{ padding: '6px 16px 110px' }}>
+    <PinPill n={pins.length} onOpen={openPins} />
     {header}
     {!items.length ? <div style={{ paddingTop: 60 }}><div className="empty"><div className="ic"><HIcon k="hups" size={32} color="var(--sub)" /></div><div>{s.t('no_hups')}</div></div></div>
       : items.map((a, i) => <div key={a.id} className="rise" style={{ animationDelay: `${(i < 8 ? i : 0) * 80}ms` }}><PostCard a={a} scope={scope.current} onDeleted={() => setItems((c) => c.filter((e) => e.id !== a.id))} /></div>)}
