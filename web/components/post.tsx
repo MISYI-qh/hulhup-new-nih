@@ -6,7 +6,7 @@ import { Icon, HIcon } from './Icon';
 import { Api, store, useStore, type A } from '@/lib/store';
 import { PBtn, IconBtn, sheet, toast, confirmDlg } from './ui';
 import { AudChip, reportSheet } from './aud';
-import { Avatar, AiTag, LinkEmbed, PostMedia, QuoteCard, MentionText, Verified, firstUrl, quoteRef } from './rich';
+import { Avatar, AiTag, ImageEmbed, VideoEmbed, LinkEmbed, PostMedia, QuoteCard, MentionText, Verified, firstUrl, quoteRef } from './rich';
 import { postCode, ORIGIN_URL } from '@/lib/links';
 
 export const postLink = (id: number) => `${ORIGIN_URL}/p/${postCode(id)}`;
@@ -112,47 +112,14 @@ export function FileBar({ keyId, url, secs, scope, onStart }: { keyId: number; u
 }
 export const fileKey = (a: A, i: number) => (i === 0 ? a.id : -(a.id * 20 + i));
 export const bgmUrl = (a: A) => a.files[Math.min(a.files.length - 1, Math.max(0, a.bgmIdx))].url;
-/** Foto/video post: berkas diambil dengan sesi login, video senyap berulang, ketuk untuk bunyi/jeda. */
+/** Foto/video post (upload langsung): berkas diambil dengan sesi login, lalu tampil PERSIS seperti media dari URL (ImageEmbed / VideoEmbed). */
 export function MediaView({ a }: { a: A }) {
   const [src, setSrc] = useState<string | null>(null); const [err, setErr] = useState(false);
-  const vid = useRef<HTMLVideoElement>(null);
-  // video: jeda & bisukan saat keluar layar, mulai lagi (senyap) saat terlihat; dilepas = berhenti total
-  useEffect(() => {
-    const v = vid.current; if (!v) return; let io: IntersectionObserver | null = null;
-    if (typeof IntersectionObserver !== 'undefined') { io = new IntersectionObserver(([e]) => { if (e.isIntersecting) v.play().catch(() => {}); else { v.pause(); v.muted = true; } }, { threshold: 0.25 }); io.observe(v); }
-    return () => { io?.disconnect(); v.pause(); v.muted = true; v.removeAttribute('src'); v.load(); };
-  }, [src]);
   useEffect(() => { let u = ''; let live = true; Api.bytes(a.files[0]?.url ?? a.url).then((b) => { if (!live) return; if (b) { u = URL.createObjectURL(b); setSrc(u); } else setErr(true); }).catch(() => live && setErr(true)); return () => { live = false; if (u) URL.revokeObjectURL(u); }; }, [a.id]);
-  const [big, setBig] = useState(false);
-  useEffect(() => { if (!big) return; const k = (e: KeyboardEvent) => e.key === 'Escape' && setBig(false); addEventListener('keydown', k); const o = document.body.style.overflow; document.body.style.overflow = 'hidden'; return () => { removeEventListener('keydown', k); document.body.style.overflow = o; }; }, [big]);
-  const box = { borderRadius: 18, overflow: 'hidden', background: 'var(--soft)', minHeight: 120, marginTop: 6, position: 'relative', cursor: 'zoom-in' } as const;
-  if (err) return <div style={{ ...box, display: 'grid', placeItems: 'center', color: 'var(--sub)' }}><Icon n="broken_image_outlined" size={28} /></div>;
-  if (!src) return <div style={{ ...box, aspectRatio: '4/3' }} />;
-  return <div style={box} onClick={(e) => { e.stopPropagation(); setBig(true); }}>{a.kind === 'video'
-    ? <video ref={vid} src={src} muted loop autoPlay playsInline controls={false} style={{ width: '100%', display: 'block', maxHeight: 520 }} />
-    : <img src={src} alt="" style={{ width: '100%', display: 'block', maxHeight: 520, objectFit: 'cover' }} />}
-    {a.kind === 'video' ? <div style={{ position: 'absolute', right: 10, bottom: 10, width: 34, height: 34, borderRadius: 17, background: 'rgba(0,0,0,.55)', color: '#fff', display: 'grid', placeItems: 'center' }}><Icon n="play_arrow_rounded" size={22} /></div> : null}
-    {a.ai ? <div style={{ padding: '6px 10px' }} onClick={(e) => e.stopPropagation()}><AiTag label={store.t(a.kind === 'video' ? (a.aiKind === 'edited' ? 'ai_video_edit' : 'ai_video') : (a.aiKind === 'edited' ? 'ai_photo_edit' : 'ai_photo'))} /></div> : null}
-    {big ? <div onClick={(e) => { e.stopPropagation(); setBig(false); }} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.94)', display: 'grid', placeItems: 'center', cursor: 'zoom-out' }}>
-      <ZoomBox>{a.kind === 'video' ? <video src={src} autoPlay loop playsInline controls style={{ maxWidth: '100vw', maxHeight: '100vh', display: 'block' }} /> : <img src={src} alt="" draggable={false} style={{ maxWidth: '100vw', maxHeight: '100vh', objectFit: 'contain', display: 'block' }} />}</ZoomBox>
-      <button className="tap" aria-label="Tutup" onClick={(e) => { e.stopPropagation(); setBig(false); }} style={{ position: 'fixed', top: 'max(14px, env(safe-area-inset-top))', right: 14, width: 42, height: 42, borderRadius: 21, background: 'rgba(255,255,255,.18)', color: '#fff', display: 'grid', placeItems: 'center' }}><Icon n="close_rounded" size={24} /></button>
-    </div> : null}</div>;
-}
-/** Zoom: cubit 2 jari, roda mouse, ketuk 2x; geser saat diperbesar. */
-function ZoomBox({ children }: { children: React.ReactNode }) {
-  const [t, setT] = useState({ s: 1, x: 0, y: 0 }); const T = useRef(t); T.current = t;
-  const pts = useRef(new Map<number, { x: number; y: number }>()); const last = useRef({ d: 0, x: 0, y: 0, tap: 0 });
-  const set = (n: { s: number; x: number; y: number }) => { const s = Math.min(6, Math.max(1, n.s)); setT(s === 1 ? { s: 1, x: 0, y: 0 } : { s, x: n.x, y: n.y }); };
-  const dist = () => { const p = [...pts.current.values()]; return p.length > 1 ? Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) : 0; };
-  return <div onClick={(e) => e.stopPropagation()}
-    onWheel={(e) => set({ ...T.current, s: T.current.s * (e.deltaY < 0 ? 1.15 : 1 / 1.15) })}
-    onDoubleClick={() => set(T.current.s > 1 ? { s: 1, x: 0, y: 0 } : { s: 2.5, x: 0, y: 0 })}
-    onPointerDown={(e) => { pts.current.set(e.pointerId, { x: e.clientX, y: e.clientY }); last.current.d = dist(); last.current.x = e.clientX; last.current.y = e.clientY; }}
-    onPointerMove={(e) => { if (!pts.current.has(e.pointerId)) return; pts.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (pts.current.size > 1) { const d = dist(); if (last.current.d) set({ ...T.current, s: T.current.s * d / last.current.d }); last.current.d = d; }
-      else if (T.current.s > 1) { set({ ...T.current, x: T.current.x + e.clientX - last.current.x, y: T.current.y + e.clientY - last.current.y }); last.current.x = e.clientX; last.current.y = e.clientY; } }}
-    onPointerUp={(e) => { pts.current.delete(e.pointerId); last.current.d = 0; }} onPointerCancel={(e) => { pts.current.delete(e.pointerId); last.current.d = 0; }}
-    style={{ touchAction: 'none', transform: `translate(${t.x}px,${t.y}px) scale(${t.s})`, transition: pts.current.size ? 'none' : 'transform .15s', cursor: t.s > 1 ? 'grab' : 'zoom-in' }}>{children}</div>;
+  if (err) return <div className="embed" style={{ display: 'grid', placeItems: 'center', height: 120, marginRight: 8, color: 'var(--sub)' }}><Icon n="broken_image_outlined" size={28} /></div>;
+  if (!src) return <div className="embed" style={{ marginRight: 8, aspectRatio: '4/3', background: 'var(--soft)' }} />;
+  return <div>{a.kind === 'video' ? <VideoEmbed url={src} /> : <ImageEmbed src={src} orig="" />}
+    {a.ai ? <AiTag label={store.t(a.kind === 'video' ? (a.aiKind === 'edited' ? 'ai_video_edit' : 'ai_video') : (a.aiKind === 'edited' ? 'ai_photo_edit' : 'ai_photo'))} /> : null}</div>;
 }
 export function AudioBars({ a, scope }: { a: A; scope?: unknown }) {
   if (a.kind === 'image' || a.kind === 'video') return <MediaView a={a} />;

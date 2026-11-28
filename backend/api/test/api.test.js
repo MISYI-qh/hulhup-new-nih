@@ -490,3 +490,39 @@ test('phipop v2: tools hanya publik, tag khusus, relationship, chat async, kelol
   assert.equal(cr2.skipped, true); // satu kali per slot per hari
   delete globalThis.__phipopGen;
 });
+
+test('voting, masa aktif, dan pin admin', async () => {
+  const { q } = await import('../lib/db.js');
+  const adm = await reg('admvt'); const a = await reg('vta'); const b = await reg('vtb');
+  await q(`update users set role='admin' where username='admvt'`);
+  // poll tidak valid
+  assert.equal((await call('POST', '/posts', { token: a, body: { text: 'x', audios: 0, poll: { options: ['satu'] } } })).error, 'poll_bad');
+  assert.equal((await call('POST', '/posts', { token: a, body: { text: 'x', audios: 0, poll: { options: ['a', 'A'] } } })).error, 'poll_dup');
+  // poll maks 2, hasil disembunyikan sebelum memilih
+  const p = await call('POST', '/posts', { token: a, body: { audios: 0, poll: { title: 'Makan apa?', options: ['nasi', 'mie', 'roti'], max: 2, show_first: false }, expires_in: 3600000 } });
+  assert.ok(p.id);
+  let v = (await call('GET', `/posts/${p.id}`, { token: b })).post;
+  assert.equal(v.poll.title, 'Makan apa?'); assert.equal(v.poll.reveal, false); assert.equal(v.poll.options[0].votes, null); assert.ok(v.expires_at > 0);
+  const ids = v.poll.options.map((o) => o.id);
+  assert.equal((await call('POST', `/posts/${p.id}/vote`, { token: b, body: { options: ids } })).error, 'poll_max');
+  const r1 = await call('POST', `/posts/${p.id}/vote`, { token: b, body: { options: [ids[0], ids[2]] } });
+  assert.equal(r1.poll.reveal, true); assert.equal(r1.poll.total, 1); assert.deepEqual(r1.poll.options.map((o) => o.votes), [1, 0, 1]);
+  const r2 = await call('POST', `/posts/${p.id}/vote`, { token: b, body: { options: [ids[1]] } }); // ganti pilihan
+  assert.deepEqual(r2.poll.options.map((o) => o.votes), [0, 1, 0]);
+  // pin: hanya admin, hanya publik
+  assert.equal((await call('POST', '/admin/pin', { token: a, body: { audio: p.id, minutes: 60 } })).status, 403);
+  assert.ok((await call('POST', '/admin/pin', { token: adm, body: { audio: p.id, minutes: 60 } })).pinned);
+  const h = await call('GET', '/hups?f=public', { token: b });
+  assert.equal(h.pins[0].id, p.id); assert.ok(h.pins[0].pinned); assert.ok(!h.items.some((x) => x.id === p.id));
+  assert.ok((await call('POST', '/admin/pin', { token: adm, body: { audio: p.id, unpin: true } })).ok);
+  assert.equal((await call('GET', '/hups?f=public', { token: b })).pins.length, 0);
+  // habis waktu: peringatan lalu hapus permanen
+  await q('update audios set expires_at=$2, created=$3 where id=$1', [p.id, Date.now() + 5000, Date.now() - 3600000]);
+  const { sweep } = await import('../lib/app.js');
+  assert.equal((await call('GET', '/cron/sweep')).warned, 1);
+  await q('update audios set expires_at=$2 where id=$1', [p.id, Date.now() - 1]);
+  assert.equal((await call('GET', '/cron/sweep')).removed, 1);
+  assert.equal((await call('GET', `/posts/${p.id}`, { token: b })).error, 'not_found');
+  const ns = (await call('GET', '/notifications', { token: a })).items.map((n) => n.type);
+  assert.ok(ns.includes('expired'));
+});

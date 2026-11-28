@@ -187,7 +187,8 @@ private suspend fun fetchPreview(url: String): JSONObject? {
 }
 
 /** Video dari URL: tidak diunduh sampai diketuk (hemat kuota), lalu diputar di tempat dengan kontrol buatan sendiri. Kotak mengikuti rasio asli video. */
-@Composable fun PostVideo(fileUri: String) = VideoEmbed(fileUri, silent = true)
+@Composable fun PostVideo(fileUri: String) = VideoEmbed(fileUri)
+@Composable fun PostImage(fileUri: String) = ImageEmbed(fileUri, "")
 
 @Composable private fun VideoEmbed(url: String, poster: String? = null, tall: Boolean = false, orig: String? = null, silent: Boolean = false) {
     var started by remember { mutableStateOf(false) }; var failed by remember { mutableStateOf(false) }

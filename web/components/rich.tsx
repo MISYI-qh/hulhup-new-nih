@@ -172,7 +172,7 @@ function PageCard({ url, p }: { url: string; p: any }) {
       {p.desc ? <div className="ds">{p.desc}</div> : null}
     </div></a>;
 }
-function ImageEmbed({ src, orig }: { src: string; orig: string }) {
+export function ImageEmbed({ src, orig }: { src: string; orig: string }) {
   const [bad, setBad] = useState(false), [full, setFull] = useState(false);
   if (bad) return <div className="embed" style={{ padding: 14, marginRight: 8, display: 'flex', gap: 10, color: 'var(--sub)' }}><Icon n="broken_image_outlined" />{host(orig || src)}</div>;
   return <>
@@ -180,12 +180,28 @@ function ImageEmbed({ src, orig }: { src: string; orig: string }) {
     {full ? <Lightbox src={src} onClose={() => setFull(false)} /> : null}
   </>;
 }
+/** Zoom: cubit 2 jari, roda mouse, ketuk 2x; geser saat diperbesar. */
+export function ZoomBox({ children }: { children: React.ReactNode }) {
+  const [t, setT] = useState({ s: 1, x: 0, y: 0 }); const T = useRef(t); T.current = t;
+  const pts = useRef(new Map<number, { x: number; y: number }>()); const last = useRef({ d: 0, x: 0, y: 0, tap: 0 });
+  const set = (n: { s: number; x: number; y: number }) => { const s = Math.min(6, Math.max(1, n.s)); setT(s === 1 ? { s: 1, x: 0, y: 0 } : { s, x: n.x, y: n.y }); };
+  const dist = () => { const p = [...pts.current.values()]; return p.length > 1 ? Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) : 0; };
+  return <div onClick={(e) => e.stopPropagation()}
+    onWheel={(e) => set({ ...T.current, s: T.current.s * (e.deltaY < 0 ? 1.15 : 1 / 1.15) })}
+    onDoubleClick={() => set(T.current.s > 1 ? { s: 1, x: 0, y: 0 } : { s: 2.5, x: 0, y: 0 })}
+    onPointerDown={(e) => { pts.current.set(e.pointerId, { x: e.clientX, y: e.clientY }); last.current.d = dist(); last.current.x = e.clientX; last.current.y = e.clientY; }}
+    onPointerMove={(e) => { if (!pts.current.has(e.pointerId)) return; pts.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pts.current.size > 1) { const d = dist(); if (last.current.d) set({ ...T.current, s: T.current.s * d / last.current.d }); last.current.d = d; }
+      else if (T.current.s > 1) { set({ ...T.current, x: T.current.x + e.clientX - last.current.x, y: T.current.y + e.clientY - last.current.y }); last.current.x = e.clientX; last.current.y = e.clientY; } }}
+    onPointerUp={(e) => { pts.current.delete(e.pointerId); last.current.d = 0; }} onPointerCancel={(e) => { pts.current.delete(e.pointerId); last.current.d = 0; }}
+    style={{ touchAction: 'none', transform: `translate(${t.x}px,${t.y}px) scale(${t.s})`, transition: pts.current.size ? 'none' : 'transform .15s', cursor: t.s > 1 ? 'grab' : 'zoom-in' }}>{children}</div>;
+}
 function Lightbox({ src, onClose }: { src: string; onClose: () => void }) {
   useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); }; window.addEventListener('keydown', k); const o = document.body.style.overflow; document.body.style.overflow = 'hidden'; return () => { window.removeEventListener('keydown', k); document.body.style.overflow = o; }; }, []);
-  return createPortal(<div className="lbx" onClick={(e) => { e.stopPropagation(); onClose(); }}><img src={src} alt="" onClick={(e) => e.stopPropagation()} /><button className="lbx-x tap" aria-label="Tutup" onClick={(e) => { e.stopPropagation(); onClose(); }}><Icon n="close_rounded" size={24} /></button></div>, document.body);
+  return createPortal(<div className="lbx" onClick={(e) => { e.stopPropagation(); onClose(); }}><ZoomBox><img src={src} alt="" draggable={false} /></ZoomBox><button className="lbx-x tap" aria-label="Tutup" onClick={(e) => { e.stopPropagation(); onClose(); }}><Icon n="close_rounded" size={24} /></button></div>, document.body);
 }
 /** Video dari URL: tidak diunduh sampai diketuk (hemat kuota), lalu langsung diputar di tempat. */
-function VideoEmbed({ url, poster, orig }: { url: string; poster?: string; tall?: boolean; orig?: string }) {
+export function VideoEmbed({ url, poster, orig }: { url: string; poster?: string; tall?: boolean; orig?: string }) {
   const [on, setOn] = useState(false), [bad, setBad] = useState(false);
   if (bad) return <a className="embed" style={{ display: 'grid', placeItems: 'center', height: 120, marginRight: 8, background: 'var(--soft)', color: 'var(--ink)' }} href={orig ?? url} target="_blank" rel="noopener noreferrer"><Icon n="open_in_new_rounded" size={34} /></a>;
   return <div className="embed vemb" style={{ marginRight: 8 }} onClick={(e) => e.stopPropagation()}>

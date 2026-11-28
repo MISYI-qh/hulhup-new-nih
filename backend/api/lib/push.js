@@ -27,8 +27,8 @@ async function accessToken() {
 }
 
 const TXT = {
-  id: { like: 'menyorot audiomu', follow: 'mulai mengikutimu', comment: 'mengomentari postinganmu', reply: 'membalas komentarmu', mention: 'menyebutmu', rel_req: 'mengajakmu menjalin hubungan', rel_ok: 'menerima hubunganmu', phipop_code: 'mengirim kode akses Phipop untukmu', badge: 'memberimu centang', takedown_post: 'menurunkan postinganmu (take down)', takedown_comment: 'menurunkan komentarmu (take down)' },
-  en: { like: 'spotlighted your audio', follow: 'started following you', comment: 'commented on your post', reply: 'replied to your comment', mention: 'mentioned you', rel_req: 'invited you to a relationship', rel_ok: 'accepted your relationship', phipop_code: 'sent you a Phipop access code', badge: 'gave you a check', takedown_post: 'took down your post', takedown_comment: 'took down your comment' },
+  id: { like: 'menyorot audiomu', follow: 'mulai mengikutimu', comment: 'mengomentari postinganmu', reply: 'membalas komentarmu', mention: 'menyebutmu', rel_req: 'mengajakmu menjalin hubungan', rel_ok: 'menerima hubunganmu', phipop_code: 'mengirim kode akses Phipop untukmu', badge: 'memberimu centang', takedown_post: 'menurunkan postinganmu (take down)', takedown_comment: 'menurunkan komentarmu (take down)', expiring: 'postinganmu sebentar lagi habis waktunya', expired: 'postinganmu sudah habis waktunya dan dihapus' },
+  en: { like: 'spotlighted your audio', follow: 'started following you', comment: 'commented on your post', reply: 'replied to your comment', mention: 'mentioned you', rel_req: 'invited you to a relationship', rel_ok: 'accepted your relationship', phipop_code: 'sent you a Phipop access code', badge: 'gave you a check', takedown_post: 'took down your post', takedown_comment: 'took down your comment', expiring: 'your post is about to expire', expired: 'your post has expired and was removed' },
 };
 
 export async function pushFlush() {

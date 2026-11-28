@@ -161,7 +161,7 @@ async function uv(u, me, today) {
   };
 }
 
-const AUD_SQL = `select a.id, a.descr, a.secs, a.pprof, a.rand, a.created, a.likes, a.plays, a.views, a.owner, a.body_len, a.in_rand, a.in_hups, a.n_audio, a.comments, a.bgm, a.bgm_idx, a.media, a.ai, a.ai_kind, a.ptag, a.kind, a.ai_comment, a.ai_view, a.body btext, u.username ou, u.name oname, u.av_ver oav, u.av_ai oai, u.av_ai_kind oaik, u.verified ov, u.pvis opvis,
+const AUD_SQL = `select a.id, a.descr, a.secs, a.pprof, a.rand, a.created, a.likes, a.plays, a.views, a.owner, a.body_len, a.in_rand, a.in_hups, a.n_audio, a.comments, a.bgm, a.bgm_idx, a.media, a.ai, a.ai_kind, a.ptag, a.kind, a.ai_comment, a.ai_view, a.expires_at, a.pin_until, a.body btext, u.username ou, u.name oname, u.av_ver oav, u.av_ai oai, u.av_ai_kind oaik, u.verified ov, u.pvis opvis,
   exists(select 1 from likes l where l.audio_id=a.id and l.user_id=$1) liked, exists(select 1 from saves sv where sv.post_id=a.id and sv.user_id=$1) saved from audios a join users u on u.id=a.owner`;
 
 function av(a) {
@@ -175,10 +175,33 @@ function av(a) {
     files, comments: a.comments || 0, saved: a.saved === true,
     bgm: a.bgm === true, bgm_idx: a.bgm_idx || 0, text: a.btext ?? null,
     media: Array.isArray(a.media) ? a.media : [],
+    expires_at: a.expires_at ? Number(a.expires_at) : 0, pinned: Number(a.pin_until || 0) > now(), pin_until: Number(a.pin_until || 0) > now() ? Number(a.pin_until) : 0,
   };
 }
 /** Untuk penulis sendiri: sertakan daftar akun tujuan pada post berpilihan "akun tertentu". */
+async function addPolls(items, me) {
+  const ids = items.map((p) => p.id);
+  if (!ids.length) return items;
+  const ps = await many('select post_id, title, max_pick, show_first from polls where post_id = any($1::bigint[])', [ids]);
+  if (!ps.length) return items;
+  const pids = ps.map((x) => Number(x.post_id)), vid = me ? Number(me.id) : 0;
+  const opts = await many('select id, post_id, label, votes from poll_opts where post_id = any($1::bigint[]) order by post_id, pos', [pids]);
+  const mine = vid ? await many('select post_id, opt_id from poll_votes where user_id=$1 and post_id = any($2::bigint[])', [vid, pids]) : [];
+  const voters = await many('select post_id, count(distinct user_id)::int n from poll_votes where post_id = any($1::bigint[]) group by post_id', [pids]);
+  for (const p of items) {
+    const pl = ps.find((x) => Number(x.post_id) === p.id); if (!pl) continue;
+    const my = mine.filter((r) => Number(r.post_id) === p.id).map((r) => Number(r.opt_id));
+    const reveal = pl.show_first || my.length > 0 || (!!me && p.owner === me.username);
+    p.poll = {
+      title: pl.title, max: pl.max_pick, show_first: pl.show_first, voted: my.length > 0, mine: my, reveal,
+      total: reveal ? (voters.find((r) => Number(r.post_id) === p.id)?.n ?? 0) : null,
+      options: opts.filter((o) => Number(o.post_id) === p.id).map((o) => ({ id: Number(o.id), label: o.label, votes: reveal ? o.votes : null })),
+    };
+  }
+  return items;
+}
 async function addTo(items, me) {
+  await addPolls(items, me);
   if (!me) return items;
   const ids = items.filter((p) => p.owner === me.username && String(p.rand).split(',').includes('accounts')).map((p) => p.id);
   if (!ids.length) return items;
@@ -364,7 +387,7 @@ route('GET', /^\/random$/, async (c) => {
   const row = await one(`select a.id ${base} and a.id <> all($2::bigint[]) order by a.id offset ${off} limit 1`, [vid, avoid]);
   const a = await one(`${AUD_SQL} where a.id=$2`, [vid, row.id]);
   if (c.me && c.query.peek !== '1') taps = await addTap(c.me.id, f);
-  return { taps, audio: av(a) };
+  return { taps, audio: (await addTo([av(a)], c.me))[0] };
 });
 
 // Hitung satu ketukan Acak untuk audio yang sudah diambil lebih dulu (peek=1), agar angka ketukan tetap tepat.
@@ -578,7 +601,7 @@ route('DELETE', /^\/me$/, async (c) => {
 route('GET', /^\/me\/liked$/, async (c) => {
   const u = c.need();
   const rows = await many(`${AUD_SQL} where not a.hidden and not a.pending and exists(select 1 from likes l where l.audio_id=a.id and l.user_id=$1) order by a.id desc limit 200`, [u.id]);
-  return { audios: rows.map(av) };
+  return { audios: await addTo(rows.map(av), c.me) };
 });
 
 route('GET', /^\/notifications$/, async (c) => {
@@ -889,7 +912,7 @@ route('GET', /^\/users\/([a-z0-9_]+)$/, async (c, m) => {
     const r = await one(`select r.*, l.name label_name from rels r left join rel_labels l on l.id = case when r.a=$1 then r.la else r.lb end where (r.a=$1 and r.b=$2) or (r.a=$2 and r.b=$1)`, [vid, uid]);
     if (r) rel = { status: r.status === 'active' ? 'active' : Number(r.a) === Number(vid) ? 'out' : 'in', type: r.type, label: r.label_name ?? null };
   }
-  return { user: await uv(u, c.me, c.today), audios: mine ? await addTo(rows.map(av), c.me) : rows.map(av), locked, rel };
+  return { user: await uv(u, c.me, c.today), audios: await addTo(rows.map(av), mine ? c.me : null), locked, rel };
 });
 
 route('POST', /^\/users\/([a-z0-9_]+)\/follow$/, async (c, m) => {
@@ -958,10 +981,11 @@ async function blobsOf(postWhere, commentWhere, params) {
 }
 
 async function accessRow(id) {
-  return one(`select a.id, a.owner, a.rand, a.hidden, a.pending, a.in_hups, a.in_rand, a.store, a.blob_key, a.mime, u.pvis, u.status ostatus from audios a join users u on u.id=a.owner where a.id=$1`, [id]);
+  return one(`select a.id, a.owner, a.rand, a.hidden, a.pending, a.expires_at, a.in_hups, a.in_rand, a.store, a.blob_key, a.mime, u.pvis, u.status ostatus from audios a join users u on u.id=a.owner where a.id=$1`, [id]);
 }
 /** Boleh membuka post: pemilik, atau pemirsa yang masuk audiens post / profil pemilik, atau yang sudah menyorot/menyimpan. */
 async function canOpen(a, vid) {
+  if (a.expires_at && Number(a.expires_at) <= now()) return false;
   if (vid && vid === Number(a.owner)) return true;
   if (a.hidden || a.pending || a.ostatus !== 'active') return false;
   let ok = false;
@@ -1000,6 +1024,48 @@ async function slotInfo() {
 }
 route('GET', /^\/media-slot$/, async () => slotInfo());
 
+/** Voting: 2–200 pilihan, tema opsional, batas pilihan per orang, hasil terlihat sebelum memilih atau tidak. */
+function okPoll(v) {
+  if (v === undefined || v === null || v === false) return null;
+  if (typeof v !== 'object') throw new ApiErr('bad_request');
+  const opts = (Array.isArray(v.options) ? v.options : []).map((x) => String(x ?? '').trim().slice(0, 100)).filter(Boolean);
+  if (opts.length < 2 || opts.length > 200) throw new ApiErr('poll_bad', 400);
+  if (new Set(opts.map((x) => x.toLowerCase())).size !== opts.length) throw new ApiErr('poll_dup', 400);
+  return { title: String(v.title ?? '').trim().slice(0, 200), opts, max: Math.min(opts.length, Math.max(1, parseInt(v.max, 10) || 1)), show_first: v.show_first !== false };
+}
+/** Masa aktif post (ms dari sekarang). Kosong = biasa (tanpa batas). Custom bebas, minimal 1 menit teknis. */
+function okExpiry(v) {
+  if (v === undefined || v === null || v === '' || v === 0) return null;
+  const n = Number(v);
+  if (!Number.isFinite(n) || n <= 0) throw new ApiErr('bad_request');
+  return now() + Math.min(Math.max(n, 60000), 315360000000);
+}
+let lastSweep = 0;
+/** Sapu post habis waktu: peringatan ke pemilik menjelang habis, lalu hapus dari database (+ berkas) dan beri tahu. Dipanggil tiap ≥15 dtk oleh permintaan apa pun. */
+async function sweep(force = false) {
+  const t = now();
+  if (!force && t - lastSweep < 15000) return { skipped: true };
+  lastSweep = t;
+  const hl = await one(`select id from users where username='hulhup'`); const actor = hl ? Number(hl.id) : null;
+  let warned = 0, removed = 0;
+  const warn = await many(`select id, owner, descr from audios where expires_at is not null and not exp_warned and expires_at > $1 and expires_at - $1 <= least(3600000, greatest(30000, (expires_at - created) / 5)) limit 50`, [t]);
+  for (const w of warn) {
+    if (!(await one('update audios set exp_warned=true where id=$1 and not exp_warned returning id', [w.id]))) continue;
+    await q(`insert into notifs(to_user, type, actor, audio, extra, created) values ($1,'expiring',$2,$3,$4,$5)`, [w.owner, actor, w.id, String(w.descr || '').slice(0, 80), t]);
+    pushLater(Number(w.owner), 'expiring', actor || 0, String(w.descr || '').slice(0, 80)); warned++;
+  }
+  const dead = await many('select id, owner, descr from audios where expires_at is not null and expires_at <= $1 limit 50', [t]);
+  for (const d of dead) {
+    const bl = await blobsOf('a.id=$1', 'c.post_id=$1', [d.id]);
+    if (!(await one('delete from audios where id=$1 returning id', [d.id]))) continue;
+    await q('update media_slot set started=0, owner=null, post=null where id=1 and post=$1', [d.id]);
+    await Promise.all(bl.map((b) => delAudio(b.store, b.key).catch(() => {})));
+    await q(`insert into notifs(to_user, type, actor, extra, created) values ($1,'expired',$2,$3,$4)`, [d.owner, actor, String(d.descr || '').slice(0, 80), t]);
+    pushLater(Number(d.owner), 'expired', actor || 0, String(d.descr || '').slice(0, 80)); removed++;
+  }
+  return { warned, removed };
+}
+
 route('POST', /^\/posts$/, async (c) => {
   const u = c.need();
   await hit(`post:${u.id}`, 40, 3600);
@@ -1008,7 +1074,8 @@ route('POST', /^\/posts$/, async (c) => {
   const n = b.audios === undefined ? 0 : parseInt(b.audios, 10); // 0 = hanya teks, 1 = satu audio (biasa atau backsound)
   if (n !== 0 && n !== 1) throw new ApiErr('need_audio');
   const media = okMedia(b.media);
-  if (n === 0 && !text && !media.length) throw new ApiErr('empty');
+  const poll = okPoll(b.poll), expAt = okExpiry(b.expires_in);
+  if (n === 0 && !text && !media.length && !poll) throw new ApiErr('empty');
   const mk = n === 1 && (b.media_kind === 'image' || b.media_kind === 'video') ? b.media_kind : null;
   if (mk && !(await slotInfo()).open) throw new ApiErr('media_slot_taken', 409);
   const bgm = n === 1 && !mk && b.bgm === true, bgmIdx = 0, inRand = true, inHups = true; // satu post tampil di Acak dan di Hups
@@ -1029,7 +1096,13 @@ route('POST', /^\/posts$/, async (c) => {
       const r = await t.query(`insert into audios(owner, descr, secs, rand, pprof, created, body, body_key, body_len, in_rand, in_hups, n_audio, pending, bgm, mentions, bgm_idx, media) values ($1,$2,0,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb) returning id`,
         [u.id, cutPreview(text), rnd, b.pprof !== false, now(), body, key, text.length, inRand, inHups, n, n > 0, bgm, mentions.join(','), bgmIdx, JSON.stringify(media)]);
       for (const x of to) await t.query('insert into audio_to(audio_id, user_id) values ($1,$2)', [r.rows[0].id, x]);
-      return Number(r.rows[0].id);
+      const pid = Number(r.rows[0].id);
+      if (expAt) await t.query('update audios set expires_at=$2 where id=$1', [pid, expAt]);
+      if (poll) {
+        await t.query('insert into polls(post_id, title, max_pick, show_first) values ($1,$2,$3,$4)', [pid, poll.title, poll.max, poll.show_first]);
+        for (let i = 0; i < poll.opts.length; i++) await t.query('insert into poll_opts(post_id, pos, label) values ($1,$2,$3)', [pid, i, poll.opts[i]]);
+      }
+      return pid;
     });
   } catch (e) { if (key) await delAudio('mongo', key); throw e; }
   if (n === 0) await mentionNotify(id, u.id);
@@ -1082,6 +1155,25 @@ route('GET', /^\/posts\/(\d+)$/, async (c, m) => {
   return { post: p, text: await readText(full.body, full.body_key) };
 });
 
+route('POST', /^\/posts\/(\d+)\/vote$/, async (c, m) => {
+  const u = c.need();
+  await hit(`vote:${u.id}`, 60, 60);
+  await openPost(m[1], c);
+  const pl = await one('select max_pick from polls where post_id=$1', [m[1]]);
+  if (!pl) throw new ApiErr('not_found', 404);
+  const ids = [...new Set((Array.isArray(c.body.options) ? c.body.options : []).map(Number).filter((x) => Number.isInteger(x) && x > 0))];
+  if (ids.length > pl.max_pick) throw new ApiErr('poll_max', 400);
+  await tx(async (t) => {
+    const ok = ids.length ? (await t.query('select id from poll_opts where post_id=$1 and id = any($2::bigint[])', [m[1], ids])).rows.length : 0;
+    if (ok !== ids.length) throw new ApiErr('bad_request');
+    const old = (await t.query('delete from poll_votes where post_id=$1 and user_id=$2 returning opt_id', [m[1], u.id])).rows;
+    for (const o of old) await t.query('update poll_opts set votes=greatest(0, votes-1) where id=$1', [o.opt_id]);
+    for (const id of ids) { await t.query('insert into poll_votes(post_id, user_id, opt_id) values ($1,$2,$3)', [m[1], u.id, id]); await t.query('update poll_opts set votes=votes+1 where id=$1', [id]); }
+  });
+  const row = await one(`${AUD_SQL} where a.id=$2`, [u.id, m[1]]);
+  return { poll: (await addTo([av(row)], c.me))[0].poll };
+});
+
 route('GET', /^\/hups$/, async (c) => {
   await hit(`hups:${c.me ? 'u' + c.me.id : c.ip}`, 240, 60);
   const f = filterOf(c.query.f);
@@ -1102,10 +1194,12 @@ route('GET', /^\/hups$/, async (c) => {
     * (case when (select count(*) from audios z where z.owner=a.owner and z.created > ${now() - T1}) > 2 then 0.6 else 1 end)
     * power(0.8, row_number() over (partition by a.owner order by a.created desc) - 1))`;
   const rows = await many(
-    `${AUD_SQL} where a.in_hups and not a.hidden and not a.pending and u.status='active' and (${audCond(f)} or (a.owner=$1 and ${HAS('public')} and '${f}'='public')) order by ${score} desc, a.id desc offset ${off} limit 21`,
+    `${AUD_SQL} where a.in_hups and not a.hidden and not a.pending and a.pin_until <= ${now()} and u.status='active' and (${audCond(f)} or (a.owner=$1 and ${HAS('public')} and '${f}'='public')) order by ${score} desc, a.id desc offset ${off} limit 21`,
     [vid]);
   const items = await addTo(rows.slice(0, 20).map(av), c.me);
-  return { items, next: rows.length > 20 ? off + 20 : 0 };
+  let pins = [];
+  if (off === 0 && f === 'public') pins = await addTo((await many(`${AUD_SQL} where a.pin_until > ${now()} and not a.hidden and not a.pending and u.status='active' and ${HAS('public')} order by a.pin_at desc limit 5`, [vid])).map(av), c.me);
+  return { items, pins, next: rows.length > 20 ? off + 20 : 0 };
 });
 
 route('POST', /^\/audios\/(\d+)\/save$/, async (c, m) => {
@@ -1126,13 +1220,13 @@ route('GET', /^\/me\/sent$/, async (c) => {
     return { people: rows.map((r) => ({ ...mini(r), n: r.n })) };
   }
   const rows = await many(`${AUD_SQL} where a.owner=$1 and not a.pending and exists(select 1 from audio_to t join users x on x.id=t.user_id where t.audio_id=a.id and x.username=$2) order by a.id desc limit 200`, [u.id, to]);
-  return { audios: rows.map(av) };
+  return { audios: await addTo(rows.map(av), c.me) };
 });
 
 route('GET', /^\/me\/saved$/, async (c) => {
   const u = c.need();
   const rows = await many(`${AUD_SQL} join saves sv on sv.post_id=a.id and sv.user_id=$1 where not a.hidden and not a.pending and u.status='active' order by sv.created desc limit 200`, [u.id]);
-  return { audios: rows.map(av) };
+  return { audios: await addTo(rows.map(av), c.me) };
 });
 
 // ----- tag (@nama) -----
@@ -1520,6 +1614,28 @@ route('GET', /^\/admin\/content$/, async (c) => {
   const r = await many(`select a.id, a.descr, a.hidden, u.username from audios a join users u on u.id=a.owner where ($1='' or lower(a.descr) like $2 or u.username like $2) order by a.id desc limit 40`, [qs, `%${qs}%`]);
   return { items: r.map((x) => ({ id: Number(x.id), user: x.username, text: String(x.descr ?? '').slice(0, 160), taken_down: !!x.hidden })) };
 });
+route('GET', /^\/admin\/pins$/, async (c) => {
+  needAdmin(c);
+  const rows = await many(`${AUD_SQL} where a.pin_until > ${now()} and not a.hidden order by a.pin_at desc limit 20`, [0]);
+  return { items: rows.map(av) };
+});
+/** Sematkan/lepas post (hanya post publik) di Hups, dengan lama bebas (menit). */
+route('POST', /^\/admin\/pin$/, async (c) => {
+  const me = needAdmin(c);
+  let aid = Number(c.body.audio) || 0;
+  if (!aid && c.body.ref) aid = Number(refToId(c.body.ref)) || 0;
+  const a = aid ? await one('select id, rand, hidden, pending from audios where id=$1', [aid]) : null;
+  if (!a) throw new ApiErr('not_found', 404);
+  if (c.body.unpin === true) { await q('update audios set pin_until=0, pin_at=0 where id=$1', [aid]); return { ok: true, pinned: false }; }
+  if (a.hidden || a.pending || !String(a.rand).split(',').includes('public')) throw new ApiErr('pin_public_only', 400);
+  const mins = Number(c.body.minutes);
+  if (!Number.isFinite(mins) || mins <= 0) throw new ApiErr('bad_request');
+  const until = now() + Math.min(mins, 525600 * 5) * 60000;
+  await q('update audios set pin_until=$2, pin_at=$3 where id=$1', [aid, until, now()]);
+  await q('insert into admin_log(admin, action, target_audio, reason, created) values ($1,$2,$3,$4,$5)', [me.id, 'pin', aid, String(mins), now()]).catch(() => {});
+  return { ok: true, pinned: true, until };
+});
+
 route('PUT', /^\/admin\/badge$/, async (c) => {
   const me = needAdmin(c);
   const o = await one(`select id, username, badge from users where username=$1`, [String(c.body.username ?? '').toLowerCase()]);
@@ -1603,6 +1719,7 @@ export async function handle(req, url) {
     if (!cronOk(req, url)) throw new ApiErr('unauthorized', 401);
     return phipopAutoPost(url.searchParams.get('slot') === 'pm' ? 'pm' : 'am');
   }
+  if (path === '/cron/sweep') return { ok: true, ...(await sweep(true)) };
   if (path === '/cron/reminder') {
     const k = process.env.CRON_SECRET, got = String(req.headers.authorization || '').replace('Bearer ', '') || url.searchParams.get('key');
     const ga = Buffer.from(String(got)), ka = Buffer.from(String(k || ''));
@@ -1612,6 +1729,7 @@ export async function handle(req, url) {
   if (path === '/' || path === '/health') { if (url.searchParams.get('warm')) await one('select 1 as x'); if (url.searchParams.get('push') && cronOk(req, url)) return { ok: true, push: await pushDiag() }; return { ok: true, service: 'hulhup-api' }; }
   if (path === '/deks/selftest') { if (!cronOk(req, url)) throw new ApiErr('not_found', 404); return runSelfTest(); }
   await ensureOfficial();
+  await sweep().catch(() => {});
   const me = await authUser(req);
   const ip = ipOf(req);
   if (!/^\/users\/[a-z0-9_]+\/(avatar|cover)$/.test(path)) await hit(`ip:${ip}`, 600, 60); // foto profil di-cache lama; tidak dihitung agar daftar panjang tidak terblokir

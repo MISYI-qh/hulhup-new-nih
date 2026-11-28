@@ -166,7 +166,7 @@ import org.json.JSONObject
                     itemsIndexed(flat(), key = { _, e -> e.first.optInt("id") }) { _, e ->
                         val c = e.first
                         Box(Modifier.background(if (hl == c.optInt("id")) acc().copy(alpha = .12f) else Color.Transparent, RoundedCornerShape(16.dp))) {
-                            CommentTile(c, minOf(e.second, 3), p.id, p.owner, owner, onReply = { reply(c) }, onLike = { sc.launch { likeCmt(c) } }, onDelete = { sc.launch { delCmt(c) } }, onPin = { sc.launch { pinCmt(c) } })
+                            CommentTile(c, minOf(e.second, 3), p.id, p.owner, owner, onReply = { reply(c) }, onLike = { sc.launch { likeCmt(c) } }, onDelete = { sc.launch { delCmt(c) } }, onPin = { sc.launch { pinCmt(c) } }, rev = tick)
                         }
                     }
                 }
@@ -202,7 +202,7 @@ import org.json.JSONObject
     }
 }
 
-@Composable fun CommentTile(c: JSONObject, depth: Int, postId: Int, postOwner: String, scope: Any?, onReply: () -> Unit, onLike: () -> Unit, onDelete: () -> Unit, onPin: () -> Unit) {
+@Composable fun CommentTile(c: JSONObject, depth: Int, postId: Int, postOwner: String, scope: Any?, onReply: () -> Unit, onLike: () -> Unit, onDelete: () -> Unit, onPin: () -> Unit, rev: Int = 0) {
     val s = Store; val sc = rememberCoroutineScope()
     var full by remember(c.optInt("id")) { mutableStateOf<String?>(null) }
     var loadingFull by remember { mutableStateOf(false) }

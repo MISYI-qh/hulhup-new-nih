@@ -72,31 +72,21 @@ import org.json.JSONObject
     }
 }
 
-/** Gambar/video sebuah post (kind image|video): gambar rounded selebar kolom, video dengan pemutar sendiri (ketuk putar, ulang tanpa suara). */
+/** Gambar/video sebuah post (kind image|video): berkas diambil dengan sesi login, lalu tampil PERSIS seperti media dari URL. */
 @Composable fun PostMediaFile(a: A) {
     val url = a.files.firstOrNull()?.optString("url") ?: return
-    var bmp by remember(a.id) { mutableStateOf<android.graphics.Bitmap?>(null) }
-    var vfile by remember(a.id) { mutableStateOf<String?>(null) }
+    var file by remember(a.id) { mutableStateOf<String?>(null) }
     var failed by remember(a.id) { mutableStateOf(false) }
     LaunchedEffect(a.id) {
         try {
             val b = Api.bytes(url) ?: run { failed = true; return@LaunchedEffect }
-            if (a.kind == "image") bmp = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { android.graphics.BitmapFactory.decodeByteArray(b, 0, b.size) }
-            else vfile = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { val f = java.io.File(Store.app.cacheDir, "pv${a.id}.mp4"); if (!f.exists() || f.length() != b.size.toLong()) f.writeBytes(b); "file://" + f.absolutePath }
+            file = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { val f = java.io.File(Store.app.cacheDir, "pv${a.id}.${if (a.kind == "image") "img" else "mp4"}"); if (!f.exists() || f.length() != b.size.toLong()) f.writeBytes(b); "file://" + f.absolutePath }
         } catch (_: Exception) { failed = true }
     }
     val shape = RoundedCornerShape(20.dp)
-    val bm = bmp; val vf = vfile
+    val f = file
     Column { when {
-        bm != null -> { var big by remember { mutableStateOf(false) }
-            Image(bm.asImageBitmap(), null, Modifier.padding(top = 10.dp, end = 8.dp).fillMaxWidth().clip(shape).border(1.dp, ink().copy(alpha = .08f), shape).clickable { big = true }, contentScale = ContentScale.FillWidth)
-            if (big) androidx.compose.ui.window.Dialog(onDismissRequest = { big = false }, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
-                Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black), contentAlignment = Alignment.Center) {
-                    Image(bm.asImageBitmap(), null, Modifier.fillMaxSize().zoomable(), contentScale = ContentScale.Fit)
-                    Icon(Icons.Rounded.Close, null, Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(16.dp).size(28.dp).clickable { big = false }, tint = androidx.compose.ui.graphics.Color.White)
-                }
-            } }
-        vf != null -> PostVideo(vf)
+        f != null -> if (a.kind == "image") PostImage(f) else PostVideo(f)
         else -> Box(Modifier.padding(top = 10.dp, end = 8.dp).fillMaxWidth().aspectRatio(4f / 3f).clip(shape).background(soft()), contentAlignment = Alignment.Center) {
             if (failed) Icon(Icons.Rounded.BrokenImage, null, Modifier.size(30.dp), tint = sub()) else androidx.compose.material3.CircularProgressIndicator(Modifier.size(24.dp), color = ink(), strokeWidth = 2.dp)
         }
