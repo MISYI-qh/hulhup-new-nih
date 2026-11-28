@@ -8,7 +8,7 @@ import { Toggle, toast } from './ui';
 export function leftText(ms: number): string {
   const t = (k: string) => store.t(k);
   const m = Math.max(1, Math.round(ms / 60000));
-  if (m >= 1440) { const d = Math.floor(m / 1440), h = Math.round((m % 1440) / 60); return `${d} ${t('exp_day')}${h && d < 3 ? ` ${h} ${t('exp_hour')}` : ''}`; }
+  if (m >= 1440) { const d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60); return `${d} ${t('exp_day')}${h && d < 3 ? ` ${h} ${t('exp_hour')}` : ''}`; }
   if (m >= 60) { const h = Math.floor(m / 60), mm = m % 60; return `${h} ${t('exp_hour')}${mm ? ` ${mm} ${t('exp_min')}` : ''}`; }
   return `${m} ${t('exp_min')}`;
 }
@@ -70,7 +70,7 @@ export function PollView({ a }: { a: A }) {
       <span style={{ flex: 1 }} />
       {p.ends_at && !ended ? <span className="poll-end"><Icon n="schedule_rounded" size={13} style={{ verticalAlign: -2, marginRight: 3 }} />{s.t('poll_left').replace('{t}', leftText(p.ends_at - Date.now()))}</span> : null}
       {ended ? <b className="poll-end">{s.t('poll_ended')}</b> : null}
-      {showRes && p.voted && !ended ? <button className="tap poll-link" onClick={startEdit}>{s.t('poll_change')}</button> : null}
+      {showRes && p.voted && !ended && p.allow_change !== false ? <button className="tap poll-link" onClick={startEdit}>{s.t('poll_change')}</button> : null}
       {!showRes && (multi || editing) ? <button className="tap poll-send" disabled={busy || !sel.length} onClick={() => send(sel)}>{busy ? '…' : s.t('poll_submit')}</button> : null}
       {editing ? <button className="tap poll-link" onClick={() => setEditing(false)}>{s.t('cancel')}</button> : null}
     </div>
@@ -78,8 +78,8 @@ export function PollView({ a }: { a: A }) {
 }
 
 /* ───────── penyusun voting (composer) ───────── */
-export type PollDraft = { title: string; opts: string[]; max: number; showFirst: boolean; ends: ExpDraft };
-export const newPoll = (): PollDraft => ({ title: '', opts: ['', ''], max: 1, showFirst: true, ends: newExp() });
+export type PollDraft = { title: string; opts: string[]; max: number; showFirst: boolean; allowChange: boolean; ends: ExpDraft };
+export const newPoll = (): PollDraft => ({ title: '', opts: ['', ''], max: 1, showFirst: true, allowChange: true, ends: newExp() });
 export function pollError(p: PollDraft): boolean {
   const o = p.opts.map((x) => x.trim()).filter(Boolean);
   return o.length < 2 || new Set(o.map((x) => x.toLowerCase())).size !== o.length;
@@ -103,6 +103,7 @@ export function PollEditor({ v, set, onClose }: { v: PollDraft; set: (p: PollDra
     <div className="cx-row"><div style={{ flex: 1, fontWeight: 700 }}>{s.t('poll_max_l')}</div>
       <div className="cx-step"><button className="tap" aria-label="-" disabled={v.max <= 1} onClick={() => set({ ...v, max: Math.max(1, v.max - 1) })}><Icon n="remove_rounded" size={18} /></button><b>{Math.min(v.max, maxCap)}</b><button className="tap" aria-label="+" disabled={v.max >= maxCap} onClick={() => set({ ...v, max: Math.min(maxCap, v.max + 1) })}><Icon n="add_rounded" size={18} /></button></div></div>
     <div className="cx-row"><div style={{ flex: 1 }}><div style={{ fontWeight: 700 }}>{s.t('poll_show_l')}</div><div className="cx-sub">{s.t('poll_show_d')}</div></div><Toggle v={v.showFirst} on={(x) => set({ ...v, showFirst: x })} /></div>
+    <div className="cx-row"><div style={{ flex: 1 }}><div style={{ fontWeight: 700 }}>{s.t('poll_chg_l')}</div><div className="cx-sub">{s.t('poll_chg_d')}</div></div><Toggle v={v.allowChange} on={(x) => set({ ...v, allowChange: x })} /></div>
     <div className="cx-row" style={{ display: 'block' }}><div style={{ fontWeight: 700, marginBottom: 8 }}>{s.t('poll_end')}</div>
       <div className="seg" role="tablist" style={{ marginBottom: 8 }}>{([[false, s.t('poll_end_none')], [true, s.t('poll_end_set')]] as const).map(([k, l]) => <b key={String(k)} role="tab" aria-selected={v.ends.custom === k} className={v.ends.custom === k ? 'on' : ''} onClick={() => set({ ...v, ends: { ...v.ends, custom: k } })}>{l}</b>)}</div>
       {v.ends.custom ? <DurPick v={v.ends} set={(e) => set({ ...v, ends: e })} /> : <div className="cx-sub">{s.t('poll_end_d')}</div>}</div>

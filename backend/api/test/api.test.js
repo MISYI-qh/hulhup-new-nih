@@ -509,6 +509,11 @@ test('voting, masa aktif, dan pin admin', async () => {
   assert.equal(r1.poll.reveal, true); assert.equal(r1.poll.total, 1); assert.deepEqual(r1.poll.options.map((o) => o.votes), [1, 0, 1]);
   const r2 = await call('POST', `/posts/${p.id}/vote`, { token: b, body: { options: [ids[1]] } }); // ganti pilihan
   assert.deepEqual(r2.poll.options.map((o) => o.votes), [0, 1, 0]);
+  const p3 = await call('POST', '/posts', { token: a, body: { audios: 0, poll: { options: ['x', 'y'], allow_change: false } } });
+  const v3 = (await call('GET', `/posts/${p3.id}`, { token: b })).post;
+  assert.equal(v3.poll.allow_change, false);
+  assert.ok((await call('POST', `/posts/${p3.id}/vote`, { token: b, body: { options: [v3.poll.options[0].id] } })).poll.voted);
+  assert.equal((await call('POST', `/posts/${p3.id}/vote`, { token: b, body: { options: [v3.poll.options[1].id] } })).error, 'poll_locked');
   // voting dengan waktu selesai: setelah selesai hasil terbuka & tidak bisa memilih
   const p2 = await call('POST', '/posts', { token: a, body: { audios: 0, poll: { options: ['x', 'y'], show_first: false, ends_in: 3600000 } } });
   await q('update polls set ends_at=$2 where post_id=$1', [p2.id, Date.now() - 1000]);
@@ -519,7 +524,7 @@ test('voting, masa aktif, dan pin admin', async () => {
   assert.equal((await call('POST', '/admin/pin', { token: a, body: { audio: p.id, minutes: 60 } })).status, 403);
   assert.ok((await call('POST', '/admin/pin', { token: adm, body: { audio: p.id, minutes: 60 } })).pinned);
   const h = await call('GET', '/hups?f=public', { token: b });
-  assert.equal(h.pins[0].id, p.id); assert.ok(h.pins[0].pinned); assert.ok(!h.items.some((x) => x.id === p.id));
+  assert.equal(h.pins[0].id, p.id); assert.ok(h.pins[0].pinned);
   assert.ok((await call('POST', '/admin/pin', { token: adm, body: { audio: p.id, unpin: true } })).ok);
   assert.equal((await call('GET', '/hups?f=public', { token: b })).pins.length, 0);
   // habis waktu: peringatan lalu hapus permanen

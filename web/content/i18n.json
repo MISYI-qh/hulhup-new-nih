@@ -1938,5 +1938,13 @@
 "poll_left": [
 "Selesai dalam {t}",
 "Ends in {t}"
+],
+"poll_chg_l": [
+"Boleh mengganti pilihan",
+"Allow changing vote"
+],
+"poll_chg_d": [
+"Kalau mati, pilihan tidak bisa diubah setelah memilih.",
+"If off, votes cannot be changed once cast."
 ]
 }

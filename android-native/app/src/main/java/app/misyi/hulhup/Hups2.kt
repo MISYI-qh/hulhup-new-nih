@@ -206,6 +206,7 @@ suspend fun postMenu(a: A, onDeleted: (() -> Unit)? = null) {
     val s = Store; val sc = rememberCoroutineScope()
     val cached = remember(filter) { HupsCache.m[filter]?.takeIf { System.currentTimeMillis() - it.at < 15 * 60 * 1000L } }
     val items = remember { mutableStateListOf<A>().also { l -> cached?.let { l.addAll(it.items) } } }
+    val pins = remember { mutableStateListOf<A>() }
     var loading by remember { mutableStateOf(cached == null) }
     var error by remember { mutableStateOf<String?>(null) }
     var next by remember { mutableIntStateOf(cached?.next ?: 0) }
@@ -221,7 +222,7 @@ suspend fun postMenu(a: A, onDeleted: (() -> Unit)? = null) {
     suspend fun load() {
         try {
             val j = Api.req("GET", "/hups?f=$filter")
-            items.clear(); items.addAll(((j.optJSONArray("pins") ?: org.json.JSONArray()).objects() + (j.optJSONArray("items") ?: org.json.JSONArray()).objects()).map { A(it) }); next = j.optInt("next"); error = null
+            items.clear(); items.addAll((j.optJSONArray("items") ?: org.json.JSONArray()).objects().map { A(it) }); pins.clear(); pins.addAll((j.optJSONArray("pins") ?: org.json.JSONArray()).objects().map { A(it) }); next = j.optInt("next"); error = null
         } catch (e: Exception) { error = s.err(e) }
         loading = false
     }
@@ -234,7 +235,8 @@ suspend fun postMenu(a: A, onDeleted: (() -> Unit)? = null) {
             busy = true
             try {
                 val j = Api.req("GET", "/hups?f=$filter")
-                val fresh = ((j.optJSONArray("pins") ?: org.json.JSONArray()).objects() + (j.optJSONArray("items") ?: org.json.JSONArray()).objects()).map { A(it) }
+                val fresh = (j.optJSONArray("items") ?: org.json.JSONArray()).objects().map { A(it) }
+                j.optJSONArray("pins")?.let { pa -> pins.clear(); pins.addAll(pa.objects().map { A(it) }) }
                 if (ls.firstVisibleItemIndex == 0 && ls.firstVisibleItemScrollOffset < 60) { items.clear(); items.addAll(fresh); next = j.optInt("next") }
                 else for (f in fresh) for (o in items) if (o.id == f.id) { o.likes = f.likes; o.comments = f.comments; o.liked = f.liked; o.saved = f.saved; o.poll = f.poll }
                 s.poke()
@@ -274,13 +276,12 @@ suspend fun postMenu(a: A, onDeleted: (() -> Unit)? = null) {
     LogoRefresh({ load() }) {
         if (items.isEmpty()) LazyColumn(Modifier.fillMaxSize()) { item { Spacer(Modifier.height(80.dp)); Empty(Icons.Outlined.Forum, s.t("no_hups"), custom = { HIcon(HK.hups, size = 32.dp, color = sub()) }) } }
         else Box(Modifier.fillMaxSize()) {
-            LazyColumn(Modifier.fillMaxSize(), state = ls, contentPadding = PaddingValues(16.dp, 6.dp, 16.dp, 110.dp)) {
+            LazyColumn(Modifier.fillMaxSize(), state = ls, contentPadding = PaddingValues(16.dp, if (pins.isEmpty()) 6.dp else 50.dp, 16.dp, 110.dp)) {
                 itemsIndexed(items, key = { _, a -> a.id }) { i, a ->
                     In(if (i < 8) i else 0) { PostCard(a, scope = owner, onDeleted = { items.removeAll { it.id == a.id }; s.poke() }) }
                 }
             }
-            val pins = items.filter { it.pinned }
-            PinPill(pins.size) { sc.launch { sheet<Unit> { done -> PinSheet(pins, owner) } } }
+            PinPill(pins.size) { sc.launch { sheet<Unit> { done -> PinSheet(pins.toList(), owner) } } }
         }
     }
 }

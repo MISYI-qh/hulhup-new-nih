@@ -308,6 +308,8 @@ object Strings {
         "poll_ended" to listOf("Voting selesai", "Poll ended"),
         "poll_left" to listOf("Selesai dalam {t}", "Ends in {t}"),
         "adm_tpin" to listOf("Pin", "Pin"),
+        "poll_chg_l" to listOf("Boleh mengganti pilihan", "Allow changing vote"),
+        "poll_chg_d" to listOf("Kalau mati, pilihan tidak bisa diubah setelah memilih.", "If off, votes cannot be changed once cast."),
         "n_td_post" to listOf("Postinganmu telah di-take down. Alasan: {r}", "Your post has been taken down. Reason: {r}"),
         "n_td_comment" to listOf("Komentarmu telah di-take down. Alasan: {r}", "Your comment has been taken down. Reason: {r}"),
         "ai_see" to listOf("AI boleh melihat post ini", "AI may see this post"),

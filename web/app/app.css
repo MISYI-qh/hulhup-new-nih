@@ -347,3 +347,4 @@ button:has(.avatar),button:has(.avatar):focus,button:has(.avatar):focus-visible,
 .cx-chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}
 .cx-chip{height:34px;padding:0 14px;border-radius:17px;background:var(--bg);border:1.4px solid var(--hair);font-weight:700;font-size:13px}.cx-chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .poll-end{font-weight:800;color:var(--sub);font-size:12.5px}
+.poll-ft{flex-wrap:wrap;row-gap:6px}.poll-ft>span,.poll-ft>b,.poll-ft>button{white-space:nowrap}

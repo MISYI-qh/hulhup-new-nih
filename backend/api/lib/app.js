@@ -182,7 +182,7 @@ function av(a) {
 async function addPolls(items, me) {
   const ids = items.map((p) => p.id);
   if (!ids.length) return items;
-  const ps = await many('select post_id, title, max_pick, show_first, ends_at from polls where post_id = any($1::bigint[])', [ids]);
+  const ps = await many('select post_id, title, max_pick, show_first, ends_at, allow_change from polls where post_id = any($1::bigint[])', [ids]);
   if (!ps.length) return items;
   const pids = ps.map((x) => Number(x.post_id)), vid = me ? Number(me.id) : 0;
   const opts = await many('select id, post_id, label, votes from poll_opts where post_id = any($1::bigint[]) order by post_id, pos', [pids]);
@@ -194,7 +194,7 @@ async function addPolls(items, me) {
     const endsAt = Number(pl.ends_at || 0), ended = endsAt > 0 && endsAt <= now();
     const reveal = ended || pl.show_first || my.length > 0 || (!!me && p.owner === me.username);
     p.poll = {
-      title: pl.title, max: pl.max_pick, ends_at: endsAt, ended, show_first: pl.show_first, voted: my.length > 0, mine: my, reveal,
+      title: pl.title, max: pl.max_pick, ends_at: endsAt, ended, allow_change: pl.allow_change, show_first: pl.show_first, voted: my.length > 0, mine: my, reveal,
       total: reveal ? (voters.find((r) => Number(r.post_id) === p.id)?.n ?? 0) : null,
       options: opts.filter((o) => Number(o.post_id) === p.id).map((o) => ({ id: Number(o.id), label: o.label, votes: reveal ? o.votes : null })),
     };
@@ -1032,7 +1032,7 @@ function okPoll(v) {
   const opts = (Array.isArray(v.options) ? v.options : []).map((x) => String(x ?? '').trim().slice(0, 100)).filter(Boolean);
   if (opts.length < 2 || opts.length > 200) throw new ApiErr('poll_bad', 400);
   if (new Set(opts.map((x) => x.toLowerCase())).size !== opts.length) throw new ApiErr('poll_dup', 400);
-  return { title: String(v.title ?? '').trim().slice(0, 200), opts, max: Math.min(opts.length, Math.max(1, parseInt(v.max, 10) || 1)), show_first: v.show_first !== false, ends: okEnds(v.ends_in) };
+  return { title: String(v.title ?? '').trim().slice(0, 200), opts, max: Math.min(opts.length, Math.max(1, parseInt(v.max, 10) || 1)), show_first: v.show_first !== false, allow_change: v.allow_change !== false, ends: okEnds(v.ends_in) };
 }
 function okEnds(v) {
   if (v === undefined || v === null || v === '' || v === 0) return 0;
@@ -1106,7 +1106,7 @@ route('POST', /^\/posts$/, async (c) => {
       const pid = Number(r.rows[0].id);
       if (expAt) await t.query('update audios set expires_at=$2 where id=$1', [pid, expAt]);
       if (poll) {
-        await t.query('insert into polls(post_id, title, max_pick, show_first, ends_at) values ($1,$2,$3,$4,$5)', [pid, poll.title, poll.max, poll.show_first, poll.ends]);
+        await t.query('insert into polls(post_id, title, max_pick, show_first, ends_at, allow_change) values ($1,$2,$3,$4,$5,$6)', [pid, poll.title, poll.max, poll.show_first, poll.ends, poll.allow_change]);
         for (let i = 0; i < poll.opts.length; i++) await t.query('insert into poll_opts(post_id, pos, label) values ($1,$2,$3)', [pid, i, poll.opts[i]]);
       }
       return pid;
@@ -1166,7 +1166,7 @@ route('POST', /^\/posts\/(\d+)\/vote$/, async (c, m) => {
   const u = c.need();
   await hit(`vote:${u.id}`, 60, 60);
   await openPost(m[1], c);
-  const pl = await one('select max_pick, ends_at from polls where post_id=$1', [m[1]]);
+  const pl = await one('select max_pick, ends_at, allow_change from polls where post_id=$1', [m[1]]);
   if (!pl) throw new ApiErr('not_found', 404);
   if (Number(pl.ends_at || 0) > 0 && Number(pl.ends_at) <= now()) throw new ApiErr('poll_ended', 400);
   const ids = [...new Set((Array.isArray(c.body.options) ? c.body.options : []).map(Number).filter((x) => Number.isInteger(x) && x > 0))];
@@ -1174,6 +1174,7 @@ route('POST', /^\/posts\/(\d+)\/vote$/, async (c, m) => {
   await tx(async (t) => {
     const ok = ids.length ? (await t.query('select id from poll_opts where post_id=$1 and id = any($2::bigint[])', [m[1], ids])).rows.length : 0;
     if (ok !== ids.length) throw new ApiErr('bad_request');
+    if (!pl.allow_change && (await t.query('select 1 from poll_votes where post_id=$1 and user_id=$2', [m[1], u.id])).rows.length) throw new ApiErr('poll_locked', 400);
     const old = (await t.query('delete from poll_votes where post_id=$1 and user_id=$2 returning opt_id', [m[1], u.id])).rows;
     for (const o of old) await t.query('update poll_opts set votes=greatest(0, votes-1) where id=$1', [o.opt_id]);
     for (const id of ids) { await t.query('insert into poll_votes(post_id, user_id, opt_id) values ($1,$2,$3)', [m[1], u.id, id]); await t.query('update poll_opts set votes=votes+1 where id=$1', [id]); }
@@ -1202,7 +1203,7 @@ route('GET', /^\/hups$/, async (c) => {
     * (case when (select count(*) from audios z where z.owner=a.owner and z.created > ${now() - T1}) > 2 then 0.6 else 1 end)
     * power(0.8, row_number() over (partition by a.owner order by a.created desc) - 1))`;
   const rows = await many(
-    `${AUD_SQL} where a.in_hups and not a.hidden and not a.pending and a.pin_until <= ${now()} and u.status='active' and (${audCond(f)} or (a.owner=$1 and ${HAS('public')} and '${f}'='public')) order by ${score} desc, a.id desc offset ${off} limit 21`,
+    `${AUD_SQL} where a.in_hups and not a.hidden and not a.pending and u.status='active' and (${audCond(f)} or (a.owner=$1 and ${HAS('public')} and '${f}'='public')) order by ${score} desc, a.id desc offset ${off} limit 21`,
     [vid]);
   const items = await addTo(rows.slice(0, 20).map(av), c.me);
   let pins = [];

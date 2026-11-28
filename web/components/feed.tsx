@@ -10,19 +10,21 @@ import { sheet } from './ui';
 
 /** Umpan Hups: muat awal, segarkan diam-diam tiap 6 dtk, muat lagi saat menggulir, backsound otomatis untuk post yang di tengah layar. */
 /** Ingat daftar & posisi gulir: kembali dari profil/post (tombol back) mendarat di tempat terakhir, bukan dari atas. */
+const pinCache = new Map<string, A[]>();
 const feedCache = new Map<string, { items: A[]; next: number; y: number; t: number }>();
 export function HupsFeed({ filter, base = '/hups', header }: { filter: string; base?: string; header?: React.ReactNode }) {
   const s = useStore();
   const [items, setItems] = useState<A[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null);
   const next = useRef(0), busy = useRef(false), more = useRef(false), scope = useRef({}), sc = useRef<HTMLDivElement>(null), alive = useRef(true), itemsRef = useRef<A[]>([]);
   itemsRef.current = items;
+  const ck = `${base}|${filter}|${s.me?.username ?? ''}`;
+  const [pins, setPins] = useState<A[]>(() => pinCache.get(ck) ?? []);
   const path = (extra = '') => `${base}?f=${encodeURIComponent(filter)}${extra}`;
 
   const load = useCallback(async () => {
-    try { const j = await Api.req('GET', path()); setItems([...((j.pins ?? []) as any[]), ...(j.items as any[])].map((e) => new A(e))); next.current = Number(j.next) || 0; setError(null); } catch (e) { setError(store.err(e)); }
+    try { const j = await Api.req('GET', path()); setItems((j.items as any[]).map((e) => new A(e))); setPins(((j.pins ?? []) as any[]).map((e) => new A(e))); pinCache.set(ck, ((j.pins ?? []) as any[]).map((e) => new A(e))); next.current = Number(j.next) || 0; setError(null); } catch (e) { setError(store.err(e)); }
     setLoading(false);
   }, [filter, base]);
-  const ck = `${base}|${filter}|${s.me?.username ?? ''}`;
   useEffect(() => {
     alive.current = true;
     const c = feedCache.get(ck);
@@ -40,7 +42,7 @@ export function HupsFeed({ filter, base = '/hups', header }: { filter: string; b
     if (document.visibilityState !== 'visible' || loading || busy.current || more.current) return;
     busy.current = true;
     try {
-      const j = await Api.req('GET', path()); const fresh = [...((j.pins ?? []) as any[]), ...(j.items as any[])].map((e) => new A(e)); if (!alive.current) return;
+      const j = await Api.req('GET', path()); const fresh = (j.items as any[]).map((e) => new A(e)); if (!alive.current) return; if (j.pins) { const np = (j.pins as any[]).map((e) => new A(e)); setPins(np); pinCache.set(ck, np); }
       const atTop = window.scrollY < 60;
       if (atTop) { setItems(fresh); next.current = Number(j.next) || 0; }
       else { for (const f of fresh) for (const o of itemsRef.current) if (o.id === f.id) { o.likes = f.likes; o.comments = f.comments; o.liked = f.liked; o.saved = f.saved; o.poll = f.poll; } store.poke(); }
@@ -77,11 +79,11 @@ export function HupsFeed({ filter, base = '/hups', header }: { filter: string; b
 
   if (loading) return <Loader />;
   if (error) return <Empty icon="cloud_off_rounded" text={error} action={<div style={{ width: 160 }}><PBtn onClick={() => { setLoading(true); load(); }}>{s.t('retry')}</PBtn></div>} />;
-  const pins = items.filter((a) => a.pinned);
   const openPins = () => sheet<void>((close) => <div style={{ padding: '0 4px 12px', maxHeight: '70vh', overflowY: 'auto' }}><div style={{ fontWeight: 800, fontSize: 18, padding: '2px 12px 10px' }}>{s.t('pin_title')}</div>
-    {pins.map((a) => <PostCard key={a.id} a={a} scope={scope.current} onDeleted={() => { setItems((c) => c.filter((e) => e.id !== a.id)); close(undefined as any); }} />)}</div>);
+    {pins.map((a) => <PostCard key={a.id} a={a} scope={scope.current} onDeleted={() => { setPins((c) => c.filter((e) => e.id !== a.id)); setItems((c) => c.filter((e) => e.id !== a.id)); close(undefined as any); }} />)}</div>);
   return <LogoRefresh onRefresh={load}><div ref={sc} style={{ padding: '6px 16px 110px' }}>
     <PinPill n={pins.length} onOpen={openPins} />
+    {pins.length ? <div style={{ height: 40 }} /> : null}
     {header}
     {!items.length ? <div style={{ paddingTop: 60 }}><div className="empty"><div className="ic"><HIcon k="hups" size={32} color="var(--sub)" /></div><div>{s.t('no_hups')}</div></div></div>
       : items.map((a, i) => <div key={a.id} className="rise" style={{ animationDelay: `${(i < 8 ? i : 0) * 80}ms` }}><PostCard a={a} scope={scope.current} onDeleted={() => setItems((c) => c.filter((e) => e.id !== a.id))} /></div>)}

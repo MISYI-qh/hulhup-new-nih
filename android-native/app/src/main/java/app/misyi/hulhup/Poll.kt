@@ -32,7 +32,7 @@ import kotlin.math.roundToInt
 /* ───────── waktu tersisa ───────── */
 fun leftText(ms: Long): String {
     val s = Store; val m = (ms / 60000.0).roundToInt().coerceAtLeast(1)
-    return if (m >= 1440) { val d = m / 1440; val h = ((m % 1440) / 60.0).roundToInt(); "$d ${s.t("exp_day")}" + if (h > 0 && d < 3) " $h ${s.t("exp_hour")}" else "" }
+    return if (m >= 1440) { val d = m / 1440; val h = (m % 1440) / 60; "$d ${s.t("exp_day")}" + if (h > 0 && d < 3) " $h ${s.t("exp_hour")}" else "" }
     else if (m >= 60) { val h = m / 60; val mm = m % 60; "$h ${s.t("exp_hour")}" + if (mm > 0) " $mm ${s.t("exp_min")}" else "" }
     else "$m ${s.t("exp_min")}"
 }
@@ -126,17 +126,24 @@ fun leftText(ms: Long): String {
                 }
             }
         }
-        Row(Modifier.padding(top = 12.dp, start = 2.dp).fillMaxWidth().heightIn(min = 30.dp), verticalAlignment = Alignment.CenterVertically) {
-            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                if (!reveal) { Icon(Icons.Rounded.Lock, null, Modifier.size(13.dp), tint = sub()); Spacer(Modifier.width(4.dp)); HText(s.t("poll_hidden"), 12.5f, FontWeight.SemiBold, sub()) }
-                else HText(if (total > 0) s.t("poll_total").replace("{n}", s.fmt(total)) else s.t("poll_none"), 12.5f, FontWeight.SemiBold, sub())
+        Column(Modifier.padding(top = 12.dp, start = 2.dp).fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                    if (!reveal) { Icon(Icons.Rounded.Lock, null, Modifier.size(13.dp), tint = sub()); Spacer(Modifier.width(4.dp)); HText(s.t("poll_hidden"), 12.5f, FontWeight.SemiBold, sub(), maxLines = 2) }
+                    else HText(if (total > 0) s.t("poll_total").replace("{n}", s.fmt(total)) else s.t("poll_none"), 12.5f, FontWeight.SemiBold, sub(), maxLines = 1)
+                }
+                Spacer(Modifier.width(8.dp))
+                if (ended) HText(s.t("poll_ended"), 12.5f, FontWeight.ExtraBold, sub(), maxLines = 1)
+                else if (p.optLong("ends_at") > 0) HText(s.t("poll_left").replace("{t}", leftText(p.optLong("ends_at") - System.currentTimeMillis())), 12.5f, FontWeight.ExtraBold, sub(), maxLines = 1)
             }
-            if (ended) HText(s.t("poll_ended"), 12.5f, FontWeight.ExtraBold, sub(), Modifier.padding(end = 8.dp))
-            else if (p.optLong("ends_at") > 0) HText(s.t("poll_left").replace("{t}", leftText(p.optLong("ends_at") - System.currentTimeMillis())), 12.5f, FontWeight.ExtraBold, sub(), Modifier.padding(end = 8.dp))
-            if (showRes && voted && !ended) Tap(onTap = { sel = mine.toSet(); editing = true }) { HText(s.t("poll_change"), 13f, FontWeight.ExtraBold, modifier = Modifier.padding(6.dp, 6.dp)) }
-            if (editing) Tap(onTap = { editing = false }) { HText(s.t("cancel"), 13f, FontWeight.ExtraBold, sub(), Modifier.padding(6.dp, 6.dp)) }
-            if (!showRes && (multi || editing)) Tap(onTap = if (!busy && sel.isNotEmpty()) ({ sc.launch { send(sel.toList()) } }) else null) {
-                Box(Modifier.background(ink().copy(alpha = if (sel.isEmpty() || busy) .4f else 1f), RoundedCornerShape(16.dp)).padding(16.dp, 8.dp)) { HText(if (busy) "…" else s.t("poll_submit"), 13f, FontWeight.ExtraBold, bgOf()) }
+            val canChange = showRes && voted && !ended && p.optBoolean("allow_change", true)
+            val canSend = !showRes && (multi || editing)
+            if (canChange || editing || canSend) Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                if (canChange) Tap(onTap = { sel = mine.toSet(); editing = true }) { HText(s.t("poll_change"), 13f, FontWeight.ExtraBold, modifier = Modifier.padding(6.dp, 6.dp), maxLines = 1) }
+                if (editing) Tap(onTap = { editing = false }) { HText(s.t("cancel"), 13f, FontWeight.ExtraBold, sub(), Modifier.padding(6.dp, 6.dp), maxLines = 1) }
+                if (canSend) Tap(onTap = if (!busy && sel.isNotEmpty()) ({ sc.launch { send(sel.toList()) } }) else null) {
+                    Box(Modifier.background(ink().copy(alpha = if (sel.isEmpty() || busy) .4f else 1f), RoundedCornerShape(16.dp)).padding(16.dp, 8.dp)) { HText(if (busy) "…" else s.t("poll_submit"), 13f, FontWeight.ExtraBold, bgOf(), maxLines = 1) }
+                }
             }
         }
     }
@@ -144,10 +151,10 @@ fun leftText(ms: Long): String {
 
 /* ───────── penyusun voting ───────── */
 class PollDraft {
-    val ends = ExpDraft(); var title by mutableStateOf(""); val opts = mutableStateListOf("", ""); var max by mutableIntStateOf(1); var showFirst by mutableStateOf(true)
+    val ends = ExpDraft(); var allowChange by mutableStateOf(true); var title by mutableStateOf(""); val opts = mutableStateListOf("", ""); var max by mutableIntStateOf(1); var showFirst by mutableStateOf(true)
     fun filled() = opts.map { it.trim() }.filter { it.isNotEmpty() }
     fun bad(): Boolean { val f = filled(); return f.size < 2 || f.map { it.lowercase() }.toSet().size != f.size }
-    fun json(): JSONObject = JSONObject().put("title", title.trim()).put("options", JSONArray(filled())).put("max", max.coerceAtMost(filled().size.coerceAtLeast(1))).put("show_first", showFirst).also { if (ends.ms() > 0) it.put("ends_in", ends.ms()) }
+    fun json(): JSONObject = JSONObject().put("title", title.trim()).put("options", JSONArray(filled())).put("max", max.coerceAtMost(filled().size.coerceAtLeast(1))).put("show_first", showFirst).put("allow_change", allowChange).also { if (ends.ms() > 0) it.put("ends_in", ends.ms()) }
 }
 
 @Composable private fun XField(v: String, on: (String) -> Unit, ph: String, modifier: Modifier = Modifier, bold: Boolean = false, kb: KeyboardType = KeyboardType.Text, max: Int = 100) {
@@ -188,6 +195,10 @@ class PollDraft {
         Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) { HText(s.t("poll_show_l"), 15f, FontWeight.Bold); HText(s.t("poll_show_d"), 12.5f, color = sub()) }
             Toggle(d.showFirst) { d.showFirst = it }
+        }
+        Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) { HText(s.t("poll_chg_l"), 15f, FontWeight.Bold); HText(s.t("poll_chg_d"), 12.5f, color = sub()) }
+            Toggle(d.allowChange) { d.allowChange = it }
         }
         HText(s.t("poll_end"), 15f, FontWeight.Bold, modifier = Modifier.padding(top = 14.dp, bottom = 8.dp))
         SegRow(listOf("0" to s.t("poll_end_none"), "1" to s.t("poll_end_set")), if (d.ends.custom) "1" else "0") { d.ends.custom = it == "1" }

@@ -33,7 +33,7 @@ export class U {
 }
 export type File = { url: string; secs: number };
 export type PollOpt = { id: number; label: string; votes: number | null };
-export type Poll = { ended?: boolean; ends_at?: number; title: string; max: number; show_first: boolean; voted: boolean; mine: number[]; reveal: boolean; total: number | null; options: PollOpt[] };
+export type Poll = { allow_change?: boolean; ended?: boolean; ends_at?: number; title: string; max: number; show_first: boolean; voted: boolean; mine: number[]; reveal: boolean; total: number | null; options: PollOpt[] };
 export class A {
   id: number; secs: number; created: number; comments: number; desc: string; url: string; vis: string; rand: string; owner: string; ownerName: string; to: string[];
   ownerAvatar: string | null; popup: boolean; pprof: boolean; ownerVerified: boolean; long: boolean; inRand: boolean; inHups: boolean; bgm: boolean; ai: boolean; ownerAvatarAi: boolean;

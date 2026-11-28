@@ -245,7 +245,7 @@ export function ComposeScreen() {
     if (audSplit(rand).includes('accounts') && !Object.keys(picked).length) { toast(s.t('e_need_accounts'), { bad: true }); return; }
     lock.current = true; setBusy(true); let id: number | null = null;
     try {
-      const pl = poll ? { title: poll.title.trim(), options: poll.opts.map((x) => x.trim()).filter(Boolean), max: poll.max, show_first: poll.showFirst, ...(expMs(poll.ends) ? { ends_in: expMs(poll.ends) } : {}) } : undefined;
+      const pl = poll ? { title: poll.title.trim(), options: poll.opts.map((x) => x.trim()).filter(Boolean), max: poll.max, show_first: poll.showFirst, allow_change: poll.allowChange, ...(expMs(poll.ends) ? { ends_in: expMs(poll.ends) } : {}) } : undefined;
       const j = await Api.req('POST', '/posts', { text: t, audios: clip || pm ? 1 : 0, ...(clip ? { bgm } : {}), ...(pm ? { media_kind: pm.kind } : {}), media, pprof, ai_comment: aiC && aiV, ai_view: aiV, rand: audSplit(rand), to: Object.keys(picked), ...(pl ? { poll: pl } : {}), ...(em ? { expires_in: em } : {}) });
       id = Number(j.id);
       if (clip) await Api.send(`/posts/${id}/audio?secs=${clip.secs}`, clip.blob, 'application/octet-stream');
