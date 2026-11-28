@@ -53,10 +53,30 @@ export function refToId(ref) {
 }
 
 const POSTQ = `select a.id, a.descr, a.body, a.body_key, a.rand, a.created, a.likes, a.comments, a.media, a.n_audio, a.secs, a.hidden, a.pending, a.ai_view, u.username, u.name, u.status, u.pvis from audios a join users u on u.id=a.owner`;
-const card = async (r, full = false) => ({
+const card = async (r, full = false) => ({ ...(await extraOf(r.id).then((e) => (e ? { fitur: e } : {}))),
   id: Number(r.id), url: postUrl(r.id), oleh: `@${r.username}`, tanggal: day(r.created), sorot: r.likes, komentar: r.comments,
   teks: clip(full ? await bodyOf(r) : r.descr, full ? 1800 : 240), ...(Number(r.n_audio) > 0 ? { ada_audio: true } : {}), ...((r.media || []).length ? { media: (r.media || []).slice(0, 6) } : {}),
 });
+
+
+/** Ringkasan fitur sebuah post (voting, foto/video, masa aktif, pin) agar AI melihat aplikasi seperti orang normal. */
+export async function extraOf(id) {
+  const a = await one('select kind, n_audio, expires_at, pin_until from audios where id=$1', [id]).catch(() => null); if (!a) return '';
+  const out = []; const t = Date.now();
+  const left = (ms) => { const m = Math.max(1, Math.round(ms / 60000)); return m >= 1440 ? `${Math.floor(m / 1440)} hari ${Math.floor((m % 1440) / 60)} jam` : m >= 60 ? `${Math.floor(m / 60)} jam ${m % 60} menit` : `${m} menit`; };
+  const pl = await one('select title, max_pick, show_first, ends_at, allow_change from polls where post_id=$1', [id]).catch(() => null);
+  if (pl) {
+    const ended = Number(pl.ends_at) > 0 && Number(pl.ends_at) <= t;
+    const opts = await many('select label, votes from poll_opts where post_id=$1 order by pos', [id]);
+    const nv = await one('select count(distinct user_id)::int n from poll_votes where post_id=$1', [id]);
+    const show = pl.show_first || ended;
+    out.push(`[VOTING${pl.title ? ` "${clip(pl.title, 120)}"` : ''}] pilihan: ${opts.map((o) => `"${clip(o.label, 60)}"${show ? ` (${o.votes} suara)` : ''}`).join(', ')}; ${show ? `total ${nv?.n ?? 0} pemilih` : 'hasil disembunyikan pembuat sampai orang memilih (jangan bocorkan angka)'}; tiap orang maks ${pl.max_pick} pilihan; ${pl.allow_change ? 'boleh ganti pilihan' : 'tidak boleh ganti pilihan'}; ${Number(pl.ends_at) > 0 ? (ended ? 'voting sudah selesai' : `voting selesai dalam ${left(Number(pl.ends_at) - t)}`) : 'tanpa batas waktu'}`);
+  }
+  if (a.kind === 'image') out.push('[post ini berisi FOTO]'); else if (a.kind === 'video') out.push('[post ini berisi VIDEO]'); else if (Number(a.n_audio) > 0) out.push('[post ini berisi AUDIO]');
+  if (Number(a.expires_at) > t) out.push(`[post ini punya masa aktif: terhapus otomatis dalam ${left(Number(a.expires_at) - t)}]`);
+  if (Number(a.pin_until) > t) out.push(`[post ini DISEMATKAN admin di Hups, sisa ${left(Number(a.pin_until) - t)}]`);
+  return out.join(' ');
+}
 
 // ---------- tools Hulhup ----------
 export async function searchHulhup({ q = '', kind = 'post', sort = 'baru' } = {}) {
@@ -88,6 +108,10 @@ export async function pantau(jenis) {
     const since = Date.now() - 36 * 3600e3;
     const rows = await many(`select c.body, c.post_id, cu.username cuser, pu.username puser from comments c join audios a on a.id=c.post_id join users cu on cu.id=c.owner join users pu on pu.id=a.owner where a.rand ~ '(^|,)public(,|$)' and not a.hidden and not a.pending and pu.status='active' and pu.pvis='public' and cu.status='active' and cu.pvis='public' and not c.pending and c.ph_state='' and c.created > $1 order by c.id desc limit 18`, [since]);
     return { hasil: rows.map((r) => ({ oleh: `@${r.cuser}`, di_post_milik: `@${r.puser}`, url: postUrl(r.post_id), komentar: clip(r.body, 200) })) };
+  }
+  if (j === 'disematkan') {
+    const rows = await many(`${POSTQ} where ${PUB} and a.pin_until > ${Date.now()} order by a.pin_at desc limit 5`);
+    return rows.length ? { hasil: await Promise.all(rows.map((r) => card(r, true))) } : { hasil: [], catatan: 'tidak ada post yang sedang disematkan admin' };
   }
   const rows = await many(`${POSTQ} where ${PUB} and a.created > ${Date.now() - 3 * 86400e3} order by (a.likes + a.comments * 2) desc, a.id desc limit 8`);
   return { hasil: await Promise.all(rows.map((r) => card(r))) };
@@ -244,8 +268,8 @@ export async function viewAvatar(username, askerId = 0) {
 export const TOOL_DECLS = [
   { name: 'search_hulhup', description: 'Cari post atau akun di Hulhup (hanya yang publik). Pakai kalau pengguna minta cari/lihat post, akun, atau topik di Hulhup, atau butuh contoh/bahan dari Hulhup. sort=top untuk yang paling banyak disorot minggu ini.',
     parameters: { type: 'OBJECT', properties: { q: { type: 'STRING', description: 'kata kunci (boleh kosong untuk terbaru/top)' }, kind: { type: 'STRING', enum: ['post', 'akun'] }, sort: { type: 'STRING', enum: ['baru', 'top'] } } } },
-  { name: 'pantau_hulhup', description: 'Akses baca-saja ke data publik Hulhup. jenis: pengikut_terbanyak (akun dengan pengikut terbanyak), post_ramai (post publik paling ramai 3 hari terakhir), komentar_baru (komentar publik 36 jam terakhir, termasuk yang lagi ribut), akun_baru. Pakai untuk pertanyaan peringkat/statistik/lagi viral apa di Hulhup.',
-    parameters: { type: 'OBJECT', properties: { jenis: { type: 'STRING', enum: ['pengikut_terbanyak', 'post_ramai', 'komentar_baru', 'akun_baru'] } }, required: ['jenis'] } },
+  { name: 'pantau_hulhup', description: 'Akses baca-saja ke data publik Hulhup. jenis: pengikut_terbanyak (akun dengan pengikut terbanyak), post_ramai (post publik paling ramai 3 hari terakhir), komentar_baru (komentar publik 36 jam terakhir, termasuk yang lagi ribut), akun_baru, disematkan (post yang sedang disematkan admin di Hups). Pakai untuk pertanyaan peringkat/statistik/lagi viral apa di Hulhup.',
+    parameters: { type: 'OBJECT', properties: { jenis: { type: 'STRING', enum: ['pengikut_terbanyak', 'post_ramai', 'komentar_baru', 'akun_baru', 'disematkan'] } }, required: ['jenis'] } },
   { name: 'get_post', description: 'Baca satu post Hulhup lengkap beserta komentarnya. ref = id, kode 7 huruf, atau URL hulhup.my.id/p/...', parameters: { type: 'OBJECT', properties: { ref: { type: 'STRING' } }, required: ['ref'] } },
   { name: 'get_account', description: 'Lihat profil akun Hulhup publik dan post publik terbarunya.', parameters: { type: 'OBJECT', properties: { username: { type: 'STRING' } }, required: ['username'] } },
   { name: 'view_avatar', description: 'Lihat foto profil (avatar) sebuah akun Hulhup: akun publik mana pun, penanya sendiri, atau kamu sendiri (username phipop).', parameters: { type: 'OBJECT', properties: { username: { type: 'STRING' } }, required: ['username'] } },
